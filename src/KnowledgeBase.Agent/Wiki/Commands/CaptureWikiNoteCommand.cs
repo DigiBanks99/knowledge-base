@@ -4,19 +4,19 @@ using Microsoft.Extensions.Options;
 
 namespace KnowledgeBase.Agent.Wiki.Commands;
 
-public record CreateWikiSourceCommand(string Name, string Content);
+public record CaptureWikiNoteCommand(string Name, string Content);
 
-internal sealed class CreateWikiSourceCommandHandler(
+internal sealed class CaptureWikiNoteCommandHandler(
     CreateFileHandler fileHandler,
     IOptions<WikiConfigurationSettings> options)
 {
     private readonly WikiConfigurationSettings _settings = options.Value;
 
     public async Task<Result<string, Error>> Handle(
-        CreateWikiSourceCommand command,
+        CaptureWikiNoteCommand command,
         CancellationToken cancellationToken)
     {
-        string filePath = Path.Combine(_settings.RootDirectory, command.Name);
+        string filePath = Path.Combine(_settings.NewNotesDirectory, command.Name);
         CreateFileRequest createFileRequest = new(filePath, command.Content, "text/markdown");
         return await fileHandler.Handle(createFileRequest, cancellationToken);
     }

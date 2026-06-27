@@ -7,7 +7,9 @@ public record CreateFileRequest(
     string Content,
     string MimeType);
 
-internal class CreateFileHandler(ILogger<CreateFileHandler> logger)
+internal sealed class CreateFileHandler(
+    ILogger<CreateFileHandler> logger,
+    CreateDirectoryHandler directoryHandler)
 {
     public async Task<Result<string, Error>> Handle(
         CreateFileRequest request,
@@ -35,18 +37,11 @@ internal class CreateFileHandler(ILogger<CreateFileHandler> logger)
         };
 
         string filePath = Path.ChangeExtension(request.Name, extension);
-        DirectoryInfo directory = new(Path.GetDirectoryName(filePath) ?? string.Empty);
-        if (!directory.Exists)
+        CreateDirectory createDirectory = CreateDirectory.Create(Path.GetDirectoryName(filePath)!);
+        Result<string, Error> directoryResult = directoryHandler.Handle(createDirectory);
+        if (directoryResult.IsFailure)
         {
-            try
-            {
-                directory.Create();
-            }
-            catch (IOException ex)
-            {
-                logger.FailedToCreateDirectory(directory.FullName, ex);
-                return DirectoryCreateError.Create(directory);
-            }
+            return directoryResult.Error;
         }
 
         try

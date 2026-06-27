@@ -1,7 +1,7 @@
 using KnowledgeBase.Agent.Wiki;
 using KnowledgeBase.Agent.Wiki.Commands;
 
-namespace KnowledgeBase.Agent.Source.Endpoints;
+namespace KnowledgeBase.Agent.Notes.Endpoints;
 
 public record CaptureNoteRequest(string Content);
 
@@ -9,7 +9,7 @@ internal static class CaptureNote
 {
     extension(IEndpointRouteBuilder endpoints)
     {
-        public IEndpointRouteBuilder MapCaptureNoteEndpoint()
+        public IEndpointRouteBuilder MapCaptureNote()
         {
             endpoints
                 .MapPost("note", Handle)
@@ -28,11 +28,11 @@ internal static class CaptureNote
     private static async Task<Microsoft.AspNetCore.Http.IResult> Handle(
         CaptureNoteRequest request,
         TimeProvider timeProvider,
-        CreateWikiSourceCommandHandler handler)
+        CaptureWikiNoteCommandHandler handler)
     {
         string name = $"note-{timeProvider.GetUtcNow():yyyy-MM-dd-HHmmss}";
 
-        CreateWikiSourceCommand createWikiSourceCommand = new(name, request.Content);
+        CaptureWikiNoteCommand createWikiSourceCommand = new(name, request.Content);
         return await handler
             .Handle(createWikiSourceCommand, CancellationToken.None)
             .Match(

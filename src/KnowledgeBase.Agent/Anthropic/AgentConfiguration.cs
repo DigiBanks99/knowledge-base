@@ -20,7 +20,7 @@ internal static class AgentConfiguration
             IConfiguration config = builder.Configuration.GetSection(agentName);
             AnthropicOptions options = config.Get<AnthropicOptions>()
                 ?? throw new InvalidOperationException($"Failed to bind Anthropic options for agent {agentName}. Please ensure the configuration is correct.");
-            
+
             AnthropicClient client = new()
             {
                 ApiKey = options.ApiKey,

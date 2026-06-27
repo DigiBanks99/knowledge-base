@@ -1,6 +1,6 @@
 ﻿using KnowledgeBase.Agent.Anthropic;
 using KnowledgeBase.Agent.Health;
-using KnowledgeBase.Agent.Source;
+using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Telemetry;
 using KnowledgeBase.Agent.Wiki;
 
@@ -31,7 +31,7 @@ WebApplication app = builder.Build();
 app.UseExceptionHandler();
 
 app
-    .MapSourceEndpoints()
+    .MapNotesEndpoints()
     .MapHealthEndpoints();
 
 app.MapOpenApi();
