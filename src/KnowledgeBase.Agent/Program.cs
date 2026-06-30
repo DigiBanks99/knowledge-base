@@ -1,17 +1,20 @@
-﻿using KnowledgeBase.Agent.Anthropic;
+﻿using KnowledgeBase.Agent;
+using KnowledgeBase.Agent.Anthropic;
 using KnowledgeBase.Agent.Health;
-using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Telemetry;
 using KnowledgeBase.Agent.Wiki;
+using KnowledgeBase.Agent.Wiki.Tools;
 
 using Scalar.AspNetCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder
-    .ConfigureAgent("ContentProcessor")
-    .ConfigureAgent("ThreadWeaver")
-    .ConfigureAgent("Consolidator");
+    .ConfigureAgent(KnownAgents.FactFinder)
+        .WithTools(toolsBuilder => toolsBuilder.WithFactTools())
+    .ConfigureAgent(KnownAgents.ThreadWeaver)
+        .WithTools(toolsBuilder => toolsBuilder.WithFactTools())
+    .ConfigureAgent(KnownAgents.Consolidator);
 
 builder
     .AddRedisClientBuilder("cache")
@@ -30,15 +33,12 @@ WebApplication app = builder.Build();
 
 app.UseExceptionHandler();
 
-app
-    .MapNotesEndpoints()
-    .MapHealthEndpoints();
+app.UseWiki();
 
 app.MapOpenApi();
 app.MapScalarApiReference();
 
-app.UseOutputCache();
-
-app.UseFileServer();
+app.UseOutputCache()
+    .UseFileServer();
 
 await app.RunAsync();

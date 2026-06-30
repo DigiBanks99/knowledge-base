@@ -2,18 +2,18 @@ using KnowledgeBase.Agent.Wiki.Errors;
 
 namespace KnowledgeBase.Agent.Wiki.Files;
 
-public record CreateDirectory(DirectoryInfo DirectoryInfo)
+public record CreateDirectoryRequest(DirectoryInfo DirectoryInfo)
 {
-    public static CreateDirectory Create(string parentDirectory, string directoryName) =>
+    public static CreateDirectoryRequest Create(string parentDirectory, string directoryName) =>
         new(new DirectoryInfo(Path.Combine(parentDirectory, directoryName)));
 
-    public static CreateDirectory Create(string directoryPath) =>
+    public static CreateDirectoryRequest Create(string directoryPath) =>
         new(new DirectoryInfo(directoryPath));
 }
 
 internal sealed class CreateDirectoryHandler(ILogger<CreateDirectoryHandler> logger)
 {
-    public Result<string, Error> Handle(CreateDirectory request)
+    public Result<string, Error> Handle(CreateDirectoryRequest request)
     {
         if (request.DirectoryInfo.Exists)
         {

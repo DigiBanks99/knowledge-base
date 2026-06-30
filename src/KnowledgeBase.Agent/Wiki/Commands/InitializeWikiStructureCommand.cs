@@ -17,16 +17,16 @@ internal sealed class InitializeWikiStructureCommandHandler(
     {
         logger.InitializingWikiStructure();
 
-        CreateDirectory[] directories =
+        CreateDirectoryRequest[] directories =
         [
-            CreateDirectory.Create(settings.NotesDirectory),
-            CreateDirectory.Create(settings.NewNotesDirectory),
-            CreateDirectory.Create(settings.ProcessingNotesDirectory),
-            CreateDirectory.Create(settings.ProcessedNotesDirectory),
-            CreateDirectory.Create(settings.FactsDirectory),
-            CreateDirectory.Create(settings.ThreadsDirectory),
-            CreateDirectory.Create(settings.LogsDirectory),
-            CreateDirectory.Create(settings.WikiDirectory)
+            CreateDirectoryRequest.Create(settings.NotesDirectory),
+            CreateDirectoryRequest.Create(settings.NewNotesDirectory),
+            CreateDirectoryRequest.Create(settings.ProcessingNotesDirectory),
+            CreateDirectoryRequest.Create(settings.ProcessedNotesDirectory),
+            CreateDirectoryRequest.Create(settings.FactsDirectory),
+            CreateDirectoryRequest.Create(settings.ThreadsDirectory),
+            CreateDirectoryRequest.Create(settings.LogsDirectory),
+            CreateDirectoryRequest.Create(settings.WikiDirectory)
         ];
 
         return Result

@@ -7,9 +7,10 @@ internal static class FileDependencyInjection
         public WebApplicationBuilder AddFileOperations()
         {
             builder.Services
-                .AddSingleton<CreateFileHandler>()
                 .AddSingleton<CreateDirectoryHandler>()
+                .AddSingleton<CreateFileHandler>()
                 .AddSingleton<ListFilesHandler>()
+                .AddSingleton<MoveFileHandler>()
                 .AddSingleton<ReadFileHandler>();
             return builder;
         }

@@ -37,7 +37,7 @@ internal sealed class CreateFileHandler(
         };
 
         string filePath = Path.ChangeExtension(request.Name, extension);
-        CreateDirectory createDirectory = CreateDirectory.Create(Path.GetDirectoryName(filePath)!);
+        CreateDirectoryRequest createDirectory = CreateDirectoryRequest.Create(Path.GetDirectoryName(filePath)!);
         Result<string, Error> directoryResult = directoryHandler.Handle(createDirectory);
         if (directoryResult.IsFailure)
         {

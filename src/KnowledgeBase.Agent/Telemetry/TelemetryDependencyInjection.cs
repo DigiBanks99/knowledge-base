@@ -26,23 +26,19 @@ internal static class TelemetryDependencyInjection
             });
 
             builder.Services.AddOpenTelemetry()
-                .WithMetrics(metrics =>
-                {
-                    metrics.AddAspNetCoreInstrumentation()
-                        .AddHttpClientInstrumentation()
-                        .AddRuntimeInstrumentation();
-                })
-                .WithTracing(tracing =>
-                {
-                    tracing.AddSource(builder.Environment.ApplicationName)
-                        .AddAspNetCoreInstrumentation(tracing =>
-                            // Exclude health check requests from tracing
-                            tracing.Filter = context =>
-                                !context.Request.Path.StartsWithSegments(HealthEndpoints.HealthEndpointPath)
-                                && !context.Request.Path.StartsWithSegments(HealthEndpoints.AlivenessEndpointPath)
-                        )
-                        .AddHttpClientInstrumentation();
-                });
+                .WithMetrics(metrics => metrics
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddRuntimeInstrumentation())
+                .WithTracing(tracing => tracing
+                    .AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(tracing =>
+                        // Exclude health check requests from tracing
+                        tracing.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpoints.HealthEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(HealthEndpoints.AlivenessEndpointPath)
+                    )
+                    .AddHttpClientInstrumentation());
 
             builder.AddOpenTelemetryExporters();
 

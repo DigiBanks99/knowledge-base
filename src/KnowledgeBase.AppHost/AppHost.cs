@@ -4,10 +4,10 @@ IResourceBuilder<ParameterResource> rootDirectory = builder
     .AddParameter("WikiRootDirectory");
 IResourceBuilder<ParameterResource> apiKey = builder
     .AddParameter("AnthropicApiKey", true);
-IResourceBuilder<ParameterResource> contentProcessorModel = builder
+IResourceBuilder<ParameterResource> FactFinderModel = builder
     .AddParameter("AnthropicModel");
-IResourceBuilder<ParameterResource> contentProcessorInstructions = builder
-    .AddParameter("ContentProcessorInstructions");
+IResourceBuilder<ParameterResource> FactFinderInstructions = builder
+    .AddParameter("FactFinderInstructions");
 IResourceBuilder<ParameterResource> threadWeaverModel = builder
     .AddParameter("ThreadWeaverModel");
 IResourceBuilder<ParameterResource> threadWeaverInstructions = builder
@@ -24,9 +24,9 @@ IResourceBuilder<ProjectResource> knowledgeBase = builder
     .WithReference(cache)
     .WaitFor(cache)
     .WithEnvironment("Wiki__RootDirectory", rootDirectory)
-    .WithEnvironment("ContentProcessor__ApiKey", apiKey)
-    .WithEnvironment("ContentProcessor__Model", contentProcessorModel)
-    .WithEnvironment("ContentProcessor__Instructions", contentProcessorInstructions)
+    .WithEnvironment("FactFinder__ApiKey", apiKey)
+    .WithEnvironment("FactFinder__Model", FactFinderModel)
+    .WithEnvironment("FactFinder__Instructions", FactFinderInstructions)
     .WithEnvironment("ThreadWeaver__ApiKey", apiKey)
     .WithEnvironment("ThreadWeaver__Model", threadWeaverModel)
     .WithEnvironment("ThreadWeaver__Instructions", threadWeaverInstructions)

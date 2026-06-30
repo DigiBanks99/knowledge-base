@@ -1,6 +1,10 @@
+using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Notes;
+using KnowledgeBase.Agent.Watchers;
 using KnowledgeBase.Agent.Wiki.Commands;
 using KnowledgeBase.Agent.Wiki.Files;
 using KnowledgeBase.Agent.Wiki.Queries;
+using KnowledgeBase.Agent.Wiki.Tools;
 
 namespace KnowledgeBase.Agent.Wiki;
 
@@ -11,10 +15,12 @@ internal static class WikiDependencyInjection
         public WebApplicationBuilder AddWiki()
         {
             builder
+                .AddJobs()
                 .AddFileOperations()
                 .AddSettings()
-                .AddJobs()
-                .AddHandlers();
+                .AddHandlers()
+                .AddWatchers()
+                .AddTools();
 
             return builder;
         }
@@ -40,9 +46,44 @@ internal static class WikiDependencyInjection
             builder.Services
                 .AddSingleton<CaptureWikiNoteCommandHandler>()
                 .AddSingleton<InitializeWikiStructureCommandHandler>()
-                .AddSingleton<ListWikiNotesQueryHandler>();
+                .AddSingleton<ListWikiNotesQueryHandler>()
+                .AddSingleton<StartNoteProcessingCommandHandler>();
 
             return builder;
+        }
+
+        private WebApplicationBuilder AddWatchers()
+        {
+            builder.Services.AddSingleton<NoteWatcher>();
+
+            return builder;
+        }
+
+        private WebApplicationBuilder AddTools()
+        {
+            builder.Services.AddSingleton<FactTools>();
+
+            return builder;
+        }
+    }
+
+    extension(WebApplication app)
+    {
+        public WebApplication UseWiki()
+        {
+            app.Services
+                .GetRequiredService<InitializeWikiStructureCommandHandler>()
+                .Handle(new InitializeWikiStructureCommand());
+
+            app.Services
+                .GetRequiredService<NoteWatcher>()
+                .Register();
+
+            app
+                .MapNotesEndpoints()
+                .MapHealthEndpoints();
+
+            return app;
         }
     }
 }
