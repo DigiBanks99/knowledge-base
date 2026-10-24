@@ -483,3 +483,9 @@ $RECYCLE.BIN/
 
 # Local dev artifacts
 local/
+
+# Personal agent definitions (contain private wiki rules)
+.github/agents/
+
+# Windows device name written as a file by tools that redirect to NUL from a POSIX shell
+NUL
