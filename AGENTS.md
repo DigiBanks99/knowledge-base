@@ -1,7 +1,8 @@
 # AGENTS.md
 
 Guidance for coding agents working in this repository. See [README.md](README.md) for what the app does and how to
-configure it.
+configure it, and [docs/ubiquitous-language.md](docs/ubiquitous-language.md) for the domain terms to use in code,
+prompts and the UI.
 
 ## Layout
 

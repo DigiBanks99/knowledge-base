@@ -32,6 +32,9 @@ Each agent's system prompt is built in layers: the shared pipeline description
 shared instructions and wiki rules, then the agent's role. The personal layers live in a private repository mounted as
 the `config` submodule (see [Instructions](#instructions)), so nothing about you lives in this repository.
 
+The terms used throughout (note, fact, subject, finding, run, ...) are defined in the
+[ubiquitous language](docs/ubiquitous-language.md).
+
 ## Projects
 
 | Path                         | What it is                                                                         |
