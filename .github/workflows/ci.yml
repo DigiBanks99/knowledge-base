@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: the jobs only read the repository.
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the run it replaces; runs on main always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Actions are pinned to full commit SHAs (tag in the trailing comment) so a moved or compromised tag cannot change
+# what runs.
+jobs:
+  api:
+    name: API and AppHost (.NET)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      # Locked mode fails if a lock file is out of date. NuGet audit runs during restore, and with warnings treated
+      # as errors, any package with a known vulnerability fails the build here.
+      - name: Restore
+        run: dotnet restore KnowledgeBase.slnx --locked-mode
+
+      - name: Check formatting
+        run: dotnet format KnowledgeBase.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build KnowledgeBase.slnx --no-restore --configuration Release
+
+  web:
+    name: UI (React)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/KnowledgeBase.Web
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/KnowledgeBase.Web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      # Type-checks (tsc -b) and builds the production bundle.
+      - name: Build
+        run: npm run build
