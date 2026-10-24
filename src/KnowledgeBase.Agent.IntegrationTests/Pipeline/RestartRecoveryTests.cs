@@ -29,6 +29,7 @@ public sealed class RestartRecoveryTests : IAsyncDisposable
         _wiki.Start();
         bool settled = await Eventually.Until(() =>
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1);
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
 
         ItShouldReadTheNoteAgain();
         ItShouldFinishProcessingIt();
@@ -37,7 +38,7 @@ public sealed class RestartRecoveryTests : IAsyncDisposable
 
         void ItShouldFinishProcessingIt()
         {
-            settled.ShouldBeTrue();
+            settled.ShouldBeTrue(pipeline);
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).ShouldBe([NoteName]);
         }
     }
@@ -56,6 +57,7 @@ public sealed class RestartRecoveryTests : IAsyncDisposable
         bool settled = await Eventually.Until(() =>
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1
             && TestWiki.FileNames(_wiki.Settings.ProcessedFactsDirectory).Count == 1);
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
 
         ItShouldNotReadTheNoteAgain();
         ItShouldWeaveTheWaitingFacts();
@@ -67,7 +69,7 @@ public sealed class RestartRecoveryTests : IAsyncDisposable
 
         void ItShouldCompleteTheNote()
         {
-            settled.ShouldBeTrue();
+            settled.ShouldBeTrue(pipeline);
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).ShouldBe([NoteName]);
         }
     }

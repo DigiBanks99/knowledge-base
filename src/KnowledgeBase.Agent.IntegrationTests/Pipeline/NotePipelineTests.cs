@@ -27,6 +27,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
         await CaptureAsync(NoteName, NoteContent);
         bool settled = await Eventually.Until(async () =>
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
         IReadOnlyList<AgentRun> runs = await _wiki.RunsAsync();
 
         ItShouldFinish();
@@ -36,7 +37,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
         ItShouldGiveTheFactsAndTheirNoteToTheThreadWeaver();
         ItShouldRecordBothRuns();
 
-        void ItShouldFinish() => settled.ShouldBeTrue();
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
 
         void ItShouldFileTheNoteAsProcessed()
         {
@@ -84,12 +85,13 @@ public sealed class NotePipelineTests : IAsyncDisposable
         await CaptureAsync(NoteName, NoteContent);
         bool settled = await Eventually.Until(async () =>
             TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(1));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
 
         ItShouldFinish();
         ItShouldParkTheNoteAsFailed();
         ItShouldNotWeaveAnything();
 
-        void ItShouldFinish() => settled.ShouldBeTrue();
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
 
         void ItShouldParkTheNoteAsFailed()
         {
@@ -113,13 +115,14 @@ public sealed class NotePipelineTests : IAsyncDisposable
         await CaptureAsync(NoteName, NoteContent);
         bool settled = await Eventually.Until(async () =>
             TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(1));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
         IReadOnlyList<AgentRun> runs = await _wiki.RunsAsync();
 
         ItShouldFinish();
         ItShouldParkTheNoteAsFailed();
         ItShouldRecordWhyTheRunFailed();
 
-        void ItShouldFinish() => settled.ShouldBeTrue();
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
 
         void ItShouldParkTheNoteAsFailed() =>
             TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).ShouldBe([NoteName]);
@@ -140,6 +143,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
         await CaptureAsync(NoteName, NoteContent);
         bool settled = await Eventually.Until(async () =>
             TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
         IReadOnlyList<AgentRun> runs = await _wiki.RunsAsync();
 
         ItShouldFinish();
@@ -147,7 +151,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
         ItShouldParkTheNoteAsFailed();
         ItShouldRecordTheFailedRun();
 
-        void ItShouldFinish() => settled.ShouldBeTrue();
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
 
         void ItShouldParkTheFactsAsFailed()
         {
@@ -196,6 +200,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
         bool settled = await Eventually.Until(
             () => TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 2,
             TimeSpan.FromSeconds(30));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
 
         ItShouldStartWithOneNote();
         ItShouldProcessOneNoteAtATime();
@@ -207,7 +212,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
 
         void ItShouldProcessBothNotes()
         {
-            settled.ShouldBeTrue();
+            settled.ShouldBeTrue(pipeline);
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).ShouldBe([NoteName, secondNote]);
         }
     }
