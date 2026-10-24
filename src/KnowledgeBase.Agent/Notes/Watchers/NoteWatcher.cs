@@ -1,4 +1,6 @@
-﻿using KnowledgeBase.Agent.Notes.Commands;
+﻿using KnowledgeBase.Agent.Common;
+using KnowledgeBase.Agent.Files;
+using KnowledgeBase.Agent.Notes.Commands;
 using KnowledgeBase.Agent.Wiki;
 
 using Microsoft.Extensions.Options;
@@ -8,38 +10,54 @@ namespace KnowledgeBase.Agent.Notes.Watchers;
 internal sealed class NoteWatcher(
     ILogger<NoteWatcher> logger,
     IOptions<WikiConfigurationSettings> settings,
+    MoveFileHandler moveFileHandler,
     StartNoteProcessingCommandHandler startNoteProcessingCommandHandler)
     : IDisposable
 {
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
-    private FileSystemWatcher? _newNotesWatcher;
+    private DirectoryWatcher? _newNotesWatcher;
 
-    public void Dispose()
-    {
-        _newNotesWatcher?.Created -= OnNewNoteCreated;
-        _newNotesWatcher?.Dispose();
-    }
+    public void Dispose() => _newNotesWatcher?.Dispose();
 
     public void Register()
     {
-        _newNotesWatcher = new FileSystemWatcher
-        {
-            Path = _wikiConfigurationSettings.NewNotesDirectory,
-            Filter = "*.md",
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
-            IncludeSubdirectories = true,
-            EnableRaisingEvents = true
-        };
+        RequeueInterruptedNotes();
 
-        _newNotesWatcher.Created += OnNewNoteCreated;
+        _newNotesWatcher = new DirectoryWatcher(logger, _wikiConfigurationSettings.NewNotesDirectory, "*.md", OnNewNote);
+        _newNotesWatcher.Start();
     }
 
-    private async void OnNewNoteCreated(object sender, FileSystemEventArgs e)
+    private async Task OnNewNote(string notePath)
     {
-        logger.NewNoteCreated(e.FullPath);
+        logger.NewNoteCreated(notePath);
 
-        await Result.Try(() => startNoteProcessingCommandHandler
-            .Handle(new StartNoteProcessingCommand(e.FullPath), CancellationToken.None)
-            .TapError(error => logger.FailedToProcessNewNote(e.FullPath, error)));
+        await startNoteProcessingCommandHandler
+            .Handle(new StartNoteProcessingCommand(notePath), CancellationToken.None)
+            .TapError(error => logger.FailedToProcessNewNote(notePath, error));
+    }
+
+    /// <summary>
+    /// A note left in processing with no facts waiting to be woven was interrupted before its facts were written
+    /// (for example by a restart), and would block the processing slot forever. Move it back so it is processed again.
+    /// Notes whose facts are still waiting are left alone; weaving those facts completes them.
+    /// </summary>
+    private void RequeueInterruptedNotes()
+    {
+        bool hasPendingFacts = Directory
+            .EnumerateFiles(_wikiConfigurationSettings.FactsDirectory, "*.json", SearchOption.TopDirectoryOnly)
+            .Any();
+        if (hasPendingFacts)
+        {
+            return;
+        }
+
+        foreach (string notePath in Directory.EnumerateFiles(_wikiConfigurationSettings.ProcessingNotesDirectory, "*.md"))
+        {
+            logger.RequeueingInterruptedNote(notePath);
+            string newPath = Path.Combine(_wikiConfigurationSettings.NewNotesDirectory, Path.GetFileName(notePath));
+            moveFileHandler
+                .Handle(new MoveFileRequest(notePath, newPath))
+                .TapError(error => logger.FailedToProcessNewNote(notePath, error));
+        }
     }
 }

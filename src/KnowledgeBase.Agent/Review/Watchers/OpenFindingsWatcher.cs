@@ -1,3 +1,4 @@
+using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Review.Commands;
 using KnowledgeBase.Agent.Wiki;
 
@@ -20,31 +21,28 @@ internal sealed class OpenFindingsWatcher(
 
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
     private readonly SemaphoreSlim _editorGate = new(1, 1);
-    private FileSystemWatcher? _openFindingsWatcher;
+    private DirectoryWatcher? _openFindingsWatcher;
     private int _pending;
 
     public void Dispose()
     {
-        _openFindingsWatcher?.Created -= OnFindingOpened;
         _openFindingsWatcher?.Dispose();
         _editorGate.Dispose();
     }
 
     public void Register()
     {
-        _openFindingsWatcher = new FileSystemWatcher
-        {
-            Path = _wikiConfigurationSettings.ReviewOpenFindingsDirectory,
-            Filter = "*.json",
-            NotifyFilter = NotifyFilters.FileName,
-            EnableRaisingEvents = true
-        };
-        _openFindingsWatcher.Created += OnFindingOpened;
+        _openFindingsWatcher = new DirectoryWatcher(
+            logger,
+            _wikiConfigurationSettings.ReviewOpenFindingsDirectory,
+            "*.json",
+            OnFindingOpened);
+        _openFindingsWatcher.Start();
     }
 
-    private async void OnFindingOpened(object sender, FileSystemEventArgs e)
+    private async Task OnFindingOpened(string findingPath)
     {
-        logger.NewFindingOpened(e.FullPath);
+        logger.NewFindingOpened(findingPath);
         Interlocked.Exchange(ref _pending, 1);
 
         while (Volatile.Read(ref _pending) == 1 && await _editorGate.WaitAsync(0))

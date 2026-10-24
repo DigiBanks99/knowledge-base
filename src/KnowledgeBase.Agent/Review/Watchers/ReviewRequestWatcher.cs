@@ -1,4 +1,5 @@
-﻿using KnowledgeBase.Agent.Files;
+﻿using KnowledgeBase.Agent.Common;
+using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Review.Commands;
 using KnowledgeBase.Agent.Wiki;
 
@@ -10,39 +11,38 @@ internal sealed class ReviewRequestWatcher(
     ILogger<ReviewRequestWatcher> logger,
     IOptions<WikiConfigurationSettings> settings,
     ReadFileHandler readFileHandler,
+    MoveFileHandler moveFileHandler,
     ReviewWikiCommandHandler reviewWikiCommandHandler)
     : IDisposable
 {
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
-    private FileSystemWatcher? _newReviewRequestWatcher;
+    private DirectoryWatcher? _newReviewRequestWatcher;
 
-    public void Dispose()
-    {
-        _newReviewRequestWatcher?.Created -= OnNewReviewRequestCreated;
-        _newReviewRequestWatcher?.Dispose();
-    }
+    public void Dispose() => _newReviewRequestWatcher?.Dispose();
 
     public void Register()
     {
-        _newReviewRequestWatcher = new FileSystemWatcher
-        {
-            Path = _wikiConfigurationSettings.ReviewRequestDirectory,
-            Filter = "*.md",
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
-            IncludeSubdirectories = true,
-            EnableRaisingEvents = true
-        };
-        _newReviewRequestWatcher.Created += OnNewReviewRequestCreated;
+        _newReviewRequestWatcher = new DirectoryWatcher(
+            logger,
+            _wikiConfigurationSettings.ReviewRequestDirectory,
+            "*.md",
+            OnNewReviewRequest);
+        _newReviewRequestWatcher.Start();
     }
 
-    private async void OnNewReviewRequestCreated(object sender, FileSystemEventArgs e)
+    private async Task OnNewReviewRequest(string requestPath)
     {
-        logger.NewReviewRequestRead(e.FullPath);
+        logger.NewReviewRequestRead(requestPath);
 
-        await Result.Try(() => readFileHandler
-            .Handle(new ReadFileRequest(e.FullPath), CancellationToken.None)
+        string completedPath = Path.Combine(
+            _wikiConfigurationSettings.CompletedReviewRequestDirectory,
+            Path.GetFileName(requestPath));
+
+        await readFileHandler
+            .Handle(new ReadFileRequest(requestPath), CancellationToken.None)
             .Map(content => DateTimeOffset.Parse(content["Review - ".Length..]))
             .Bind(date => reviewWikiCommandHandler.Handle(new ReviewWikiCommand(date), CancellationToken.None))
-            .TapError(error => logger.FailedToReviewWiki(e.FullPath, error)));
+            .Bind(_ => moveFileHandler.Handle(new MoveFileRequest(requestPath, completedPath)))
+            .TapError(error => logger.FailedToReviewWiki(requestPath, error));
     }
 }
