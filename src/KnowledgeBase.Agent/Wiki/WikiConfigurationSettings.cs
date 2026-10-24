@@ -12,5 +12,11 @@ public class WikiConfigurationSettings
     public string FactsDirectory => Path.Combine(RootDirectory, "facts");
     public string ThreadsDirectory => Path.Combine(RootDirectory, "threads");
     public string LogsDirectory => Path.Combine(RootDirectory, "logs");
+    public string ReviewDirectory => Path.Combine(RootDirectory, "review");
+    public string ReviewRequestDirectory => Path.Combine(ReviewDirectory, "requests");
+    public string ReviewReportsDirectory => Path.Combine(ReviewDirectory, "reports");
+    public string ReviewFindingsDirectory => Path.Combine(ReviewDirectory, "findings");
+    public string ReviewOpenFindingsDirectory => Path.Combine(ReviewFindingsDirectory, "open");
+    public string ReviewClosedFindingsDirectory => Path.Combine(ReviewFindingsDirectory, "closed");
     public string WikiDirectory => Path.Combine(RootDirectory, "wiki");
 }

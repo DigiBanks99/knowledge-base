@@ -1,9 +1,12 @@
+using KnowledgeBase.Agent.Files.Errors;
+using KnowledgeBase.Agent.Notes.Commands;
 using KnowledgeBase.Agent.Wiki;
 using KnowledgeBase.Agent.Wiki.Commands;
 
 namespace KnowledgeBase.Agent.Notes.Endpoints;
 
-public record CaptureNoteRequest(string Content);
+public sealed record CaptureNoteRequest(string Content);
+public sealed record CaptureNoteRequestRecorded(string FilePath);
 
 internal static class CaptureNote
 {
@@ -16,7 +19,7 @@ internal static class CaptureNote
                 .WithName(nameof(CaptureNote))
                 .WithSummary("Capture Note")
                 .WithDescription("Capture a note and store it in the file system.")
-                .Produces<string>(StatusCodes.Status200OK)
+                .Produces<CaptureNoteRequestRecorded>(StatusCodes.Status201Created)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status409Conflict)
                 .Produces(StatusCodes.Status500InternalServerError);
@@ -36,7 +39,7 @@ internal static class CaptureNote
         return await handler
             .Handle(createWikiSourceCommand, CancellationToken.None)
             .Match(
-                filePath => Results.Ok(new { FilePath = filePath }),
+                filePath => Results.Created(string.Empty, new CaptureNoteRequestRecorded(filePath)),
                 error => Results.Problem(error.Message, statusCode: error switch
                 {
                     ValidationError => StatusCodes.Status400BadRequest,

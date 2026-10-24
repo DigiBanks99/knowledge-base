@@ -1,6 +1,6 @@
 using KnowledgeBase.Agent.Wiki.Commands;
 
-namespace KnowledgeBase.Agent.Wiki;
+namespace KnowledgeBase.Agent.Wiki.Jobs;
 
 internal sealed class InitializeWikiStructureJob(IServiceScopeFactory serviceScopeFactory)
  : BackgroundService
@@ -12,7 +12,7 @@ internal sealed class InitializeWikiStructureJob(IServiceScopeFactory serviceSco
             .GetRequiredService<InitializeWikiStructureCommandHandler>();
 
         InitializeWikiStructureCommand command = new();
-        Result<bool, Error> result = commandHandler.Handle(command);
+        Result<bool, Error> result = await commandHandler.Handle(command, stoppingToken);
         if (result.IsFailure)
         {
             throw new ApplicationException($"Failed to initialize wiki structure: {result.Error}");

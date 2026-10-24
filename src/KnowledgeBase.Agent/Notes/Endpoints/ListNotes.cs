@@ -1,5 +1,6 @@
+using KnowledgeBase.Agent.Files.Errors;
+using KnowledgeBase.Agent.Notes.Queries;
 using KnowledgeBase.Agent.Wiki.Errors;
-using KnowledgeBase.Agent.Wiki.Queries;
 
 namespace KnowledgeBase.Agent.Notes.Endpoints;
 
@@ -14,7 +15,7 @@ internal static class ListNotes
                 .WithName(nameof(ListNotes))
                 .WithSummary("List wiki notes")
                 .WithDescription("Returns a list of all wiki notes that are to be processed")
-                .Produces<Wiki.Queries.Notes>(StatusCodes.Status200OK)
+                .Produces<Models.Notes>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status404NotFound)
                 .Produces(StatusCodes.Status500InternalServerError);
 

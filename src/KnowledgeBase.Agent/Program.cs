@@ -1,9 +1,11 @@
 ﻿using KnowledgeBase.Agent;
 using KnowledgeBase.Agent.Anthropic;
+using KnowledgeBase.Agent.Facts.Tools;
+using KnowledgeBase.Agent.Files.Tools;
 using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Review.Tools;
 using KnowledgeBase.Agent.Telemetry;
 using KnowledgeBase.Agent.Wiki;
-using KnowledgeBase.Agent.Wiki.Tools;
 
 using Scalar.AspNetCore;
 
@@ -12,9 +14,12 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder
     .ConfigureAgent(KnownAgents.FactFinder)
         .WithTools(toolsBuilder => toolsBuilder.WithFactTools())
-    .ConfigureAgent(KnownAgents.ThreadWeaver)
-        .WithTools(toolsBuilder => toolsBuilder.WithFactTools())
-    .ConfigureAgent(KnownAgents.Consolidator);
+    .ConfigureAgent(KnownAgents.ThreadWeaver, includeWikiRules: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithFileTools())
+    .ConfigureAgent(KnownAgents.Reviewer, includeWikiRules: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithReviewTools())
+    .ConfigureAgent(KnownAgents.Editor, includeWikiRules: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithEditorTools());
 
 builder
     .AddRedisClientBuilder("cache")

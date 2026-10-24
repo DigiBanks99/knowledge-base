@@ -1,9 +1,13 @@
+using KnowledgeBase.Agent.Facts;
+using KnowledgeBase.Agent.Facts.Watchers;
+using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Health;
 using KnowledgeBase.Agent.Notes;
-using KnowledgeBase.Agent.Watchers;
+using KnowledgeBase.Agent.Notes.Watchers;
+using KnowledgeBase.Agent.Review;
+using KnowledgeBase.Agent.Review.Watchers;
 using KnowledgeBase.Agent.Wiki.Commands;
-using KnowledgeBase.Agent.Wiki.Files;
-using KnowledgeBase.Agent.Wiki.Queries;
+using KnowledgeBase.Agent.Wiki.Jobs;
 using KnowledgeBase.Agent.Wiki.Tools;
 
 namespace KnowledgeBase.Agent.Wiki;
@@ -12,18 +16,15 @@ internal static class WikiDependencyInjection
 {
     extension(WebApplicationBuilder builder)
     {
-        public WebApplicationBuilder AddWiki()
-        {
-            builder
-                .AddJobs()
-                .AddFileOperations()
-                .AddSettings()
-                .AddHandlers()
-                .AddWatchers()
-                .AddTools();
-
-            return builder;
-        }
+        public WebApplicationBuilder AddWiki() => builder
+            .AddFacts()
+            .AddFileOperations()
+            .AddHandlers()
+            .AddJobs()
+            .AddNotes()
+            .AddTools()
+            .AddReview()
+            .AddSettings();
 
         private WebApplicationBuilder AddSettings()
         {
@@ -34,34 +35,12 @@ internal static class WikiDependencyInjection
             return builder;
         }
 
-        private WebApplicationBuilder AddJobs()
-        {
-            builder.Services.AddHostedService<InitializeWikiStructureJob>();
-
-            return builder;
-        }
-
         private WebApplicationBuilder AddHandlers()
         {
             builder.Services
-                .AddSingleton<CaptureWikiNoteCommandHandler>()
+                .AddSingleton<WikiLock>()
                 .AddSingleton<InitializeWikiStructureCommandHandler>()
-                .AddSingleton<ListWikiNotesQueryHandler>()
-                .AddSingleton<StartNoteProcessingCommandHandler>();
-
-            return builder;
-        }
-
-        private WebApplicationBuilder AddWatchers()
-        {
-            builder.Services.AddSingleton<NoteWatcher>();
-
-            return builder;
-        }
-
-        private WebApplicationBuilder AddTools()
-        {
-            builder.Services.AddSingleton<FactTools>();
+                .AddSingleton<RecordWikiNoteProcessedCommandHandler>();
 
             return builder;
         }
@@ -73,15 +52,30 @@ internal static class WikiDependencyInjection
         {
             app.Services
                 .GetRequiredService<InitializeWikiStructureCommandHandler>()
-                .Handle(new InitializeWikiStructureCommand());
+                .Handle(new InitializeWikiStructureCommand(), CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
 
             app.Services
                 .GetRequiredService<NoteWatcher>()
                 .Register();
 
+            app.Services
+                .GetRequiredService<FactWatcher>()
+                .Register();
+
+            app.Services
+                .GetRequiredService<ReviewRequestWatcher>()
+                .Register();
+
+            app.Services
+                .GetRequiredService<OpenFindingsWatcher>()
+                .Register();
+
             app
+                .MapHealthEndpoints()
                 .MapNotesEndpoints()
-                .MapHealthEndpoints();
+                .MapReviewEndpoints();
 
             return app;
         }
