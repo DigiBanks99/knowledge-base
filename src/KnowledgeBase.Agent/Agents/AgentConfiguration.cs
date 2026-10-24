@@ -46,6 +46,12 @@ internal static class AgentConfiguration
         {
             AgentModelOptions options = builder.Configuration.GetSection(agentName).Get<AgentModelOptions>()
                 ?? throw new InvalidOperationException($"Failed to bind model options for agent {agentName}. Please ensure the configuration is correct.");
+            if (string.IsNullOrWhiteSpace(options.Instructions))
+            {
+                throw new InvalidOperationException(
+                    $"Agent {agentName} has no instructions. Add config/{agentName}.Instructions.md, or run the AppHost's scaffold-config command (see the README).");
+            }
+
             string instructions = AgentInstructions.Compose(
                 builder.Configuration,
                 agentName,
