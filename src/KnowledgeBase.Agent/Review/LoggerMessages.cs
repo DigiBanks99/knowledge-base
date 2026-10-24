@@ -28,4 +28,7 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Warning, "Skipped the unreadable finding '{FilePath}': {Error}")]
     public static partial void SkippedUnreadableFinding(this ILogger logger, string filePath, Error error);
+
+    [LoggerMessage(LogLevel.Warning, "The review request '{FilePath}' has no readable request time; using the time it was written.")]
+    public static partial void UnreadableReviewRequestTime(this ILogger logger, string filePath);
 }
