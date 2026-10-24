@@ -12,6 +12,14 @@ internal sealed class CreateFileHandler(
     ILogger<CreateFileHandler> logger,
     CreateDirectoryHandler directoryHandler)
 {
+    private static readonly Dictionary<string, string> ExtensionsByMimeType = new()
+    {
+        ["text/plain"] = ".txt",
+        ["text/markdown"] = ".md",
+        ["text/log"] = ".log",
+        ["application/json"] = ".json"
+    };
+
     public async Task<Result<string, Error>> Handle(
         CreateFileRequest request,
         CancellationToken cancellationToken) => await ValidateRequest(request)
@@ -28,16 +36,7 @@ internal sealed class CreateFileHandler(
         CreateFileRequest request,
         CancellationToken cancellationToken)
     {
-        string extension = request.MimeType switch
-        {
-            "text/plain" => ".txt",
-            "text/markdown" => ".md",
-            "text/log" => ".log",
-            "application/json" => ".json",
-            _ => throw new ArgumentException($"Unsupported MIME type: {request.MimeType}")
-        };
-
-        string filePath = Path.ChangeExtension(request.Name, extension);
+        string filePath = Path.ChangeExtension(request.Name, ExtensionsByMimeType[request.MimeType]);
         CreateDirectoryRequest createDirectory = CreateDirectoryRequest.Create(Path.GetDirectoryName(filePath)!);
         Result<string, Error> directoryResult = directoryHandler.Handle(createDirectory);
         if (directoryResult.IsFailure)
@@ -83,6 +82,14 @@ internal sealed class CreateFileHandler(
         if (string.IsNullOrWhiteSpace(request.MimeType))
         {
             return new ValidationError("MimeTypeRequired", "The file MIME type is required.");
+        }
+
+        // Agents choose the MIME type, so the error names the supported ones for the model to correct its call.
+        if (!ExtensionsByMimeType.ContainsKey(request.MimeType))
+        {
+            return new ValidationError(
+                "MimeTypeUnsupported",
+                $"The MIME type '{request.MimeType}' is not supported. Use one of: {string.Join(", ", ExtensionsByMimeType.Keys)}.");
         }
 
         return request;
