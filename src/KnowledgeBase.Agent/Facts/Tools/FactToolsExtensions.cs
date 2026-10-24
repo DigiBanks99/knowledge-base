@@ -1,4 +1,4 @@
-﻿using KnowledgeBase.Agent.Anthropic;
+﻿using KnowledgeBase.Agent.Agents;
 
 using Microsoft.Extensions.AI;
 

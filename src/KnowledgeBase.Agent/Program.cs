@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 
 using KnowledgeBase.Agent;
-using KnowledgeBase.Agent.Anthropic;
+using KnowledgeBase.Agent.Agents;
 using KnowledgeBase.Agent.Auth;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Files.Tools;

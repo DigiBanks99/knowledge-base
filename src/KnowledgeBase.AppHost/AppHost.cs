@@ -21,6 +21,12 @@ IResourceBuilder<ParameterResource> entraClientId = builder
 IResourceBuilder<ParameterResource> entraClientSecret = builder
     .AddParameter("EntraClientSecret", secret: true);
 
+// An OpenAI-compatible server (such as llama.cpp's llama-server) for agents whose provider is OpenAICompatible.
+IResourceBuilder<ParameterResource> openAICompatibleEndpoint = builder
+    .AddParameter("OpenAICompatibleEndpoint");
+IResourceBuilder<ParameterResource> openAICompatibleApiKey = builder
+    .AddParameter("OpenAICompatibleApiKey", secret: true);
+
 IResourceBuilder<RedisResource> cache = builder
     .AddRedis("cache");
 
@@ -33,11 +39,14 @@ IResourceBuilder<ProjectResource> api = builder
     .WithEnvironment("WikiRules", wikiRules)
     .WithEnvironment("Authentication__TenantId", entraTenantId)
     .WithEnvironment("Authentication__ClientId", entraClientId)
-    .WithEnvironment("Authentication__ClientSecret", entraClientSecret);
+    .WithEnvironment("Authentication__ClientSecret", entraClientSecret)
+    .WithEnvironment("OpenAICompatible__Endpoint", openAICompatibleEndpoint)
+    .WithEnvironment("OpenAICompatible__ApiKey", openAICompatibleApiKey);
 
 foreach (string agent in agents)
 {
     api
+        .WithEnvironment($"{agent}__Provider", builder.AddParameter($"{agent}Provider"))
         .WithEnvironment($"{agent}__ApiKey", apiKey)
         .WithEnvironment($"{agent}__Model", builder.AddParameter($"{agent}Model"))
         .WithEnvironment($"{agent}__Instructions", builder.AddParameter($"{agent}Instructions"));

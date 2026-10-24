@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text;
 
-namespace KnowledgeBase.Agent.Anthropic;
+namespace KnowledgeBase.Agent.Agents;
 
 /// <summary>
 /// Composes an agent's system instructions from layers, most general first:
