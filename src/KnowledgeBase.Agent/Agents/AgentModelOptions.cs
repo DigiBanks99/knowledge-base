@@ -21,6 +21,12 @@ public sealed class AgentModelOptions
     /// </summary>
     public string Model { get; init; } = "claude-haiku-5-5";
 
+    /// <summary>
+    /// The most tokens one Anthropic response may hold. A tool call's arguments count towards it, and a call cut off
+    /// at the limit reaches the tool with arguments missing, so this is well above the client's default of 4096.
+    /// </summary>
+    public int MaxOutputTokens { get; init; } = 16384;
+
     public required string Instructions { get; init; }
 }
 
