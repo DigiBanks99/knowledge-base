@@ -10,6 +10,8 @@ configure it.
 - `src/KnowledgeBase.Agent`: the API and the agents, organised by feature folder (`Notes`, `Facts`, `Review`, `Wiki`,
   `Conversations`, `Runs`, `Files`, `Auth`, ...). `Program.cs` registers the five agents and their tools.
 - `src/KnowledgeBase.Agent.Tests`: unit tests for the API, mirroring its feature folders.
+- `src/KnowledgeBase.Agent.IntegrationTests`: the API's services and pipeline against a temporary wiki root, with
+  scripted agents.
 - `src/KnowledgeBase.Web`: React 19 + TypeScript + Vite UI. The API client is in `src/api.ts`, pages in `src/pages`.
 - `.agents/skills`: Aspire skills for agents. `.mcp.json` registers the Aspire MCP server (`aspire agent mcp`).
 
@@ -71,7 +73,12 @@ pnpm run build   # tsc -b && vite build
 - TUnit runs the tests (on Microsoft.Testing.Platform, selected in `global.json`), Shouldly asserts and NSubstitute
   fakes dependencies. Do not add TUnit's own assertions, xUnit or Moq.
 - Unit tests stay pure: no LLM calls, network or real wiki directory. Logic that needs the disk or an agent belongs
-  behind something a test can substitute, or in a separate integration test project.
+  behind something a test can substitute, or in the integration tests.
+- Integration tests never call a model either. `TestWiki` builds the API's real services (`AddWiki`) over a temporary
+  root and replaces every agent with a `FakeAgent` whose `Behaviour` a test scripts, usually calling the agent's real
+  tools through `TestWiki.CallToolAsync` so runs record tool calls as in production. `Start()` runs `UseWiki`, so
+  laying out files first and then starting simulates a restart. Assert on where files end up, and wait with
+  `Eventually.Until` rather than fixed delays.
 - One test class per class under test (`WikiPathsTests`), its subject built in the constructor. A test method names
   the scenario, never the expectation (`APathLeavesTheWiki`, not `ResolveThrowsWhenOutsideTheWiki`). It arranges and
   acts, then calls local functions named for each expectation (`ItShouldBeRefused()`), declared below the calls,
