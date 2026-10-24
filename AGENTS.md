@@ -75,7 +75,11 @@ npm run build   # tsc -b && vite build
 - Run agents through `AgentRunTracker.RunAsync` so runs and tool calls are recorded.
 - `pipeline.md` is embedded and public. Anything personal (about the author, wiki rules, agent role prompts) belongs
   in configuration, never in the repository.
-- Adding an agent means updating `KnownAgents`, `Program.cs` and the `agents` array in `AppHost.cs`.
+- Agents are created in `Agents/AgentConfiguration.cs` for the provider each one is configured with (`Anthropic` or
+  `OpenAICompatible`). Callers depend only on `AIAgent`; keep provider-specific code in that file. Local models are
+  weaker at tool calling, so tool descriptions and errors must be explicit enough to correct a bad call.
+- Adding an agent means updating `KnownAgents`, `Program.cs`, the `agents` array in `AppHost.cs` and the
+  `{Agent}Provider` default in the AppHost's `appsettings.json`.
 - `WikiSections` must stay in sync with the folders described in the wiki rules.
 
 ## UI conventions
