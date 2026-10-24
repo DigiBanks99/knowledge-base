@@ -96,7 +96,12 @@ internal static class AgentConfiguration
             ApiKey = options.ApiKey,
         };
 
-        return tools => client.AsAIAgent(options.Model, instructions, agentName, tools: tools);
+        return tools => client.AsAIAgent(
+            options.Model,
+            instructions,
+            agentName,
+            tools: tools,
+            defaultMaxTokens: options.MaxOutputTokens);
     }
 
     private static Func<AITool[], AIAgent> CreateOpenAICompatibleAgent(
