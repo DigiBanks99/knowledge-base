@@ -1,6 +1,7 @@
 # Knowledge Base
 
-[![CI](https://github.com/DigiBanks99/knowledge-base/actions/workflows/ci.yml/badge.svg)](https://github.com/DigiBanks99/knowledge-base/actions/workflows/ci.yml)
+[![CI](https://github.com/DigiBanks99/knowledge-base/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/DigiBanks99/knowledge-base/actions/workflows/ci.yml?query=branch%3Amain)
+[![CD](https://github.com/DigiBanks99/knowledge-base/actions/workflows/cd.yml/badge.svg)](https://github.com/DigiBanks99/knowledge-base/actions/workflows/cd.yml)
 
 A personal knowledge wiki that maintains itself. You capture free-form notes; a pipeline of Claude agents turns them
 into an interlinked wiki of markdown pages, keeps it tidy, and answers questions from it.
