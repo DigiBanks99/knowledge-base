@@ -12,7 +12,8 @@ internal sealed class ReviewRequestWatcher(
     IOptions<WikiConfigurationSettings> settings,
     ReadFileHandler readFileHandler,
     MoveFileHandler moveFileHandler,
-    ReviewWikiCommandHandler reviewWikiCommandHandler)
+    ReviewWikiCommandHandler reviewWikiCommandHandler,
+    TimeProvider timeProvider)
     : IDisposable
 {
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
@@ -24,6 +25,7 @@ internal sealed class ReviewRequestWatcher(
     {
         _newReviewRequestWatcher = new DirectoryWatcher(
             logger,
+            timeProvider,
             _wikiConfigurationSettings.ReviewRequestDirectory,
             "*.md",
             OnNewReviewRequest);

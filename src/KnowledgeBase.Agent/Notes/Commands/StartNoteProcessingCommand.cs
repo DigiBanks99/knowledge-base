@@ -23,7 +23,8 @@ internal sealed class StartNoteProcessingCommandHandler(
     AgentRunTracker runTracker,
     MoveFileHandler moveFileHandler,
     ReadFileHandler readFileHandler,
-    ListWikiNotesQueryHandler listNotesHandler)
+    ListWikiNotesQueryHandler listNotesHandler,
+    TimeProvider timeProvider)
 {
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
     private readonly SemaphoreSlim _slotGate = new(1, 1);
@@ -129,7 +130,7 @@ internal sealed class StartNoteProcessingCommandHandler(
                 return true;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), timeProvider, cancellationToken);
         }
 
         return true;

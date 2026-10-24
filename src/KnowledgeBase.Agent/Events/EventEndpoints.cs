@@ -19,8 +19,11 @@ internal static class EventEndpoints
         }
     }
 
-    private static Microsoft.AspNetCore.Http.IResult Handle(ChangeNotifier notifier, CancellationToken cancellationToken) =>
-        TypedResults.ServerSentEvents(Stream(notifier, cancellationToken));
+    private static Microsoft.AspNetCore.Http.IResult Handle(
+        ChangeNotifier notifier,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) =>
+        TypedResults.ServerSentEvents(Stream(notifier, timeProvider, cancellationToken));
 
     /// <summary>
     /// Proxies such as Cloudflare close connections that stay idle for around 100 seconds, so a ping is sent whenever
@@ -30,6 +33,7 @@ internal static class EventEndpoints
 
     private static async IAsyncEnumerable<SseItem<ChangeEvent>> Stream(
         ChangeNotifier notifier,
+        TimeProvider timeProvider,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await using IAsyncEnumerator<ChangeEvent> changes = notifier
@@ -38,14 +42,14 @@ internal static class EventEndpoints
         Task<bool> nextChange = changes.MoveNextAsync().AsTask();
 
         // Sent straight away so the response starts and the browser knows the stream is open.
-        yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", DateTimeOffset.UtcNow), "ping");
+        yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", timeProvider.GetUtcNow()), "ping");
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            Task completed = await Task.WhenAny(nextChange, Task.Delay(HeartbeatInterval, cancellationToken));
+            Task completed = await Task.WhenAny(nextChange, Task.Delay(HeartbeatInterval, timeProvider, cancellationToken));
             if (completed != nextChange)
             {
-                yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", DateTimeOffset.UtcNow), "ping");
+                yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", timeProvider.GetUtcNow()), "ping");
                 continue;
             }
 

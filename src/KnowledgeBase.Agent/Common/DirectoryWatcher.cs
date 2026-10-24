@@ -10,6 +10,7 @@ namespace KnowledgeBase.Agent.Common;
 /// </summary>
 internal sealed class DirectoryWatcher(
     ILogger logger,
+    TimeProvider timeProvider,
     string directory,
     string filter,
     Func<string, Task> handleFile)
@@ -117,7 +118,7 @@ internal sealed class DirectoryWatcher(
             }
             catch (IOException)
             {
-                await Task.Delay(ReadyRetryDelay);
+                await Task.Delay(ReadyRetryDelay, timeProvider);
             }
         }
 

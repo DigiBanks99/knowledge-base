@@ -47,8 +47,8 @@ public sealed class ReviewPipelineTests : IAsyncDisposable
 
         Result<string, Error> requested = await _wiki.Get<RequestReviewWikiCommandHandler>()
             .Handle(new RequestReviewWikiCommand(DateTimeOffset.Parse("2026-10-24T10:00:00Z")), CancellationToken.None);
-        // The Editor waits for findings to stop arriving before it starts, so this takes a few seconds. Waiting for the
-        // outcome rather than a number of runs lets an extra Editor run fail its own check below instead of timing out.
+        // Waiting for the outcome rather than a number of runs lets an extra Editor run fail its own check below instead
+        // of timing out.
         bool settled = await Eventually.Until(
             async () => TestWiki.FileNames(_wiki.Settings.ReviewClosedFindingsDirectory).Count == findings.Length
                 && TestWiki.FileNames(_wiki.Settings.CompletedReviewRequestDirectory).Count == 1
