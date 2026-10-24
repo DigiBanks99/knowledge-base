@@ -2,6 +2,7 @@
 
 using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Files;
+using KnowledgeBase.Agent.Files.Errors;
 using KnowledgeBase.Agent.Review.Models;
 using KnowledgeBase.Agent.Wiki;
 using KnowledgeBase.Agent.Wiki.Errors;
@@ -13,6 +14,7 @@ namespace KnowledgeBase.Agent.Review.Queries;
 public record ListFindingsQuery(FindingState DesiredState);
 
 internal sealed class ListFindingsQueryHandler(
+    ILogger<ListFindingsQueryHandler> logger,
     IOptions<WikiConfigurationSettings> options,
     ListFilesHandler listFilesHandler,
     ReadFileHandler readFileHandler)
@@ -46,7 +48,23 @@ internal sealed class ListFindingsQueryHandler(
         CancellationToken cancellationToken) => await readFileHandler
         .Handle(new ReadFileRequest(filePath), cancellationToken)
         .Bind(ReadFindingContent)
-        .Map(IReadOnlyCollection<ReviewFinding> (finding) => [finding]);
+        .Map(IReadOnlyCollection<ReviewFinding> (finding) => [finding])
+        .OnFailureCompensate(error => SkipUnreadableFinding(filePath, error));
+
+    /// <summary>
+    /// A finding that is corrupt (such as one edited by hand), or that was resolved and removed while the findings were
+    /// being listed, is skipped, so it cannot hide every other finding from the UI and the Editor.
+    /// </summary>
+    private Result<IReadOnlyCollection<ReviewFinding>, Error> SkipUnreadableFinding(string filePath, Error error)
+    {
+        if (error is not (SerializationError or FileNotFoundError))
+        {
+            return error;
+        }
+
+        logger.SkippedUnreadableFinding(filePath, error);
+        return Result.Success<IReadOnlyCollection<ReviewFinding>, Error>([]);
+    }
 
     private static Result<ReviewFinding, Error> ReadFindingContent(string content) => Result
         .Try<ReviewFinding, Error>(
