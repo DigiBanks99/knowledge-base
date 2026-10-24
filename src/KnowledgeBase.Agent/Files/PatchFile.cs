@@ -22,8 +22,8 @@ internal sealed class PatchFileHandler()
             return new FileNotFoundError(request.FilePath);
         }
 
-       try
-       {
+        try
+        {
             string currentContent = await File.ReadAllTextAsync(request.FilePath, cancellationToken);
             string newContent = Regex.Replace(currentContent, Regex.Escape(request.OriginalContent), request.PatchedContent);
             await File.WriteAllTextAsync(request.FilePath, newContent, cancellationToken);

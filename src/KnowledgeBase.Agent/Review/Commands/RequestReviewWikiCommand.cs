@@ -29,4 +29,4 @@ internal sealed class RequestReviewWikiCommandHandler(
         string fileName = $"review-{reviewDate:yyyy-MM-dd-HH-mm-ss}.md";
         return Path.Combine(_settings.ReviewRequestDirectory, fileName);
     }
-} 
+}
