@@ -24,9 +24,9 @@ dotnet build KnowledgeBase.slnx --no-restore --configuration Release
 
 ```shell
 cd src/KnowledgeBase.Web
-npm ci
-npm run lint    # oxlint --deny-warnings
-npm run build   # tsc -b && vite build
+pnpm install --frozen-lockfile
+pnpm run lint    # oxlint --deny-warnings
+pnpm run build   # tsc -b && vite build
 ```
 
 - If `dotnet format --verify-no-changes` fails, run `dotnet format KnowledgeBase.slnx` and review the diff.
@@ -40,7 +40,9 @@ npm run build   # tsc -b && vite build
   no `Version`.
 - Every project has a `packages.lock.json`. After adding or changing a package, run `dotnet restore` (without
   `--locked-mode`) and commit the updated lock files, or CI fails.
-- The UI uses npm with a committed `package-lock.json`. `npm audit --audit-level=high` must pass.
+- The UI uses pnpm with a committed `pnpm-lock.yaml`; never add a `package-lock.json` or use npm to install. The pnpm
+  version is pinned (with its hash) in `package.json`'s `packageManager` field, which CI and the deployed image
+  both follow. `pnpm audit --audit-level high` must pass.
 - `TreatWarningsAsErrors` is on for every .NET project.
 
 ## C# conventions

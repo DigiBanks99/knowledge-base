@@ -44,7 +44,7 @@ In production the API serves the built UI from `wwwroot`.
 ## Prerequisites
 
 - [.NET SDK 10.0.302](https://dotnet.microsoft.com/download) (pinned in `global.json`)
-- [Node.js 24](https://nodejs.org/)
+- [Node.js 24](https://nodejs.org/) and [pnpm](https://pnpm.io/installation) (the version pinned in `src/KnowledgeBase.Web/package.json`)
 - [Aspire CLI](https://aspire.dev/get-started/install-cli/)
 - A container runtime (Docker or Podman) for Redis
 - An [Anthropic API key](https://console.anthropic.com/)
@@ -173,10 +173,10 @@ dotnet build KnowledgeBase.slnx --no-restore --configuration Release
 
 # UI
 cd src/KnowledgeBase.Web
-npm ci
-npm audit --audit-level=high
-npm run lint
-npm run build
+pnpm install --frozen-lockfile
+pnpm audit --audit-level high
+pnpm run lint
+pnpm run build
 ```
 
 Warnings are errors in both builds, NuGet packages use lock files, and NuGet audit fails the restore on known
