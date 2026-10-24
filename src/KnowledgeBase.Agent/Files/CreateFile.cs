@@ -45,16 +45,26 @@ internal sealed class CreateFileHandler(
             return directoryResult.Error;
         }
 
+        // The file is written under a temporary name and then moved into place, so the pipeline's watchers never see it
+        // before its content is complete. On Linux a watcher can otherwise open a new file between its creation and the
+        // writer locking it, and read it empty.
+        string temporaryPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
         try
         {
             logger.CreatingFile(filePath);
-            await File.WriteAllTextAsync(filePath, request.Content, cancellationToken);
+            await File.WriteAllTextAsync(temporaryPath, request.Content, cancellationToken);
+            File.Move(temporaryPath, filePath);
         }
         catch (IOException ex)
         {
             logger.CreateFileFailed(filePath, ex);
             return new FileWriteError(filePath);
         }
+        finally
+        {
+            File.Delete(temporaryPath);
+        }
+
         return filePath;
     }
 

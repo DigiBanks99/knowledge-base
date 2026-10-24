@@ -82,13 +82,15 @@ public sealed class DirectoryWatcherTests : IDisposable
     [Test]
     public async Task AFileIsStillBeingWritten()
     {
-        _watcher.Start();
         bool handledWhileOpen;
 
+        // The writer opens the file before watching starts: on Linux the watcher could otherwise lock a new file before
+        // its writer does, which is why the pipeline's own writers move complete files into place.
         await using (FileStream writer = new(_directory.File("a.md"), FileMode.CreateNew, FileAccess.Write, FileShare.Read))
         {
             await writer.WriteAsync("A"u8.ToArray());
             await writer.FlushAsync();
+            _watcher.Start();
             handledWhileOpen = await Eventually.Until(() => !_handled.IsEmpty, TimeSpan.FromMilliseconds(750));
         }
 
