@@ -1,0 +1,4 @@
+[submodule "config"]
+	path = config
+	url = https://github.com/DigiBanks99/knowledge-base-config.git
+	branch = main

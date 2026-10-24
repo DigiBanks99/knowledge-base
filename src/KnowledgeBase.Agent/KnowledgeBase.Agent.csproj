@@ -18,6 +18,11 @@
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 
+  <!-- The private instructions submodule. It is not checked out in public CI builds, so the glob may match nothing. -->
+  <ItemGroup>
+    <None Include="..\..\config\*.md" Exclude="..\..\config\README.md" LinkBase="config" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="Agents\Instructions\pipeline.md" LogicalName="KnowledgeBase.Agent.Instructions.pipeline.md" />
   </ItemGroup>

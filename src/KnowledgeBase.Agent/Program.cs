@@ -3,6 +3,7 @@
 using KnowledgeBase.Agent;
 using KnowledgeBase.Agent.Agents;
 using KnowledgeBase.Agent.Auth;
+using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Files.Tools;
 using KnowledgeBase.Agent.Health;
@@ -15,6 +16,7 @@ using Scalar.AspNetCore;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder
+    .AddConfigFiles()
     .ConfigureAgent(KnownAgents.FactFinder)
         .WithTools(toolsBuilder => toolsBuilder.WithFactTools())
     .ConfigureAgent(KnownAgents.ThreadWeaver, includeWikiRules: true)
