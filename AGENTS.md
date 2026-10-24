@@ -90,6 +90,21 @@ npm run build   # tsc -b && vite build
 - The Vite dev server proxies `/api`, `/auth` and the OIDC callbacks to the API so the browser sees one origin.
   Keep new server routes under those prefixes.
 
+## Deployment
+
+- `.github/workflows/cd.yml` deploys after CI succeeds on `main`, on the self-hosted runner labelled
+  `knowledge-base`. Keep its `if:` guard: `workflow_run` also fires for pull request CI runs, including forks, and
+  those must never reach the self-hosted runner. CI itself stays on GitHub-hosted runners.
+- The Compose shape lives in `AppHost.cs` (`PublishAsDockerComposeService`); never hand-edit generated
+  `aspire-output/`. The API uses host networking and is configured through loopback ports defined at the bottom of
+  `AppHost.cs`. Preview changes with `aspire publish -o <scratch dir>`.
+- A new AppHost parameter must also be added to the CD workflow's `env:` (as `Parameters__<Name>`) and to
+  `scripts/setup-github.ps1`. Anything secret is a GitHub secret, not a variable: the logs are public.
+- Personal text (instructions, wiki rules) never goes in this repository or in GitHub settings. It lives in the private
+  `config/` submodule as markdown files loaded by `Common/ConfigFiles.cs`. The submodule may be absent (public CI,
+  other people's clones); the build must keep working without it. `config.template/` holds the public, generic
+  versions that the AppHost's `scaffold-config` command copies in; a new config file needs a template too.
+
 ## Git
 
 - Conventional Commits with a scope where it helps: `feat(api): ...`, `refactor(web): ...`, `ci: ...`, `style: ...`.

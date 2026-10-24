@@ -27,9 +27,9 @@ Failed notes and facts are parked in a `failed` folder and can be retried from t
 recorded under `runs/` so you can see what each agent did.
 
 Each agent's system prompt is built in layers: the shared pipeline description
-([`pipeline.md`](src/KnowledgeBase.Agent/Anthropic/Instructions/pipeline.md), embedded in the build), then your own
-shared instructions and wiki rules, then the agent's role. The personal layers come from configuration, so nothing
-about you lives in the repository.
+([`pipeline.md`](src/KnowledgeBase.Agent/Agents/Instructions/pipeline.md), embedded in the build), then your own
+shared instructions and wiki rules, then the agent's role. The personal layers live in a private repository mounted as
+the `config` submodule (see [Instructions](#instructions)), so nothing about you lives in this repository.
 
 ## Projects
 
@@ -65,14 +65,11 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 |---------------------------|:------:|----------------------------------------------------------------------------------------|
 | `WikiRootDirectory`       |        | Folder that holds the wiki and all pipeline state. Created on first run.               |
 | `AnthropicApiKey`         |   ✓    | Shared by all agents.                                                                  |
-| `SharedInstructions`      |   ✓    | Context about you and the wiki, given to every agent.                                  |
-| `WikiRules`               |   ✓    | Structure and naming rules for the wiki, given to every agent except the FactFinder.    |
 | `EntraTenantId`           |        | Directory (tenant) id of the app registration.                                         |
 | `EntraClientId`           |        | Application (client) id of the app registration.                                       |
 | `EntraClientSecret`       |   ✓    | A client secret of the app registration.                                               |
 | `{Agent}Provider`         |        | `Anthropic` (default) or `OpenAICompatible`. See [Local models](#local-models-llamacpp). |
 | `{Agent}Model`            |        | Model per agent, e.g. `claude-sonnet-5-5`. One each for the five agents.               |
-| `{Agent}Instructions`     |        | Role instructions per agent.                                                           |
 | `OpenAICompatibleEndpoint`|        | Base address of the OpenAI-compatible server (default `http://localhost:8080/v1`).     |
 | `OpenAICompatibleApiKey`  |   ✓    | The server's API key, if it was started with one (default empty).                      |
 
@@ -80,6 +77,41 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 OpenAI-compatible defaults live in the AppHost's `appsettings.json`; override them with user secrets or
 `Parameters__*` environment variables. `AnthropicApiKey` is still required by the AppHost, so set a placeholder
 when no agent uses Anthropic.
+
+### Instructions
+
+The shared instructions, the wiki rules and each agent's role are markdown files in a private repository,
+`knowledge-base-config`, mounted as a submodule at `config/`. Each file is one setting: the name without `.md` is the
+key, with `.` separating sections (`WikiRules.md`, `SharedInstructions.md`, `FactFinder.Instructions.md`, ...).
+
+```shell
+git clone --recurse-submodules https://github.com/DigiBanks99/knowledge-base.git
+```
+
+A local run reads the files straight from `config/`, so edit them and restart the API to try a change. To ship it,
+commit in `config/`, then commit the new submodule commit here and merge to `main`. The deployment builds the files at
+that commit into the image, so every app commit pins its instructions.
+
+A plain `git push` does not push the submodule, and a pointer to an unpushed `config` commit breaks the deployment.
+Have git push both:
+
+```shell
+git config push.recurseSubmodules on-demand
+```
+
+#### Without access to the config repository
+
+The API does not start without instructions. Scaffold bare ones from [`config.template/`](config.template) with the
+AppHost's **Scaffold config** command, either from the `knowledgebase-agent` resource's menu in the Aspire dashboard or
+from the CLI while `aspire run` is going:
+
+```shell
+aspire resource knowledgebase-agent scaffold-config
+aspire resource knowledgebase-agent restart
+```
+
+It copies any missing files into `config/` and never overwrites existing ones. Then shape the templates to your own
+wiki, starting with `SharedInstructions.md`.
 
 Optional API settings (set on the `knowledgebase-agent` project):
 
@@ -116,15 +148,9 @@ The agents depend on tool calling, so the server must support it. For `llama-ser
 - A completion may take up to `OpenAICompatible:NetworkTimeout` (default 10 minutes) before the API gives up. Keep
   llama-server's own `--timeout` at least as long.
 
-Where the API reaches the server depends on how it is hosted:
-
-- **API running directly on the same machine:** `http://127.0.0.1:8080/v1`, with llama-server bound to `127.0.0.1`.
-- **API in a container on that machine:** `http://host.docker.internal:8080/v1`. On Linux, add
-  `extra_hosts: ["host.docker.internal:host-gateway"]` to the service and bind llama-server to the Docker bridge
-  address (usually `172.17.0.1`) rather than `0.0.0.0`.
-
-Either way, do not expose the llama-server port publicly. If it has to listen beyond loopback, start it with
-`--api-key` and set `OpenAICompatibleApiKey`.
+In the [deployment](#deployment), the API container shares the host's network, so a llama-server bound to
+`127.0.0.1` on the same machine is reached at its loopback address. Do not expose the llama-server port publicly. If
+it has to listen beyond loopback, start it with `--api-key` and set `OpenAICompatibleApiKey`.
 
 ## Running locally
 
@@ -155,3 +181,48 @@ npm run build
 
 Warnings are errors in both builds, NuGet packages use lock files, and NuGet audit fails the restore on known
 vulnerabilities.
+
+## Deployment
+
+Every successful CI run on `main` deploys to an ARM64 VM through the [CD workflow](.github/workflows/cd.yml). The
+workflow runs on a self-hosted runner on that VM and uses `aspire deploy` to build the images there and run them with
+Docker Compose:
+
+| Service        | Listens on                     | Notes                                                       |
+|----------------|--------------------------------|-------------------------------------------------------------|
+| API and UI     | `127.0.0.1:7321`               | Host network; a Cloudflare tunnel forwards the public host. |
+| Redis          | `127.0.0.1:7322`               | Output cache.                                               |
+| Aspire dashboard | `127.0.0.1:7323` (OTLP `7324`) | Reach it with `ssh -L 7323:127.0.0.1:7323 <vm>`; the login token is in `docker logs`. |
+
+The API container shares the host's network so it reaches llama-server on the VM's loopback
+(`http://127.0.0.1:9931/v1`) without opening it to containers. The wiki root directory on the VM is mounted at
+`/data`, and the sign-in keys are kept in its `keys` folder so deployments do not sign you out.
+
+### Setting it up
+
+Run the setup script on your machine. It uses the GitHub CLI and asks before each change:
+
+```powershell
+./scripts/setup-github.ps1 -SshTarget ubuntu@<vm-address>
+```
+
+It:
+
+1. Requires approval before workflows from outside contributors run. The repository is public, and a fork's pull
+   request must never reach the self-hosted runner.
+2. Creates the `production` environment, deployable only from `main`.
+3. Stores the AppHost parameters as environment secrets and variables, offering your local user secrets as defaults.
+   Keys go into secrets, because a public repository's logs are public. It also adds a read-only deploy key for the
+   config repository, which the workflow uses to check out the pinned instructions.
+4. Registers a runner for this repository on the VM with [`setup-vm.sh`](scripts/setup-vm.sh). That script checks Docker
+   and the docker group, creates the data directory (owned by the container user, uid 1654), installs the runner as a
+   service with the `knowledge-base` label, and checks llama-server.
+5. Lists the redirect URIs to add to the Entra app registration for the public host name.
+
+Without `-SshTarget` it prints the VM command instead. Runners on personal accounts belong to one repository, so this
+adds a second runner next to any you already have.
+
+To move existing wiki data to the VM, copy the wiki root directory into the data directory before the first
+deployment, then give it to uid 1654: `sudo chown -R 1654:1654 /srv/knowledge-base`.
+
+To deploy without a new commit: `gh workflow run CD --ref main`.
