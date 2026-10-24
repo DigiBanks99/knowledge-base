@@ -79,6 +79,10 @@ pnpm run build   # tsc -b && vite build
   tools through `TestWiki.CallToolAsync` so runs record tool calls as in production. `Start()` runs `UseWiki`, so
   laying out files first and then starting simulates a restart. Assert on where files end up, and wait with
   `Eventually.Until` rather than fixed delays.
+- HTTP tests (`Api/`) start the real `Program` through `TestApi` (`WebApplicationFactory`). Only the outside world is
+  replaced: Entra sign-in by a test scheme (`TestApi.Client(objectId)` signs in, `null` signs out), Redis by an
+  in-memory output cache and agents by `FakeAgent`. Settings `Program` reads while building its services must be
+  passed with `UseSetting`, and the environment is `Testing` so the author's user secrets are never loaded.
 - One test class per class under test (`WikiPathsTests`), its subject built in the constructor. A test method names
   the scenario, never the expectation (`APathLeavesTheWiki`, not `ResolveThrowsWhenOutsideTheWiki`). It arranges and
   acts, then calls local functions named for each expectation (`ItShouldBeRefused()`), declared below the calls,
