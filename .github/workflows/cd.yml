@@ -63,8 +63,12 @@ jobs:
             test -s "config/$file.md" || { echo "::error::config/$file.md is missing or empty"; exit 1; }
           done
 
+      # The default install location (/usr/share/dotnet) belongs to root, and the runner runs as a normal user. The
+      # runner's tool cache is writable and persists, so the SDK is only downloaded when global.json changes.
       - name: Set up .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           global-json-file: global.json
 
