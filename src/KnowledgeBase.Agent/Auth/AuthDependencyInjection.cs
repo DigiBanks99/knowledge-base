@@ -1,9 +1,12 @@
 using System.Net;
 using System.Security.Claims;
 
+using KnowledgeBase.Agent.Wiki;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 
 namespace KnowledgeBase.Agent.Auth;
@@ -26,6 +29,7 @@ internal static class AuthDependencyInjection
             AuthSettings settings = builder.Configuration.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
 
             builder.AddForwardedHeaders();
+            builder.AddDataProtectionKeys();
 
             if (!settings.IsConfigured)
             {
@@ -90,6 +94,21 @@ internal static class AuthDependencyInjection
                             StringComparer.OrdinalIgnoreCase)));
 
             return builder;
+        }
+
+        /// <summary>
+        /// The keys that protect the session cookie are kept with the wiki, so sessions survive a restart or a new
+        /// container. Otherwise every deployment would sign the user out.
+        /// </summary>
+        private void AddDataProtectionKeys()
+        {
+            WikiConfigurationSettings wiki = builder.Configuration.GetSection(WikiConfigurationSettings.SectionName).Get<WikiConfigurationSettings>()
+                ?? throw new InvalidOperationException($"The '{WikiConfigurationSettings.SectionName}' configuration section is required.");
+
+            builder.Services
+                .AddDataProtection()
+                .SetApplicationName("KnowledgeBase")
+                .PersistKeysToFileSystem(new DirectoryInfo(wiki.KeysDirectory));
         }
 
         /// <summary>
