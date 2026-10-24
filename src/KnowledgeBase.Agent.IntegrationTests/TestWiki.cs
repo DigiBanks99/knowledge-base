@@ -1,3 +1,5 @@
+using System.Text;
+
 using KnowledgeBase.Agent.Health;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Runs.Models;
@@ -10,6 +12,7 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace KnowledgeBase.Agent.IntegrationTests;
@@ -22,6 +25,7 @@ namespace KnowledgeBase.Agent.IntegrationTests;
 internal sealed class TestWiki : IAsyncDisposable
 {
     private readonly TemporaryDirectory _root = new();
+    private readonly ProblemLog _problems = new();
     private readonly WebApplication _app;
 
     public TestWiki()
@@ -31,7 +35,7 @@ internal sealed class TestWiki : IAsyncDisposable
         {
             [$"{WikiConfigurationSettings.SectionName}:{nameof(WikiConfigurationSettings.RootDirectory)}"] = _root.Path
         });
-        builder.Services.AddLogging();
+        builder.Services.AddLogging(logging => logging.AddProvider(_problems));
         builder.Services.AddSingleton<IServer, NoServer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder
@@ -105,11 +109,52 @@ internal sealed class TestWiki : IAsyncDisposable
     public Task<IReadOnlyList<AgentRun>> RunsAsync() =>
         Get<AgentRunStore>().ListAsync(null, null, null, 100, CancellationToken.None);
 
-    /// <summary>Whether every run recorded so far has finished, so their records can be asserted on.</summary>
-    public async Task<bool> RunsFinishedAsync(int expected)
+    /// <summary>
+    /// Whether every run recorded so far has finished, and, when <paramref name="expected"/> is given, that there are
+    /// that many, so their records can be asserted on.
+    /// </summary>
+    public async Task<bool> RunsFinishedAsync(int? expected = null)
     {
         IReadOnlyList<AgentRun> runs = await RunsAsync();
-        return runs.Count == expected && runs.All(run => run.Status != AgentRunStatus.Running);
+        return (expected is null || runs.Count == expected) && runs.All(run => run.Status != AgentRunStatus.Running);
+    }
+
+    /// <summary>
+    /// Everything in the pipeline folders, every run and the warnings and errors logged, to explain a test that timed
+    /// out waiting for the pipeline to settle.
+    /// </summary>
+    public async Task<string> DescribeAsync()
+    {
+        StringBuilder description = new();
+        description.AppendLine("The pipeline did not settle. Its state:");
+        string[] directories =
+        [
+            Settings.NewNotesDirectory, Settings.ProcessingNotesDirectory, Settings.ProcessedNotesDirectory,
+            Settings.FailedNotesDirectory, Settings.FactsDirectory, Settings.ProcessedFactsDirectory,
+            Settings.FailedFactsDirectory, Settings.ReviewRequestDirectory, Settings.CompletedReviewRequestDirectory,
+            Settings.ReviewOpenFindingsDirectory, Settings.ReviewClosedFindingsDirectory
+        ];
+        foreach (string directory in directories)
+        {
+            description.AppendLine($"  {Path.GetRelativePath(_root.Path, directory)}: [{string.Join(", ", FileNames(directory, "*.*"))}]");
+        }
+
+        foreach (AgentRun run in await RunsAsync())
+        {
+            description.AppendLine($"  run {run.Agent} {run.Status} ({run.Trigger.Kind} {run.Trigger.Reference}): {run.ToolCalls.Count} tool calls {run.Error}");
+        }
+
+        foreach (FakeAgent agent in Agents.Where(agent => agent.Prompts.Count > 0))
+        {
+            description.AppendLine($"  {agent.Name} was prompted {agent.Prompts.Count} times");
+        }
+
+        foreach (string problem in _problems.Entries)
+        {
+            description.AppendLine($"  {problem}");
+        }
+
+        return description.ToString();
     }
 
     public static IReadOnlyList<string> FileNames(string directory, string pattern = "*") =>
