@@ -15,7 +15,8 @@ internal sealed class ListWikiNotesQueryHandler(
         GetNewFiles()
             .BindZip(AddProcessingFiles)
             .BindZip(AddProcessedFiles)
-            .Map(files => new Notes.Models.Notes(files.First, files.Second, files.Third));
+            .BindZip(AddFailedFiles)
+            .Map(files => new Notes.Models.Notes(files.Item1, files.Item2, files.Item3, files.Item4));
 
     private Result<IEnumerable<string>, Error> GetNewFiles() => listFilesHandler
         .Handle(new ListFilesRequest(options.Value.NewNotesDirectory));
@@ -28,4 +29,10 @@ internal sealed class ListWikiNotesQueryHandler(
         IEnumerable<string> newFiles,
         IEnumerable<string> processingFiles) => listFilesHandler
             .Handle(new ListFilesRequest(options.Value.ProcessedNotesDirectory));
+
+    private Result<IEnumerable<string>, Error> AddFailedFiles(
+        IEnumerable<string> newFiles,
+        IEnumerable<string> processingFiles,
+        IEnumerable<string> processedFiles) => listFilesHandler
+            .Handle(new ListFilesRequest(options.Value.FailedNotesDirectory));
 }
