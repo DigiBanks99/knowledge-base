@@ -12,7 +12,8 @@ internal static class NotesEndpoints
                 .MapGroup("notes")
                 .WithTags("wiki", "notes")
                 .MapCaptureNote()
-                .MapListNotes();
+                .MapListNotes()
+                .MapRetryNote();
 
             return endpoints;
         }

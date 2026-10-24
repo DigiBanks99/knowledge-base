@@ -6,4 +6,5 @@ public static class KnownAgents
     public const string FactFinder = "FactFinder";
     public const string ThreadWeaver = "ThreadWeaver";
     public const string Reviewer = "Reviewer";
+    public const string Librarian = "Librarian";
 }

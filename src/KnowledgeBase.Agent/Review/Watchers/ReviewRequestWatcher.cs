@@ -41,7 +41,9 @@ internal sealed class ReviewRequestWatcher(
         await readFileHandler
             .Handle(new ReadFileRequest(requestPath), CancellationToken.None)
             .Map(content => DateTimeOffset.Parse(content["Review - ".Length..]))
-            .Bind(date => reviewWikiCommandHandler.Handle(new ReviewWikiCommand(date), CancellationToken.None))
+            .Bind(date => reviewWikiCommandHandler.Handle(
+                new ReviewWikiCommand(Path.GetFileName(requestPath), date),
+                CancellationToken.None))
             .Bind(_ => moveFileHandler.Handle(new MoveFileRequest(requestPath, completedPath)))
             .TapError(error => logger.FailedToReviewWiki(requestPath, error));
     }

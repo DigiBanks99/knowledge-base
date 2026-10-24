@@ -27,8 +27,8 @@ public static class WikiSections
 
          ## Sections
 
-         {string.Join(Environment.NewLine, All.Select(section => $"- [{section.Title}]({section.Folder}/index.md): {section.Purpose}"))}
-         """;
+         {string.Join('\n', All.Select(section => $"- [{section.Title}]({section.Folder}/index.md): {section.Purpose}"))}
+         """.ReplaceLineEndings("\n");
 
     public static string SectionIndex(WikiSection section) =>
         $"""
@@ -41,5 +41,5 @@ public static class WikiSections
          ## Pages
 
          _No pages yet._
-         """;
+         """.ReplaceLineEndings("\n");
 }

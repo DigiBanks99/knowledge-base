@@ -21,6 +21,7 @@ internal static class FileToolsExtensions
                 tools.AddTool(AIFunctionFactory.Create(fileTools.MoveFile));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.PatchFile));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ReadFile));
+                tools.AddTool(AIFunctionFactory.Create(fileTools.SearchWiki));
                 return tools;
             });
             return builder;
@@ -33,6 +34,7 @@ internal static class FileToolsExtensions
                 AgentToolCollection tools = new();
                 FileTools fileTools = sp.GetRequiredService<FileTools>();
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ReadFile));
+                tools.AddTool(AIFunctionFactory.Create(fileTools.SearchWiki));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ListFiles));
                 return tools;
             });

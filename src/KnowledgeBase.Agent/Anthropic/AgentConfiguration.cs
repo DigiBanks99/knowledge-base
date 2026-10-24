@@ -1,5 +1,6 @@
 using Anthropic;
 
+using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Wiki.Tools;
 
 using Microsoft.Agents.AI;
@@ -56,16 +57,54 @@ internal static class AgentConfiguration
             {
                 AgentToolCollection tools = sp.GetRequiredKeyedService<AgentToolCollection>(agentName);
                 DateTools dateTools = sp.GetRequiredService<DateTools>();
+                AgentRunTracker runTracker = sp.GetRequiredService<AgentRunTracker>();
                 return client
                     .AsAIAgent(
                         options.Model,
                         instructions,
                         agentName,
-                        tools: [.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)]);
+                        tools: [.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)])
+                    .AsBuilder()
+                    .Use((_, context, next, cancellationToken) => RecordToolCall(runTracker, context, next, cancellationToken))
+                    .Build();
             });
 
             return toolsBuilder;
         }
+    }
+
+    private static async ValueTask<object?> RecordToolCall(
+        AgentRunTracker runTracker,
+        FunctionInvocationContext context,
+        Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>> next,
+        CancellationToken cancellationToken)
+    {
+        string? target = ToolCallTarget(context.Arguments);
+        try
+        {
+            object? result = await next(context, cancellationToken);
+            await runTracker.RecordToolCallAsync(context.Function.Name, target, null);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await runTracker.RecordToolCallAsync(context.Function.Name, target, ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The paths (or collection name) a tool call acted on, e.g. <c>people/index.md</c> or <c>a.md → b.md</c>.
+    /// </summary>
+    private static string? ToolCallTarget(AIFunctionArguments arguments)
+    {
+        string[] targets = arguments
+            .Where(argument => argument.Key.Contains("path", StringComparison.OrdinalIgnoreCase)
+                || argument.Key.Equals("collectionName", StringComparison.OrdinalIgnoreCase))
+            .Select(argument => argument.Value?.ToString())
+            .OfType<string>()
+            .ToArray();
+        return targets.Length == 0 ? null : string.Join(" → ", targets);
     }
 
     extension(AIAgentToolsBuilder builder)

@@ -4,6 +4,8 @@ using System.Text.Json;
 
 using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Files;
+using KnowledgeBase.Agent.Runs;
+using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki;
 
 using Microsoft.Extensions.Options;
@@ -13,6 +15,7 @@ namespace KnowledgeBase.Agent.Facts.Tools;
 internal sealed class FactTools(
     ILogger<FactTools> logger,
     IOptions<WikiConfigurationSettings> settings,
+    AgentRunTracker runTracker,
     CreateFileHandler createFileHandler)
 {
     private readonly WikiConfigurationSettings _settings = settings.Value;
@@ -30,10 +33,13 @@ internal sealed class FactTools(
     {
         string factFilePath = Path.Combine(_settings.FactsDirectory, $"{collectionName}.json");
 
+        AgentRun? run = runTracker.Current;
+        string? sourceNote = run?.Trigger.Kind == AgentRunTriggerKind.Note ? run.Trigger.Reference : null;
+
         logger.SerializingFactsToFile(factFilePath);
         CreateFileRequest createFileCommand = new(
             factFilePath,
-            JsonSerializer.Serialize(facts, JsonSerializerOptions.Web),
+            JsonSerializer.Serialize(new FactDocument(sourceNote, facts.Facts), JsonSerializerOptions.Web),
             MediaTypeNames.Application.Json);
 
         Result<string, Error> result = await createFileHandler

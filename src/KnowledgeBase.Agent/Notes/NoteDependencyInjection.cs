@@ -17,6 +17,7 @@ internal static class NoteDependencyInjection
             builder.Services
                 .AddSingleton<CaptureWikiNoteCommandHandler>()
                 .AddSingleton<ListWikiNotesQueryHandler>()
+                .AddSingleton<NoteCatalog>()
                 .AddSingleton<StartNoteProcessingCommandHandler>();
 
             return builder;

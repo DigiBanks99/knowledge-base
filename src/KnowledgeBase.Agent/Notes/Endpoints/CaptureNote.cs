@@ -6,7 +6,7 @@ using KnowledgeBase.Agent.Wiki.Commands;
 namespace KnowledgeBase.Agent.Notes.Endpoints;
 
 public sealed record CaptureNoteRequest(string Content);
-public sealed record CaptureNoteRequestRecorded(string FilePath);
+public sealed record CaptureNoteRequestRecorded(string Name);
 
 internal static class CaptureNote
 {
@@ -15,7 +15,7 @@ internal static class CaptureNote
         public IEndpointRouteBuilder MapCaptureNote()
         {
             endpoints
-                .MapPost("note", Handle)
+                .MapPost(string.Empty, Handle)
                 .WithName(nameof(CaptureNote))
                 .WithSummary("Capture Note")
                 .WithDescription("Capture a note and store it in the file system.")
@@ -39,7 +39,7 @@ internal static class CaptureNote
         return await handler
             .Handle(createWikiSourceCommand, CancellationToken.None)
             .Match(
-                filePath => Results.Created(string.Empty, new CaptureNoteRequestRecorded(filePath)),
+                filePath => Results.Created($"/api/notes/{Path.GetFileName(filePath)}", new CaptureNoteRequestRecorded(Path.GetFileName(filePath))),
                 error => Results.Problem(error.Message, statusCode: error switch
                 {
                     ValidationError => StatusCodes.Status400BadRequest,

@@ -3,13 +3,11 @@ using System.Net.Mime;
 
 using KnowledgeBase.Agent.Wiki;
 
-using Microsoft.Extensions.Options;
-
 namespace KnowledgeBase.Agent.Files.Tools;
 
 internal sealed class FileTools(
     ILogger<FileTools> logger,
-    IOptions<WikiConfigurationSettings> settings,
+    WikiPaths wikiPaths,
     CreateDirectoryHandler createDirectoryHandler,
     CreateFileHandler createFileHandler,
     DeleteFileHandler deleteFileHandler,
@@ -18,16 +16,14 @@ internal sealed class FileTools(
     ReadFileHandler readFileHandler,
     PatchFileHandler patchFileHandler)
 {
-    private readonly WikiConfigurationSettings _settings = settings.Value;
-
     [Description("Creates the specified directory at the given path in the wiki.")]
     public async Task<string> CreateDirectory(
         [Description("The path of the directory to be created, relative to the wiki root.")]
         string desiredDirectoryPath)
     {
         Result<string, Error> result = createDirectoryHandler
-            .Handle(CreateDirectoryRequest.Create(ResolveWikiPath(desiredDirectoryPath)))
-            .Map(ToWikiRelativePath)
+            .Handle(CreateDirectoryRequest.Create(wikiPaths.Resolve(desiredDirectoryPath)))
+            .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -45,8 +41,8 @@ internal sealed class FileTools(
         CancellationToken cancellationToken = default)
     {
         Result<string, Error> result = await createFileHandler
-            .Handle(new CreateFileRequest(ResolveWikiPath(desiredFilePath), content, mimeType), cancellationToken)
-            .Map(ToWikiRelativePath)
+            .Handle(new CreateFileRequest(wikiPaths.Resolve(desiredFilePath), content, mimeType), cancellationToken)
+            .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -59,7 +55,7 @@ internal sealed class FileTools(
         string desiredFilePath)
     {
         Result<bool, Error> result = await deleteFileHandler
-            .Handle(new DeleteFileRequest(ResolveWikiPath(desiredFilePath)))
+            .Handle(new DeleteFileRequest(wikiPaths.Resolve(desiredFilePath)))
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -72,8 +68,8 @@ internal sealed class FileTools(
         string desiredDirectoryPath)
     {
         Result<IEnumerable<string>, Error> result = listFilesHandler
-            .Handle(new ListFilesRequest(ResolveWikiPath(desiredDirectoryPath), IncludeDirectories: true))
-            .Map(paths => paths.Select(ToWikiRelativePath))
+            .Handle(new ListFilesRequest(wikiPaths.Resolve(desiredDirectoryPath), IncludeDirectories: true))
+            .Map(paths => paths.Select(wikiPaths.ToRelative))
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -88,8 +84,8 @@ internal sealed class FileTools(
         string destinationFilePath)
     {
         Result<string, Error> result = moveFileHandler
-            .Handle(new MoveFileRequest(ResolveWikiPath(sourceFilePath), ResolveWikiPath(destinationFilePath)))
-            .Map(ToWikiRelativePath)
+            .Handle(new MoveFileRequest(wikiPaths.Resolve(sourceFilePath), wikiPaths.Resolve(destinationFilePath)))
+            .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -107,8 +103,8 @@ internal sealed class FileTools(
         CancellationToken cancellationToken = default)
     {
         Result<string, Error> result = await patchFileHandler
-            .Handle(new PatchFileRequest(ResolveWikiPath(filePath), originalContent, patchedContent), cancellationToken)
-            .Map(ToWikiRelativePath)
+            .Handle(new PatchFileRequest(wikiPaths.Resolve(filePath), originalContent, patchedContent), cancellationToken)
+            .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -122,28 +118,49 @@ internal sealed class FileTools(
         CancellationToken cancellationToken = default)
     {
         Result<string, Error> result = await readFileHandler
-            .Handle(new ReadFileRequest(ResolveWikiPath(filePath)), cancellationToken)
+            .Handle(new ReadFileRequest(wikiPaths.Resolve(filePath)), cancellationToken)
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
             error => throw new InvalidOperationException($"Failed to read file '{filePath}': {error.Message}"));
     }
 
-    private string WikiRoot => Path.GetFullPath(_settings.WikiDirectory);
-
-    private string ResolveWikiPath(string path)
+    [Description(
+        """
+        Searches every wiki page for lines containing all of the given words (case-insensitive) and returns matches as
+        'path:line: text'. Use it to find pages about a person, topic or term before reading them.
+        """)]
+    public async Task<IReadOnlyList<string>> SearchWiki(
+        [Description("One or more words to search for, separated by spaces. A line matches when it contains all of them.")]
+        string query,
+        CancellationToken cancellationToken = default)
     {
-        string fullPath = Path.GetFullPath(path, WikiRoot);
-        bool isInsideWiki = fullPath.Equals(WikiRoot, StringComparison.OrdinalIgnoreCase)
-            || fullPath.StartsWith(Path.TrimEndingDirectorySeparator(WikiRoot) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-        return isInsideWiki
-            ? fullPath
-            : throw new InvalidOperationException($"The path '{path}' is outside the wiki. All paths must be relative to the wiki root.");
-    }
+        const int maxMatches = 50;
+        string[] terms = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (terms.Length == 0)
+        {
+            return [];
+        }
 
-    private string ToWikiRelativePath(string fullPath)
-    {
-        string relativePath = Path.GetRelativePath(WikiRoot, fullPath).Replace(Path.DirectorySeparatorChar, '/');
-        return Directory.Exists(fullPath) ? $"{relativePath}/" : relativePath;
+        List<string> matches = [];
+        foreach (string filePath in Directory.EnumerateFiles(wikiPaths.Root, "*.md", SearchOption.AllDirectories))
+        {
+            string[] lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
+            for (int index = 0; index < lines.Length && matches.Count < maxMatches; index++)
+            {
+                if (terms.All(term => lines[index].Contains(term, StringComparison.OrdinalIgnoreCase)))
+                {
+                    matches.Add($"{wikiPaths.ToRelative(filePath)}:{index + 1}: {lines[index].Trim()}");
+                }
+            }
+
+            if (matches.Count >= maxMatches)
+            {
+                matches.Add($"(stopped after {maxMatches} matches; refine the query)");
+                break;
+            }
+        }
+
+        return matches;
     }
 }

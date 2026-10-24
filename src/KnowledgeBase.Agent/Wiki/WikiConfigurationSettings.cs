@@ -9,8 +9,12 @@ public class WikiConfigurationSettings
     public string NewNotesDirectory => Path.Combine(NotesDirectory, "new");
     public string ProcessingNotesDirectory => Path.Combine(NotesDirectory, "processing");
     public string ProcessedNotesDirectory => Path.Combine(NotesDirectory, "processed");
+    public string FailedNotesDirectory => Path.Combine(NotesDirectory, "failed");
     public string FactsDirectory => Path.Combine(RootDirectory, "facts");
     public string ProcessedFactsDirectory => Path.Combine(FactsDirectory, "processed");
+    public string FailedFactsDirectory => Path.Combine(FactsDirectory, "failed");
+    public string RunsDirectory => Path.Combine(RootDirectory, "runs");
+    public string ConversationsDirectory => Path.Combine(RootDirectory, "conversations");
     public string ThreadsDirectory => Path.Combine(RootDirectory, "threads");
     public string LogsDirectory => Path.Combine(RootDirectory, "logs");
     public string ReviewDirectory => Path.Combine(RootDirectory, "review");

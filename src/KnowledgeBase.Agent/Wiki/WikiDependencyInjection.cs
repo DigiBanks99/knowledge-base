@@ -1,3 +1,5 @@
+using KnowledgeBase.Agent.Conversations;
+using KnowledgeBase.Agent.Events;
 using KnowledgeBase.Agent.Facts;
 using KnowledgeBase.Agent.Facts.Watchers;
 using KnowledgeBase.Agent.Files;
@@ -6,6 +8,7 @@ using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Notes.Watchers;
 using KnowledgeBase.Agent.Review;
 using KnowledgeBase.Agent.Review.Watchers;
+using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Wiki.Commands;
 using KnowledgeBase.Agent.Wiki.Jobs;
 using KnowledgeBase.Agent.Wiki.Tools;
@@ -17,11 +20,13 @@ internal static class WikiDependencyInjection
     extension(WebApplicationBuilder builder)
     {
         public WebApplicationBuilder AddWiki() => builder
+            .AddConversations()
             .AddFacts()
             .AddFileOperations()
             .AddHandlers()
             .AddJobs()
             .AddNotes()
+            .AddRuns()
             .AddTools()
             .AddReview()
             .AddSettings();
@@ -39,6 +44,7 @@ internal static class WikiDependencyInjection
         {
             builder.Services
                 .AddSingleton<WikiLock>()
+                .AddSingleton<WikiPaths>()
                 .AddSingleton<InitializeWikiStructureCommandHandler>()
                 .AddSingleton<RecordWikiNoteProcessedCommandHandler>();
 
@@ -48,13 +54,27 @@ internal static class WikiDependencyInjection
 
     extension(WebApplication app)
     {
-        public WebApplication UseWiki()
+        /// <summary>
+        /// Prepares the directory structure, starts the pipeline watchers and maps the API. Returns the API route group
+        /// so callers can apply cross-cutting policies such as authorization.
+        /// </summary>
+        public RouteGroupBuilder UseWiki()
         {
             app.Services
                 .GetRequiredService<InitializeWikiStructureCommandHandler>()
                 .Handle(new InitializeWikiStructureCommand(), CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
+
+            app.Services
+                .GetRequiredService<AgentRunStore>()
+                .FailInterruptedRunsAsync(CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
+            app.Services
+                .GetRequiredService<ChangeNotifier>()
+                .Start();
 
             app.Services
                 .GetRequiredService<NoteWatcher>()
@@ -72,12 +92,18 @@ internal static class WikiDependencyInjection
                 .GetRequiredService<OpenFindingsWatcher>()
                 .Register();
 
-            app
-                .MapHealthEndpoints()
-                .MapNotesEndpoints()
-                .MapReviewEndpoints();
+            app.MapHealthEndpoints();
 
-            return app;
+            RouteGroupBuilder api = app.MapGroup("api");
+            api
+                .MapConversationEndpoints()
+                .MapEventEndpoints()
+                .MapNotesEndpoints()
+                .MapReviewEndpoints()
+                .MapRunEndpoints()
+                .MapWikiEndpoints();
+
+            return api;
         }
     }
 }

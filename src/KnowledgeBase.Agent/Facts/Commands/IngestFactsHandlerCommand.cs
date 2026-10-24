@@ -1,5 +1,10 @@
+using System.Text.Json;
+
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Notes.Queries;
+using KnowledgeBase.Agent.Runs;
+using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki;
 using KnowledgeBase.Agent.Wiki.Commands;
 using KnowledgeBase.Agent.Wiki.Errors;
@@ -15,6 +20,7 @@ internal sealed class IngestFactsCommandHandler(
     ILogger<IngestFactsCommandHandler> logger,
     [FromKeyedServices(KnownAgents.ThreadWeaver)] AIAgent threadWeaver,
     WikiLock wikiLock,
+    AgentRunTracker runTracker,
     IOptions<WikiConfigurationSettings> settings,
     MoveFileHandler moveFileHandler,
     ReadFileHandler readFileHandler,
@@ -35,6 +41,9 @@ internal sealed class IngestFactsCommandHandler(
             return factsResult.Error;
         }
 
+        string factFileName = Path.GetFileName(request.FactPath);
+        string? notePath = FindSourceNote(factsResult.Value);
+
         string prompt =
         $"""
         These facts must be woven into the wiki.
@@ -44,17 +53,64 @@ internal sealed class IngestFactsCommandHandler(
         ```
         """;
 
+        Result<AgentRun, Error> run;
         using (await wikiLock.AcquireAsync(cancellationToken))
         {
-            await threadWeaver.RunAsync(prompt, cancellationToken: cancellationToken);
+            run = await runTracker.RunAsync(
+                KnownAgents.ThreadWeaver,
+                new AgentRunTrigger(AgentRunTriggerKind.Facts, factFileName),
+                token => threadWeaver.RunAsync(prompt, cancellationToken: token),
+                cancellationToken);
         }
 
-        string processedFactPath = Path.Combine(_settings.ProcessedFactsDirectory, Path.GetFileName(request.FactPath));
+        if (run.IsFailure)
+        {
+            MoveFailed(request.FactPath, _settings.FailedFactsDirectory);
+            if (notePath is not null)
+            {
+                MoveFailed(notePath, _settings.FailedNotesDirectory);
+            }
+
+            return run.Error;
+        }
+
         return moveFileHandler
-            .Handle(new MoveFileRequest(request.FactPath, processedFactPath))
-            .Bind(_ => notesQueryHandler.Handle(new ListWikiNotesQuery()))
-            .Map(notes => notes.Processing.FirstOrDefault())
-            .Ensure(note => note is not null, _ => new NoNoteProcessingError())
-            .Bind(note => noteProcessedHandler.Handle(new RecordWikiNoteProcessedCommand(note!)));
+            .Handle(new MoveFileRequest(request.FactPath, Path.Combine(_settings.ProcessedFactsDirectory, factFileName)))
+            .Bind(_ => notePath is not null
+                ? Result.Success<string, Error>(notePath)
+                : Result.Failure<string, Error>(new NoNoteProcessingError()))
+            .Bind(note => noteProcessedHandler.Handle(new RecordWikiNoteProcessedCommand(note)));
     }
+
+    /// <summary>
+    /// The note the facts came from, while it is still processing. Fact files from before notes were recorded on
+    /// them fall back to the note currently processing, as only one note is processed at a time.
+    /// </summary>
+    private string? FindSourceNote(string factsJson)
+    {
+        string? sourceNote = null;
+        try
+        {
+            sourceNote = JsonSerializer.Deserialize<FactDocument>(factsJson, JsonSerializerOptions.Web)?.SourceNote;
+        }
+        catch (JsonException)
+        {
+            // Not a fact document; fall back to the processing note.
+        }
+
+        if (sourceNote is not null)
+        {
+            string sourceNotePath = Path.Combine(_settings.ProcessingNotesDirectory, Path.GetFileName(sourceNote));
+            return File.Exists(sourceNotePath) ? sourceNotePath : null;
+        }
+
+        return notesQueryHandler
+            .Handle(new ListWikiNotesQuery())
+            .Map(notes => notes.Processing.FirstOrDefault())
+            .GetValueOrDefault();
+    }
+
+    private void MoveFailed(string filePath, string failedDirectory) => moveFileHandler
+        .Handle(new MoveFileRequest(filePath, Path.Combine(failedDirectory, Path.GetFileName(filePath))))
+        .TapError(logger.ErrorOccurred);
 }

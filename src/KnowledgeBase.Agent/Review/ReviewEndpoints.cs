@@ -11,6 +11,7 @@ internal static class ReviewEndpoints
             endpoints.MapGroup("review")
                 .WithTags("wiki", "review")
                 .MapListFindings()
+                .MapListReports()
                 .MapRequestReview();
 
             return endpoints;

@@ -1,5 +1,8 @@
-﻿using KnowledgeBase.Agent;
+﻿using System.Text.Json.Serialization;
+
+using KnowledgeBase.Agent;
 using KnowledgeBase.Agent.Anthropic;
+using KnowledgeBase.Agent.Auth;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Files.Tools;
 using KnowledgeBase.Agent.Health;
@@ -19,7 +22,12 @@ builder
     .ConfigureAgent(KnownAgents.Reviewer, includeWikiRules: true)
         .WithTools(toolsBuilder => toolsBuilder.WithReviewTools())
     .ConfigureAgent(KnownAgents.Editor, includeWikiRules: true)
-        .WithTools(toolsBuilder => toolsBuilder.WithEditorTools());
+        .WithTools(toolsBuilder => toolsBuilder.WithEditorTools())
+    .ConfigureAgent(KnownAgents.Librarian, includeWikiRules: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithReadFileTools());
+
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder
     .AddRedisClientBuilder("cache")
@@ -30,6 +38,8 @@ builder
     .AddHealthChecks()
     .AddTelemetry();
 
+builder.AddAuth();
+
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -37,13 +47,24 @@ builder.Services.AddSingleton(TimeProvider.System);
 WebApplication app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseAuth();
+app.MapAuthEndpoints();
 
-app.UseWiki();
+RouteGroupBuilder api = app
+    .UseWiki()
+    .RequireSignedInUser();
+api.MapFallback(() => Results.NotFound());
 
-app.MapOpenApi();
-app.MapScalarApiReference();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+}
 
 app.UseOutputCache()
     .UseFileServer();
+
+// In production the built UI is served from wwwroot; client-side routes fall back to its index page.
+app.MapFallbackToFile("index.html");
 
 await app.RunAsync();

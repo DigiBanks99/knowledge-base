@@ -1,6 +1,7 @@
 using KnowledgeBase.Agent.Review.Models;
 using KnowledgeBase.Agent.Review.Queries;
-
+using KnowledgeBase.Agent.Runs;
+using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki;
 
 using Microsoft.Agents.AI;
@@ -12,6 +13,7 @@ public record EditWikiCommand;
 internal sealed class EditWikiCommandHandler(
     [FromKeyedServices(KnownAgents.Editor)] AIAgent editor,
     WikiLock wikiLock,
+    AgentRunTracker runTracker,
     ListFindingsQueryHandler listFindingsQueryHandler)
 {
     public async Task<Result<string, Error>> Handle(
@@ -32,9 +34,19 @@ internal sealed class EditWikiCommandHandler(
         }
 
         const string prompt = "Resolve the open review findings by editing the wiki, then mark each one as resolved.";
+        Result<AgentRun, Error> run;
         using (await wikiLock.AcquireAsync(cancellationToken))
         {
-            await editor.RunAsync(prompt, cancellationToken: cancellationToken);
+            run = await runTracker.RunAsync(
+                KnownAgents.Editor,
+                new AgentRunTrigger(AgentRunTriggerKind.Findings, string.Join(", ", openFindings.Value.Select(finding => finding.Id))),
+                token => editor.RunAsync(prompt, cancellationToken: token),
+                cancellationToken);
+        }
+
+        if (run.IsFailure)
+        {
+            return run.Error;
         }
 
         return await listFindingsQueryHandler

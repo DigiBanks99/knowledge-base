@@ -17,6 +17,7 @@ internal static class ReviewToolExtensions
                 FileTools fileTools = sp.GetRequiredService<FileTools>();
                 ReviewTools reviewTools = sp.GetRequiredService<ReviewTools>();
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ReadFile));
+                tools.AddTool(AIFunctionFactory.Create(fileTools.SearchWiki));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ListFiles));
                 tools.AddTool(AIFunctionFactory.Create(reviewTools.ListFindings));
                 tools.AddTool(AIFunctionFactory.Create(reviewTools.WriteFindings));
@@ -39,6 +40,7 @@ internal static class ReviewToolExtensions
                 tools.AddTool(AIFunctionFactory.Create(fileTools.MoveFile));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.PatchFile));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ReadFile));
+                tools.AddTool(AIFunctionFactory.Create(fileTools.SearchWiki));
                 tools.AddTool(AIFunctionFactory.Create(reviewTools.ListFindings));
                 tools.AddTool(AIFunctionFactory.Create(reviewTools.ResolveFindings));
                 return tools;
