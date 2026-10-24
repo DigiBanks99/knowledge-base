@@ -1,3 +1,5 @@
+using System.ClientModel;
+
 using Anthropic;
 
 using KnowledgeBase.Agent.Runs;
@@ -6,7 +8,10 @@ using KnowledgeBase.Agent.Wiki.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
-namespace KnowledgeBase.Agent.Anthropic;
+using OpenAI;
+using OpenAI.Chat;
+
+namespace KnowledgeBase.Agent.Agents;
 
 internal sealed class AgentToolCollection
 {
@@ -39,17 +44,19 @@ internal static class AgentConfiguration
     {
         internal AIAgentToolsBuilder ConfigureAgent(string agentName, bool includeWikiRules = false)
         {
-            AnthropicOptions options = builder.Configuration.GetSection(agentName).Get<AnthropicOptions>()
-                ?? throw new InvalidOperationException($"Failed to bind Anthropic options for agent {agentName}. Please ensure the configuration is correct.");
+            AgentModelOptions options = builder.Configuration.GetSection(agentName).Get<AgentModelOptions>()
+                ?? throw new InvalidOperationException($"Failed to bind model options for agent {agentName}. Please ensure the configuration is correct.");
             string instructions = AgentInstructions.Compose(
                 builder.Configuration,
                 agentName,
                 options.Instructions,
                 includeWikiRules);
 
-            AnthropicClient client = new()
+            Func<AITool[], AIAgent> createAgent = options.Provider switch
             {
-                ApiKey = options.ApiKey,
+                ModelProvider.Anthropic => CreateAnthropicAgent(agentName, options, instructions),
+                ModelProvider.OpenAICompatible => CreateOpenAICompatibleAgent(builder.Configuration, agentName, options, instructions),
+                _ => throw new InvalidOperationException($"Agent {agentName} has an unknown model provider '{options.Provider}'.")
             };
 
             AIAgentToolsBuilder toolsBuilder = new(builder, agentName, []);
@@ -58,12 +65,7 @@ internal static class AgentConfiguration
                 AgentToolCollection tools = sp.GetRequiredKeyedService<AgentToolCollection>(agentName);
                 DateTools dateTools = sp.GetRequiredService<DateTools>();
                 AgentRunTracker runTracker = sp.GetRequiredService<AgentRunTracker>();
-                return client
-                    .AsAIAgent(
-                        options.Model,
-                        instructions,
-                        agentName,
-                        tools: [.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)])
+                return createAgent([.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)])
                     .AsBuilder()
                     .Use((_, context, next, cancellationToken) => RecordToolCall(runTracker, context, next, cancellationToken))
                     .Build();
@@ -71,6 +73,51 @@ internal static class AgentConfiguration
 
             return toolsBuilder;
         }
+    }
+
+    private static Func<AITool[], AIAgent> CreateAnthropicAgent(
+        string agentName,
+        AgentModelOptions options,
+        string instructions)
+    {
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        {
+            throw new InvalidOperationException($"Agent {agentName} uses the Anthropic provider and requires '{agentName}:ApiKey'.");
+        }
+
+        AnthropicClient client = new()
+        {
+            ApiKey = options.ApiKey,
+        };
+
+        return tools => client.AsAIAgent(options.Model, instructions, agentName, tools: tools);
+    }
+
+    private static Func<AITool[], AIAgent> CreateOpenAICompatibleAgent(
+        IConfiguration configuration,
+        string agentName,
+        AgentModelOptions options,
+        string instructions)
+    {
+        OpenAICompatibleOptions server = configuration
+            .GetSection(OpenAICompatibleOptions.SectionName)
+            .Get<OpenAICompatibleOptions>() ?? new OpenAICompatibleOptions();
+        if (server.Endpoint is null)
+        {
+            throw new InvalidOperationException(
+                $"Agent {agentName} uses the OpenAICompatible provider and requires '{OpenAICompatibleOptions.SectionName}:Endpoint'.");
+        }
+
+        // The client refuses to send a request without a key, but a server started without one accepts any.
+        ApiKeyCredential credential = new(string.IsNullOrWhiteSpace(server.ApiKey) ? "unused" : server.ApiKey);
+        OpenAIClient client = new(credential, new OpenAIClientOptions
+        {
+            Endpoint = server.Endpoint,
+            NetworkTimeout = server.NetworkTimeout,
+        });
+        ChatClient chatClient = client.GetChatClient(options.Model);
+
+        return tools => chatClient.AsAIAgent(instructions, agentName, tools: tools);
     }
 
     private static async ValueTask<object?> RecordToolCall(

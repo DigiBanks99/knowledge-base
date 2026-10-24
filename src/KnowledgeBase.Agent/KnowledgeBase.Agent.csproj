@@ -4,6 +4,7 @@
     <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" />
     <PackageReference Include="CSharpFunctionalExtensions" />
     <PackageReference Include="Microsoft.Agents.AI.Anthropic" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
@@ -18,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Anthropic\Instructions\pipeline.md" LogicalName="KnowledgeBase.Agent.Instructions.pipeline.md" />
+    <EmbeddedResource Include="Agents\Instructions\pipeline.md" LogicalName="KnowledgeBase.Agent.Instructions.pipeline.md" />
   </ItemGroup>
 
 </Project>
