@@ -17,6 +17,7 @@ public class WikiConfigurationSettings
     public string ConversationsDirectory => Path.Combine(RootDirectory, "conversations");
     public string ThreadsDirectory => Path.Combine(RootDirectory, "threads");
     public string LogsDirectory => Path.Combine(RootDirectory, "logs");
+    public string KeysDirectory => Path.Combine(RootDirectory, "keys");
     public string ReviewDirectory => Path.Combine(RootDirectory, "review");
     public string ReviewRequestDirectory => Path.Combine(ReviewDirectory, "requests");
     public string CompletedReviewRequestDirectory => Path.Combine(ReviewRequestDirectory, "completed");
