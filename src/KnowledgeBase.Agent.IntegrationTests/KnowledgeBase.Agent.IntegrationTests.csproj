@@ -8,6 +8,7 @@
   <!-- TUnit.Core and TUnit.Engine rather than the TUnit package, which also brings TUnit's assertions: Shouldly
        is the assertion library. -->
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit.Core" />
     <PackageReference Include="TUnit.Engine" />
