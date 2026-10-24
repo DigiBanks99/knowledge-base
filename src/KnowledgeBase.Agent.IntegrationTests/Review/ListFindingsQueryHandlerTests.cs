@@ -29,8 +29,7 @@ public sealed class ListFindingsQueryHandlerTests : IAsyncDisposable
         ReviewWikiResult review = await _wiki.Get<ReviewTools>().WriteFindings("Mostly tidy.", Findings, CancellationToken.None);
         _wiki.Write(_wiki.Settings.ReviewOpenFindingsDirectory, "review-edited-by-hand-001.json", "{ \"id\": \"review-edi");
 
-        Result<IReadOnlyCollection<ReviewFinding>, Error> open = await _handler
-            .Handle(new ListFindingsQuery(FindingState.Open), CancellationToken.None);
+        Result<IReadOnlyCollection<ReviewFinding>, Error> open = await List(FindingState.Open);
 
         ItShouldStillListTheOpenFindings();
         ItShouldSkipTheCorruptFinding();
@@ -40,4 +39,46 @@ public sealed class ListFindingsQueryHandlerTests : IAsyncDisposable
         void ItShouldSkipTheCorruptFinding() =>
             open.Value.Select(finding => finding.Id).ShouldBe(review.FindingIds, ignoreOrder: true);
     }
+
+    [Test]
+    public async Task FindingsAreListedWithoutAState()
+    {
+        await _wiki.InitialiseAsync();
+        ReviewTools tools = _wiki.Get<ReviewTools>();
+        ReviewWikiResult review = await tools.WriteFindings("Mostly tidy.", Findings, CancellationToken.None);
+        string resolvedId = review.FindingIds.First();
+        string openId = review.FindingIds.Last();
+        await tools.ResolveFindings([new FindingResolution(resolvedId, "Added the link.")], CancellationToken.None);
+
+        Result<IReadOnlyCollection<ReviewFinding>, Error> all = await List(state: null);
+        Result<IReadOnlyCollection<ReviewFinding>, Error> open = await List(FindingState.Open);
+        Result<IReadOnlyCollection<ReviewFinding>, Error> closed = await List(FindingState.Closed);
+
+        ItShouldListOpenAndClosedFindings();
+        ItShouldStillFilterByState();
+
+        void ItShouldListOpenAndClosedFindings() =>
+            all.Value.Select(finding => finding.Id).ShouldBe([resolvedId, openId], ignoreOrder: true);
+
+        void ItShouldStillFilterByState()
+        {
+            open.Value.Select(finding => finding.Id).ShouldBe([openId]);
+            closed.Value.Select(finding => finding.Id).ShouldBe([resolvedId]);
+        }
+    }
+
+    [Test]
+    public async Task AnUnknownStateIsRequested()
+    {
+        await _wiki.InitialiseAsync();
+
+        Result<IReadOnlyCollection<ReviewFinding>, Error> listed = await List((FindingState)42);
+
+        ItShouldRejectTheState();
+
+        void ItShouldRejectTheState() => listed.Error.ShouldBeOfType<ValidationError>().Code.ShouldBe("UnknownFindingState");
+    }
+
+    private Task<Result<IReadOnlyCollection<ReviewFinding>, Error>> List(FindingState? state) =>
+        _handler.Handle(new ListFindingsQuery(state), CancellationToken.None);
 }

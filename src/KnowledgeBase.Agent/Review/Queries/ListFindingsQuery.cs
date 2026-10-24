@@ -11,7 +11,8 @@ using Microsoft.Extensions.Options;
 
 namespace KnowledgeBase.Agent.Review.Queries;
 
-public record ListFindingsQuery(FindingState DesiredState);
+/// <summary>Lists the findings in one state, or every finding when <paramref name="DesiredState"/> is null.</summary>
+public record ListFindingsQuery(FindingState? DesiredState);
 
 internal sealed class ListFindingsQueryHandler(
     ILogger<ListFindingsQueryHandler> logger,
@@ -25,17 +26,27 @@ internal sealed class ListFindingsQueryHandler(
         ListFindingsQuery request,
         CancellationToken cancellationToken)
     {
-        string findingDirectory = request.DesiredState switch
+        string[] findingDirectories = request.DesiredState switch
         {
-            FindingState.Open => _settings.ReviewOpenFindingsDirectory,
-            FindingState.Closed => _settings.ReviewClosedFindingsDirectory,
-            _ => throw new InvalidOperationException($"Unknown finding state: {request.DesiredState}")
+            FindingState.Open => [_settings.ReviewOpenFindingsDirectory],
+            FindingState.Closed => [_settings.ReviewClosedFindingsDirectory],
+            null => [_settings.ReviewOpenFindingsDirectory, _settings.ReviewClosedFindingsDirectory],
+            _ => []
         };
+        if (findingDirectories.Length == 0)
+        {
+            return new ValidationError("UnknownFindingState", $"Unknown finding state: {request.DesiredState}.");
+        }
 
-        return await listFilesHandler
-            .Handle(new ListFilesRequest(findingDirectory))
+        return await findingDirectories
+            .Select(ListFindingFiles)
+            .ZipResults()
             .Bind(files => ReadAllFindings(files, cancellationToken));
     }
+
+    private Result<IReadOnlyCollection<string>, Error> ListFindingFiles(string directory) => listFilesHandler
+        .Handle(new ListFilesRequest(directory))
+        .Map(IReadOnlyCollection<string> (files) => [.. files]);
 
     private async Task<Result<IReadOnlyCollection<ReviewFinding>, Error>> ReadAllFindings(
         IEnumerable<string> files,

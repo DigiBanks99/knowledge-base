@@ -18,8 +18,9 @@ internal static class ListFindings
                 .MapGet(string.Empty, Handle)
                 .WithName(nameof(ListFindings))
                 .WithSummary("List wiki findings")
-                .WithDescription("Returns a list of all wiki findings that are to be processed")
+                .WithDescription("Returns the wiki findings in the given state, or every finding when no state is given.")
                 .Produces<IReadOnlyCollection<ReviewFinding>>()
+                .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status404NotFound)
                 .Produces(StatusCodes.Status500InternalServerError);
 
@@ -29,7 +30,7 @@ internal static class ListFindings
 
     private static async Task<Microsoft.AspNetCore.Http.IResult> Handle(
         [FromQuery] [Description("Filter the findings by state. If not specified, all findings will be returned.")]
-        FindingState state,
+        FindingState? state,
         ListFindingsQueryHandler handler,
         CancellationToken cancellationToken) => await handler
         .Handle(new ListFindingsQuery(state), cancellationToken)
@@ -37,6 +38,7 @@ internal static class ListFindings
             Results.Ok,
             error => Results.Problem(error.Message, statusCode: error switch
             {
+                ValidationError => StatusCodes.Status400BadRequest,
                 DirectoryNotFoundError => StatusCodes.Status404NotFound,
                 _ => StatusCodes.Status500InternalServerError
             }));
