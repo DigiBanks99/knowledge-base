@@ -110,6 +110,7 @@ api.PublishAsDockerComposeService((resource, service) =>
 // A fixed port, so the local sign-in redirect address (http://localhost:5173/signin-oidc) can be registered in Entra.
 IResourceBuilder<ViteAppResource> web = builder
     .AddViteApp("knowledgebase-web", "../KnowledgeBase.Web")
+    .WithPnpm()
     .WithEndpoint("http", endpoint => endpoint.Port = 5173)
     .WithReference(api)
     .WaitFor(api);
