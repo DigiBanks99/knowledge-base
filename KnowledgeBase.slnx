@@ -4,6 +4,7 @@
     <Project Path="src/KnowledgeBase.AppHost/KnowledgeBase.AppHost.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="src/KnowledgeBase.Agent.IntegrationTests/KnowledgeBase.Agent.IntegrationTests.csproj" />
     <Project Path="src/KnowledgeBase.Agent.Tests/KnowledgeBase.Agent.Tests.csproj" />
   </Folder>
 </Solution>

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="KnowledgeBase.Agent.Tests" />
+    <InternalsVisibleTo Include="KnowledgeBase.Agent.IntegrationTests" />
     <!-- Lets NSubstitute proxy internal types. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
