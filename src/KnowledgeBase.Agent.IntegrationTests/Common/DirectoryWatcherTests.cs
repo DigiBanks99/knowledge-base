@@ -14,7 +14,7 @@ public sealed class DirectoryWatcherTests : IDisposable
 
     public DirectoryWatcherTests()
     {
-        _watcher = new DirectoryWatcher(NullLogger.Instance, _directory.Path, "*.md", HandleAsync);
+        _watcher = new DirectoryWatcher(NullLogger.Instance, TimeProvider.System, _directory.Path, "*.md", HandleAsync);
     }
 
     /// <summary>Files with this name fail to be handled.</summary>

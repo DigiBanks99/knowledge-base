@@ -14,7 +14,8 @@ namespace KnowledgeBase.Agent.Review.Watchers;
 internal sealed class OpenFindingsWatcher(
     ILogger<OpenFindingsWatcher> logger,
     IOptions<WikiConfigurationSettings> settings,
-    EditWikiCommandHandler editWikiCommandHandler)
+    EditWikiCommandHandler editWikiCommandHandler,
+    TimeProvider timeProvider)
     : IDisposable
 {
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromSeconds(5);
@@ -34,6 +35,7 @@ internal sealed class OpenFindingsWatcher(
     {
         _openFindingsWatcher = new DirectoryWatcher(
             logger,
+            timeProvider,
             _wikiConfigurationSettings.ReviewOpenFindingsDirectory,
             "*.json",
             OnFindingOpened);
@@ -49,7 +51,7 @@ internal sealed class OpenFindingsWatcher(
         {
             try
             {
-                await Task.Delay(DebounceDelay);
+                await Task.Delay(DebounceDelay, timeProvider);
                 while (Interlocked.Exchange(ref _pending, 0) == 1)
                 {
                     await Result.Try(() => editWikiCommandHandler

@@ -11,7 +11,8 @@ internal sealed class NoteWatcher(
     ILogger<NoteWatcher> logger,
     IOptions<WikiConfigurationSettings> settings,
     MoveFileHandler moveFileHandler,
-    StartNoteProcessingCommandHandler startNoteProcessingCommandHandler)
+    StartNoteProcessingCommandHandler startNoteProcessingCommandHandler,
+    TimeProvider timeProvider)
     : IDisposable
 {
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
@@ -23,7 +24,7 @@ internal sealed class NoteWatcher(
     {
         RequeueInterruptedNotes();
 
-        _newNotesWatcher = new DirectoryWatcher(logger, _wikiConfigurationSettings.NewNotesDirectory, "*.md", OnNewNote);
+        _newNotesWatcher = new DirectoryWatcher(logger, timeProvider, _wikiConfigurationSettings.NewNotesDirectory, "*.md", OnNewNote);
         _newNotesWatcher.Start();
     }
 

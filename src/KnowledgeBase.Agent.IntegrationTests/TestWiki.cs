@@ -37,7 +37,9 @@ internal sealed class TestWiki : IAsyncDisposable
         });
         builder.Services.AddLogging(logging => logging.AddProvider(_problems));
         builder.Services.AddSingleton<IServer, NoServer>();
-        builder.Services.AddSingleton(TimeProvider.System);
+        // Timers run ten times faster: the Editor's 5 second debounce takes half a second, which still leaves room for
+        // a review's findings to be written before it ends.
+        builder.Services.AddSingleton<TimeProvider>(new AcceleratedTimeProvider(10));
         builder
             .AddWiki()
             .AddHealthChecks();

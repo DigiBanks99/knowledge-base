@@ -9,7 +9,8 @@ namespace KnowledgeBase.Agent.Facts.Watchers;
 internal sealed class FactWatcher(
     ILogger<FactWatcher> logger,
     IOptions<WikiConfigurationSettings> settings,
-    IngestFactsCommandHandler ingestFactsHandler)
+    IngestFactsCommandHandler ingestFactsHandler,
+    TimeProvider timeProvider)
     : IDisposable
 {
     private readonly WikiConfigurationSettings _wikiConfigurationSettings = settings.Value;
@@ -19,7 +20,7 @@ internal sealed class FactWatcher(
 
     public void Register()
     {
-        _newFactsWatcher = new DirectoryWatcher(logger, _wikiConfigurationSettings.FactsDirectory, "*.json", OnNewFact);
+        _newFactsWatcher = new DirectoryWatcher(logger, timeProvider, _wikiConfigurationSettings.FactsDirectory, "*.json", OnNewFact);
         _newFactsWatcher.Start();
     }
 

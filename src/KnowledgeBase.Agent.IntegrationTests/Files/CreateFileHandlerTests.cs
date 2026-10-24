@@ -25,7 +25,7 @@ public sealed class CreateFileHandlerTests : IDisposable
         // Large enough that a write is not over before a watcher reacts to the file being created.
         string content = string.Concat(Enumerable.Repeat("Susan gave feedback on the design review. ", 2_000));
         ConcurrentDictionary<string, string> read = new();
-        using DirectoryWatcher watcher = new(NullLogger.Instance, _directory.Path, "*.md", async path =>
+        using DirectoryWatcher watcher = new(NullLogger.Instance, TimeProvider.System, _directory.Path, "*.md", async path =>
             read[Path.GetFileName(path)] = await File.ReadAllTextAsync(path));
         watcher.Start();
 
