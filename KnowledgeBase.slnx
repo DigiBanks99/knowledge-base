@@ -3,4 +3,7 @@
     <Project Path="src/KnowledgeBase.Agent/KnowledgeBase.Agent.csproj" />
     <Project Path="src/KnowledgeBase.AppHost/KnowledgeBase.AppHost.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="src/KnowledgeBase.Agent.Tests/KnowledgeBase.Agent.Tests.csproj" />
+  </Folder>
 </Solution>

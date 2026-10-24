@@ -18,6 +18,12 @@
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="KnowledgeBase.Agent.Tests" />
+    <!-- Lets NSubstitute proxy internal types. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
   <!-- The private instructions submodule. It is not checked out in public CI builds, so the glob may match nothing. -->
   <ItemGroup>
     <None Include="..\..\config\*.md" Exclude="..\..\config\README.md" LinkBase="config" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
