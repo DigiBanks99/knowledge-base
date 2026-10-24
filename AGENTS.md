@@ -9,6 +9,7 @@ configure it.
   passed to the API as environment variables.
 - `src/KnowledgeBase.Agent`: the API and the agents, organised by feature folder (`Notes`, `Facts`, `Review`, `Wiki`,
   `Conversations`, `Runs`, `Files`, `Auth`, ...). `Program.cs` registers the five agents and their tools.
+- `src/KnowledgeBase.Agent.Tests`: unit tests for the API, mirroring its feature folders.
 - `src/KnowledgeBase.Web`: React 19 + TypeScript + Vite UI. The API client is in `src/api.ts`, pages in `src/pages`.
 - `.agents/skills`: Aspire skills for agents. `.mcp.json` registers the Aspire MCP server (`aspire agent mcp`).
 
@@ -20,6 +21,7 @@ Run these before declaring work done; CI runs exactly these and fails on any war
 dotnet restore KnowledgeBase.slnx --locked-mode
 dotnet format KnowledgeBase.slnx --verify-no-changes --no-restore
 dotnet build KnowledgeBase.slnx --no-restore --configuration Release
+dotnet test --solution KnowledgeBase.slnx --no-build --configuration Release
 ```
 
 ```shell
@@ -30,7 +32,6 @@ pnpm run build   # tsc -b && vite build
 ```
 
 - If `dotnet format --verify-no-changes` fails, run `dotnet format KnowledgeBase.slnx` and review the diff.
-- There is no test project yet. Do not claim tests pass; say the build and format checks pass.
 - Run the app with `aspire run` (prefer the Aspire skills / MCP tools for starting, stopping and reading logs). It needs
   real secrets and Entra sign-in, so it may not start in an agent environment; say so rather than guessing.
 
@@ -64,6 +65,20 @@ pnpm run build   # tsc -b && vite build
   `logger.LogXxx(...)` with string templates.
 - Inject `TimeProvider` for the current time; do not call `DateTime.Now`/`UtcNow`.
 - Comments explain why, not what; XML doc comments on non-obvious types and members. Match the existing density.
+
+## Tests
+
+- TUnit runs the tests (on Microsoft.Testing.Platform, selected in `global.json`), Shouldly asserts and NSubstitute
+  fakes dependencies. Do not add TUnit's own assertions, xUnit or Moq.
+- Unit tests stay pure: no LLM calls, network or real wiki directory. Logic that needs the disk or an agent belongs
+  behind something a test can substitute, or in a separate integration test project.
+- One test class per class under test (`WikiPathsTests`), its subject built in the constructor. A test method names
+  the scenario, never the expectation (`APathLeavesTheWiki`, not `ResolveThrowsWhenOutsideTheWiki`). It arranges and
+  acts, then calls local functions named for each expectation (`ItShouldBeRefused()`), declared below the calls,
+  which only assert. Capture an expected exception with `Catch.Exception` in the act step rather than throwing
+  inside an `ItShould...` function.
+- The API grants `InternalsVisibleTo` to the test project and to NSubstitute's proxy assembly, so internal types can
+  be tested and substituted. Sealed classes cannot be substituted; depend on an interface where a test needs to.
 
 ## Agent pipeline rules
 

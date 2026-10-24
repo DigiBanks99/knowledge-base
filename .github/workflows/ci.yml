@@ -19,7 +19,7 @@ concurrency:
 # what runs.
 jobs:
   api:
-    name: API and AppHost (.NET)
+    name: API, AppHost and tests (.NET)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -48,6 +48,10 @@ jobs:
 
       - name: Build
         run: dotnet build KnowledgeBase.slnx --no-restore --configuration Release
+
+      # global.json selects Microsoft.Testing.Platform, which TUnit runs on.
+      - name: Test
+        run: dotnet test --solution KnowledgeBase.slnx --no-build --configuration Release
 
   web:
     name: UI (React)
