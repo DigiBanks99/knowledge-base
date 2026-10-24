@@ -3,17 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Link } from 'react-router-dom'
 import type { AgentRun } from './api'
-
-export function formatDate(value: string | null | undefined): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-export function formatDuration(run: AgentRun): string {
-  const end = run.completedAt ? new Date(run.completedAt).getTime() : Date.now()
-  const seconds = Math.max(0, Math.round((end - new Date(run.startedAt).getTime()) / 1000))
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-}
+import { formatDate, formatDuration, resolveWikiPath } from './format'
 
 export function Badge({ tone, children }: { tone: string; children: ReactNode }) {
   return <span className={`badge badge-${tone.toLowerCase()}`}>{children}</span>
@@ -81,16 +71,6 @@ export function RunCard({ run, defaultOpen = false }: { run: AgentRun; defaultOp
 function WikiTarget({ target, tool }: { target: string; tool: string }) {
   const isWikiPage = !target.includes('→') && target.endsWith('.md') && tool !== 'DeleteFile'
   return isWikiPage ? <Link to={`/wiki?page=${encodeURIComponent(target)}`}>{target}</Link> : <span>{target}</span>
-}
-
-/** Resolves a relative markdown link against the page it appears on, e.g. ../people/index.md from me/index.md. */
-export function resolveWikiPath(fromPage: string, href: string): string {
-  const parts = fromPage.split('/').slice(0, -1)
-  for (const segment of href.split('#')[0].split('/')) {
-    if (segment === '..') parts.pop()
-    else if (segment !== '.' && segment !== '') parts.push(segment)
-  }
-  return parts.join('/')
 }
 
 /**

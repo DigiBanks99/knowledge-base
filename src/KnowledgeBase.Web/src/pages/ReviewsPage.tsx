@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type ReviewFinding } from '../api'
-import { Badge, Empty, ErrorMessage, Loading, Markdown, RunCard, formatDate } from '../components'
+import { Badge, Empty, ErrorMessage, Loading, Markdown, RunCard } from '../components'
+import { formatDate } from '../format'
 
 export function ReviewsPage() {
   const runs = useQuery({ queryKey: ['runs', 'Reviewer'], queryFn: () => api.runs({ agent: 'Reviewer', limit: 20 }) })

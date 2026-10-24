@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, type WikiNode } from '../api'
-import { Empty, ErrorMessage, Loading, Markdown, formatDate } from '../components'
+import { Empty, ErrorMessage, Loading, Markdown } from '../components'
+import { formatDate } from '../format'
 
 export function WikiPage() {
   const [params] = useSearchParams()

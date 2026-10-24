@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, ask, type ConversationMessage } from '../api'
-import { Empty, ErrorMessage, Loading, Markdown, formatDate } from '../components'
+import { api, ask, type Conversation, type ConversationMessage } from '../api'
+import { Empty, ErrorMessage, Loading, Markdown } from '../components'
+import { formatDate } from '../format'
 
 export function AskPage() {
   const { conversationId } = useParams()
@@ -62,29 +63,28 @@ export function AskPage() {
 
 function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
   const queryClient = useQueryClient()
-  const conversation = useQuery({ queryKey: ['conversations', id], queryFn: () => api.conversation(id) })
-  const [messages, setMessages] = useState<ConversationMessage[]>([])
+  const queryKey = ['conversations', id]
+  const conversation = useQuery({ queryKey, queryFn: () => api.conversation(id) })
+  // The question being answered right now; saved messages come from the conversation itself.
+  const [pending, setPending] = useState<ConversationMessage | null>(null)
   const [question, setQuestion] = useState('')
   const [streaming, setStreaming] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const abort = useRef<AbortController | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (conversation.data) setMessages(conversation.data.messages)
-  }, [conversation.data])
-
   useEffect(() => () => abort.current?.abort(), [])
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [messages, streaming])
+  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [conversation.data, pending, streaming])
 
   const send = async () => {
     const text = question.trim()
     if (!text || streaming !== null) return
 
+    const asked: ConversationMessage = { role: 'User', text, at: new Date().toISOString() }
     setQuestion('')
     setError(null)
-    setMessages((current) => [...current, { role: 'User', text, at: new Date().toISOString() }])
+    setPending(asked)
     setStreaming('')
     abort.current = new AbortController()
 
@@ -94,7 +94,10 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
         text,
         {
           onDelta: (delta) => setStreaming((current) => (current ?? '') + delta),
-          onDone: (message) => setMessages((current) => [...current, message]),
+          onDone: (answer) =>
+            queryClient.setQueryData<Conversation>(queryKey, (current) =>
+              current ? { ...current, messages: [...current.messages, asked, answer] } : current,
+            ),
           onError: setError,
         },
         abort.current.signal,
@@ -104,6 +107,7 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
         setError('The connection was lost while answering.')
       }
     } finally {
+      setPending(null)
       setStreaming(null)
       void queryClient.invalidateQueries({ queryKey: ['conversations'] })
     }
@@ -111,6 +115,8 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
 
   if (conversation.isPending) return <Loading what="conversation" />
   if (conversation.isError) return <ErrorMessage error={conversation.error} />
+
+  const messages = pending ? [...conversation.data.messages, pending] : conversation.data.messages
 
   return (
     <>
