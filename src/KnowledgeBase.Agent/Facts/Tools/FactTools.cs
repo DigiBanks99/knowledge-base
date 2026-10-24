@@ -20,14 +20,16 @@ internal sealed class FactTools(
 {
     private readonly WikiConfigurationSettings _settings = settings.Value;
 
+    // The facts are a top-level array rather than a wrapper object: models given `facts: { facts: [...] }` tend to
+    // drop or flatten one of the levels.
     [Description("""
                  Writes facts extracted from notes being processed to a fact store for further processing. Use this to persist the facts you've extracted from a note.
-                 Give the fact file a descriptive, kebab-case name of the facts plus the json extension/
+                 Pass both `facts` and `collectionName` in one call.
                  """)]
-    public async Task<FactContainer> FactWriterTool(
-        [Description("The container of facts that were extracted and need to be persisted.")] FactContainer facts,
+    public async Task<string> FactWriterTool(
+        [Description("Every fact extracted from the note: one entry per subject, each with its observations.")] Fact[] facts,
         [Description("""
-                     The fact collection name. This will be used to identify the collection of facts in the fact store. Kebab-case, for example `thoughts-on-the-relationship-with-susan-and-growth.json`
+                     The fact collection name, used to identify the collection in the fact store. Descriptive and kebab-case, without an extension, for example `thoughts-on-the-relationship-with-susan-and-growth`.
                      """)] string collectionName,
         CancellationToken cancellationToken)
     {
@@ -39,7 +41,7 @@ internal sealed class FactTools(
         logger.SerializingFactsToFile(factFilePath);
         CreateFileRequest createFileCommand = new(
             factFilePath,
-            JsonSerializer.Serialize(new FactDocument(sourceNote, facts.Facts), JsonSerializerOptions.Web),
+            JsonSerializer.Serialize(new FactDocument(sourceNote, facts), JsonSerializerOptions.Web),
             MediaTypeNames.Application.Json);
 
         Result<string, Error> result = await createFileHandler
@@ -47,6 +49,6 @@ internal sealed class FactTools(
             .TapError(logger.ErrorOccurred);
         return result.IsFailure
             ? throw new InvalidOperationException($"Failed to write facts to {factFilePath}. Error: {result.Error}")
-            : facts;
+            : $"Wrote {facts.Length} facts to {collectionName}.";
     }
 }
