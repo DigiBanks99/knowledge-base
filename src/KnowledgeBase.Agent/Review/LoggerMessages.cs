@@ -25,4 +25,7 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Information, "Scheduled review requested at '{FilePath}'.")]
     public static partial void ScheduledReviewRequested(this ILogger logger, string filePath);
+
+    [LoggerMessage(LogLevel.Warning, "Skipped the unreadable finding '{FilePath}': {Error}")]
+    public static partial void SkippedUnreadableFinding(this ILogger logger, string filePath, Error error);
 }
