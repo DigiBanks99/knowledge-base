@@ -1,3 +1,4 @@
+using Aspire.Hosting.Docker.Resources.ServiceNodes;
 using Aspire.Hosting.JavaScript;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
@@ -8,10 +9,6 @@ IResourceBuilder<ParameterResource> rootDirectory = builder
     .AddParameter("WikiRootDirectory");
 IResourceBuilder<ParameterResource> apiKey = builder
     .AddParameter("AnthropicApiKey", true);
-IResourceBuilder<ParameterResource> sharedInstructions = builder
-    .AddParameter("SharedInstructions", true);
-IResourceBuilder<ParameterResource> wikiRules = builder
-    .AddParameter("WikiRules", true);
 
 // Sign-in with Entra ID (the app registration's directory, application id and a client secret).
 IResourceBuilder<ParameterResource> entraTenantId = builder
@@ -27,16 +24,29 @@ IResourceBuilder<ParameterResource> openAICompatibleEndpoint = builder
 IResourceBuilder<ParameterResource> openAICompatibleApiKey = builder
     .AddParameter("OpenAICompatibleApiKey", secret: true);
 
+// Deployed with Docker Compose to a single machine, where a Cloudflare tunnel forwards to the API on loopback. Nothing
+// is published beyond loopback; the dashboard is reached over an SSH tunnel.
+builder.AddDockerComposeEnvironment("compose")
+    .WithDashboard(dashboard => dashboard
+        .PublishAsDockerComposeService((_, service) =>
+        {
+            service.Ports = [$"127.0.0.1:{DashboardPort}:18888", $"127.0.0.1:{DashboardOtlpPort}:18889"];
+            service.Restart = "unless-stopped";
+        }));
+
 IResourceBuilder<RedisResource> cache = builder
-    .AddRedis("cache");
+    .AddRedis("cache")
+    .PublishAsDockerComposeService((_, service) =>
+    {
+        service.Ports = [$"127.0.0.1:{RedisPort}:6379"];
+        service.Restart = "unless-stopped";
+    });
 
 IResourceBuilder<ProjectResource> api = builder
     .AddProject<Projects.KnowledgeBase_Agent>("knowledgebase-agent")
     .WithReference(cache)
     .WaitFor(cache)
     .WithEnvironment("Wiki__RootDirectory", rootDirectory)
-    .WithEnvironment("SharedInstructions", sharedInstructions)
-    .WithEnvironment("WikiRules", wikiRules)
     .WithEnvironment("Authentication__TenantId", entraTenantId)
     .WithEnvironment("Authentication__ClientId", entraClientId)
     .WithEnvironment("Authentication__ClientSecret", entraClientSecret)
@@ -48,9 +58,45 @@ foreach (string agent in agents)
     api
         .WithEnvironment($"{agent}__Provider", builder.AddParameter($"{agent}Provider"))
         .WithEnvironment($"{agent}__ApiKey", apiKey)
-        .WithEnvironment($"{agent}__Model", builder.AddParameter($"{agent}Model"))
-        .WithEnvironment($"{agent}__Instructions", builder.AddParameter($"{agent}Instructions"));
+        .WithEnvironment($"{agent}__Model", builder.AddParameter($"{agent}Model"));
 }
+
+// The instructions and wiki rules are markdown files in the private configuration submodule. A deployment builds them
+// into the image; a local run reads them from the submodule so edits apply when the API restarts. Without access to
+// the submodule, the scaffold command copies bare templates in its place.
+if (builder.ExecutionContext.IsRunMode)
+{
+    string repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".."));
+    string configDirectory = Path.Combine(repositoryRoot, "config");
+    api
+        .WithEnvironment("ConfigDirectory", configDirectory)
+        .WithScaffoldConfigCommand(Path.Combine(repositoryRoot, "config.template"), configDirectory);
+}
+
+// The API shares the host's network so it reaches a model server listening on the host's loopback (such as
+// llama-server) without opening that server or the firewall to containers. Redis and the dashboard are therefore
+// addressed through their loopback ports, and the wiki root directory on the host is mounted into the container.
+api.PublishAsDockerComposeService((resource, service) =>
+{
+    service.NetworkMode = "host";
+    service.Networks.Clear();
+    service.Expose.Clear();
+    service.Restart = "unless-stopped";
+    service.Volumes.Add(new Volume
+    {
+        Name = "wiki",
+        Type = "bind",
+        Source = rootDirectory.AsEnvironmentPlaceholder(resource),
+        Target = ContainerWikiRoot,
+    });
+
+    service.Environment.Remove("HTTP_PORTS");
+    service.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{ApiPort}";
+    service.Environment["Wiki__RootDirectory"] = ContainerWikiRoot;
+    service.Environment["ConnectionStrings__cache"] =
+        $"127.0.0.1:{RedisPort},password={cache.Resource.PasswordParameter!.AsEnvironmentPlaceholder(resource)}";
+    service.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://127.0.0.1:{DashboardOtlpPort}";
+});
 
 // A fixed port, so the local sign-in redirect address (http://localhost:5173/signin-oidc) can be registered in Entra.
 IResourceBuilder<ViteAppResource> web = builder
@@ -62,3 +108,13 @@ IResourceBuilder<ViteAppResource> web = builder
 api.PublishWithContainerFiles(web, "wwwroot");
 
 builder.Build().Run();
+
+internal partial class Program
+{
+    /// <summary>The loopback port the Cloudflare tunnel forwards to.</summary>
+    private const int ApiPort = 7321;
+    private const int RedisPort = 7322;
+    private const int DashboardPort = 7323;
+    private const int DashboardOtlpPort = 7324;
+    private const string ContainerWikiRoot = "/data";
+}

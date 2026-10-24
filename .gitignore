@@ -489,3 +489,6 @@ local/
 
 # Windows device name written as a file by tools that redirect to NUL from a POSIX shell
 NUL
+
+# Aspire publish and deploy output (the env files hold resolved secrets)
+aspire-output/

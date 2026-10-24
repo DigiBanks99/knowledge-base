@@ -1,0 +1,114 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a queued deployment waits for the running one instead of cancelling it.
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to the VM
+    # Deploy only after CI succeeded for a push to main in this repository. workflow_run also fires for CI runs on
+    # pull requests, including those from forks, and those must never reach the self-hosted runner. A manual run is
+    # limited to main by the production environment's branch policy.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: [self-hosted, Linux, ARM64, knowledge-base]
+    environment:
+      name: production
+    timeout-minutes: 30
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      ASPIRE_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      # Deploy exactly the commit CI verified, not whatever main points to by now.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      # The agent instructions live in a private repository, pinned as the config submodule. It is checked out at the
+      # pinned commit with a read-only deploy key and built into the image.
+      - name: Find the pinned configuration
+        id: config
+        run: echo "sha=$(git ls-tree HEAD config | awk '{ print $3 }')" >> "$GITHUB_OUTPUT"
+
+      - name: Check out configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}-config
+          ref: ${{ steps.config.outputs.sha }}
+          path: config
+          ssh-key: ${{ secrets.CONFIG_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Check configuration
+        run: |
+          for file in SharedInstructions WikiRules {FactFinder,ThreadWeaver,Reviewer,Editor,Librarian}.Instructions; do
+            test -s "config/$file.md" || { echo "::error::config/$file.md is missing or empty"; exit 1; }
+          done
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # The CLI version follows the AppHost SDK, so the two never drift apart.
+      - name: Install Aspire CLI
+        run: |
+          version=$(sed -n 's#.*Sdk="Aspire.AppHost.Sdk/\([^"]*\)".*#\1#p' src/KnowledgeBase.AppHost/KnowledgeBase.AppHost.csproj)
+          dotnet tool update Aspire.Cli --version "$version" --tool-path "$RUNNER_TOOL_CACHE/aspire-cli"
+          echo "$RUNNER_TOOL_CACHE/aspire-cli" >> "$GITHUB_PATH"
+
+      # Builds the images on the VM and runs them with Docker Compose. Every AppHost parameter comes from the
+      # production environment; keys are kept in secrets so they never show in the public logs.
+      - name: Deploy
+        working-directory: src/KnowledgeBase.AppHost
+        env:
+          Parameters__WikiRootDirectory: ${{ vars.WIKI_ROOT_DIRECTORY }}
+          Parameters__AnthropicApiKey: ${{ secrets.ANTHROPIC_API_KEY }}
+          Parameters__EntraTenantId: ${{ vars.ENTRA_TENANT_ID }}
+          Parameters__EntraClientId: ${{ vars.ENTRA_CLIENT_ID }}
+          Parameters__EntraClientSecret: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          Parameters__OpenAICompatibleEndpoint: ${{ vars.OPENAI_COMPATIBLE_ENDPOINT }}
+          Parameters__OpenAICompatibleApiKey: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
+          Parameters__FactFinderProvider: ${{ vars.FACTFINDER_PROVIDER }}
+          Parameters__FactFinderModel: ${{ vars.FACTFINDER_MODEL }}
+          Parameters__ThreadWeaverProvider: ${{ vars.THREADWEAVER_PROVIDER }}
+          Parameters__ThreadWeaverModel: ${{ vars.THREADWEAVER_MODEL }}
+          Parameters__ReviewerProvider: ${{ vars.REVIEWER_PROVIDER }}
+          Parameters__ReviewerModel: ${{ vars.REVIEWER_MODEL }}
+          Parameters__EditorProvider: ${{ vars.EDITOR_PROVIDER }}
+          Parameters__EditorModel: ${{ vars.EDITOR_MODEL }}
+          Parameters__LibrarianProvider: ${{ vars.LIBRARIAN_PROVIDER }}
+          Parameters__LibrarianModel: ${{ vars.LIBRARIAN_MODEL }}
+        run: aspire deploy --environment production --non-interactive
+
+      - name: Check health
+        run: >-
+          curl --fail --silent --show-error --retry 20 --retry-delay 3 --retry-all-errors
+          http://127.0.0.1:7321/health
+
+      # The generated env file holds resolved secrets; the running containers no longer need it.
+      - name: Remove generated secrets
+        if: always()
+        run: rm -f src/KnowledgeBase.AppHost/aspire-output/.env*
+
+      - name: Remove dangling images
+        if: always()
+        run: docker image prune --force
