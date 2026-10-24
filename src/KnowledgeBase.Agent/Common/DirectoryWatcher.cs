@@ -16,8 +16,9 @@ internal sealed class DirectoryWatcher(
     Func<string, Task> handleFile)
     : IDisposable
 {
-    private static readonly TimeSpan ReadyRetryDelay = TimeSpan.FromMilliseconds(250);
-    private const int ReadyMaxAttempts = 40;
+    private static readonly TimeSpan ReadyPollInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan ReadyTimeout = TimeSpan.FromMinutes(1);
+    private const int ReadyStablePolls = 2;
 
     private readonly ConcurrentDictionary<string, byte> _inFlight = new(StringComparer.OrdinalIgnoreCase);
     private FileSystemWatcher? _watcher;
@@ -100,26 +101,37 @@ internal sealed class DirectoryWatcher(
     }
 
     /// <summary>
-    /// Waits until the file can be opened exclusively, which means its writer has finished with it.
+    /// Waits until the file has content and its size and last write time have not changed for
+    /// <see cref="ReadyStablePolls"/> polls in a row, which means its writer has finished with it.
     /// </summary>
+    /// <remarks>
+    /// The app moves the files it writes into place complete, so this is for files written by other programs, such as a
+    /// note dropped into the folder by hand. An exclusive open is no test on Linux, where file locks are advisory: other
+    /// programs do not take them, and a .NET writer takes its lock just after creating the file, so a watcher holding
+    /// one at that moment makes the writer fail.
+    /// </remarks>
     private async Task<bool> WaitUntilReady(string filePath)
     {
-        for (int attempt = 1; attempt <= ReadyMaxAttempts; attempt++)
+        long started = timeProvider.GetTimestamp();
+        (long Length, DateTime LastWriteTime)? previous = null;
+        int stablePolls = 0;
+        while (timeProvider.GetElapsedTime(started) < ReadyTimeout)
         {
-            if (!File.Exists(filePath))
+            FileInfo file = new(filePath);
+            if (!file.Exists)
             {
                 return false;
             }
 
-            try
+            (long Length, DateTime LastWriteTime) current = (file.Length, file.LastWriteTimeUtc);
+            stablePolls = current.Length > 0 && current == previous ? stablePolls + 1 : 0;
+            if (stablePolls >= ReadyStablePolls)
             {
-                await using FileStream _ = new(filePath, FileMode.Open, FileAccess.Read, FileShare.None);
                 return true;
             }
-            catch (IOException)
-            {
-                await Task.Delay(ReadyRetryDelay, timeProvider);
-            }
+
+            previous = current;
+            await Task.Delay(ReadyPollInterval, timeProvider);
         }
 
         logger.FileNotReady(filePath);

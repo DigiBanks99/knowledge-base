@@ -10,6 +10,7 @@ public sealed class DirectoryWatcherTests : IDisposable
 {
     private readonly TemporaryDirectory _directory = new();
     private readonly ConcurrentQueue<string> _handled = new();
+    private readonly ConcurrentDictionary<string, string> _contents = new();
     private readonly DirectoryWatcher _watcher;
 
     public DirectoryWatcherTests()
@@ -80,28 +81,59 @@ public sealed class DirectoryWatcherTests : IDisposable
     }
 
     [Test]
-    public async Task AFileIsStillBeingWritten()
+    public async Task AFileIsStillGrowing()
     {
-        bool handledWhileOpen;
+        string path = _directory.File("a.md");
+        _watcher.Start();
+        bool handledWhileGrowing = false;
 
-        // The writer opens the file before watching starts: on Linux the watcher could otherwise lock a new file before
-        // its writer does, which is why the pipeline's own writers move complete files into place.
-        await using (FileStream writer = new(_directory.File("a.md"), FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+        // Another program writing slowly, such as a copy over the network: the file exists from the first chunk.
+        await using (FileStream writer = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
         {
-            await writer.WriteAsync("A"u8.ToArray());
-            await writer.FlushAsync();
-            _watcher.Start();
-            handledWhileOpen = await Eventually.Until(() => !_handled.IsEmpty, TimeSpan.FromMilliseconds(750));
+            for (int chunk = 1; chunk <= 10; chunk++)
+            {
+                await writer.WriteAsync(System.Text.Encoding.UTF8.GetBytes($"Line {chunk}.\n"));
+                await writer.FlushAsync();
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                handledWhileGrowing |= !_handled.IsEmpty;
+            }
         }
 
-        bool handledOnceClosed = await Eventually.Until(() => _handled.Count == 1);
+        bool handledOnceWritten = await Eventually.Until(() => _handled.Count == 1);
 
-        ItShouldWaitForTheWriter();
-        ItShouldHandleTheFileOnceWritten();
+        ItShouldWaitUntilTheFileStopsGrowing();
+        ItShouldHandleTheWholeFile();
 
-        void ItShouldWaitForTheWriter() => handledWhileOpen.ShouldBeFalse();
+        void ItShouldWaitUntilTheFileStopsGrowing() => handledWhileGrowing.ShouldBeFalse();
 
-        void ItShouldHandleTheFileOnceWritten() => handledOnceClosed.ShouldBeTrue();
+        void ItShouldHandleTheWholeFile()
+        {
+            handledOnceWritten.ShouldBeTrue();
+            _contents["a.md"].ShouldEndWith("Line 10.\n");
+        }
+    }
+
+    [Test]
+    public async Task AnEmptyFileArrives()
+    {
+        string path = _directory.File("a.md");
+        _watcher.Start();
+
+        await File.WriteAllTextAsync(path, string.Empty);
+        bool handledWhileEmpty = await Eventually.Until(() => !_handled.IsEmpty, TimeSpan.FromMilliseconds(1_000));
+        await File.WriteAllTextAsync(path, "Written at last.");
+        bool handledOnceWritten = await Eventually.Until(() => _handled.Count == 1);
+
+        ItShouldWaitForContent();
+        ItShouldHandleTheContent();
+
+        void ItShouldWaitForContent() => handledWhileEmpty.ShouldBeFalse();
+
+        void ItShouldHandleTheContent()
+        {
+            handledOnceWritten.ShouldBeTrue();
+            _contents["a.md"].ShouldBe("Written at last.");
+        }
     }
 
     [Test]
@@ -123,10 +155,11 @@ public sealed class DirectoryWatcherTests : IDisposable
         }
     }
 
-    /// <summary>Behaves like the pipeline's handlers: records the file and moves it on, here by deleting it.</summary>
+    /// <summary>Behaves like the pipeline's handlers: reads the file and moves it on, here by deleting it.</summary>
     private Task HandleAsync(string path)
     {
         string name = Path.GetFileName(path);
+        _contents[name] = File.ReadAllText(path);
         _handled.Enqueue(name);
         File.Delete(path);
         return name == BrokenFile ? throw new IOException("The disk is full.") : Task.CompletedTask;
