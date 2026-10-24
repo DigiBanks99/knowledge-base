@@ -1,4 +1,6 @@
-﻿using KnowledgeBase.Agent.Common;
+﻿using System.Globalization;
+
+using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Review.Commands;
 using KnowledgeBase.Agent.Wiki;
@@ -40,11 +42,32 @@ internal sealed class ReviewRequestWatcher(
 
         await readFileHandler
             .Handle(new ReadFileRequest(requestPath), CancellationToken.None)
-            .Map(content => DateTimeOffset.Parse(content["Review - ".Length..]))
+            .Map(content => ReadRequestTime(requestPath, content))
             .Bind(date => reviewWikiCommandHandler.Handle(
                 new ReviewWikiCommand(Path.GetFileName(requestPath), date),
                 CancellationToken.None))
             .Bind(_ => moveFileHandler.Handle(new MoveFileRequest(requestPath, completedPath)))
             .TapError(error => logger.FailedToReviewWiki(requestPath, error));
+    }
+
+    /// <summary>
+    /// The time the review was requested, as <see cref="RequestReviewWikiCommandHandler"/> writes it. The time only
+    /// labels the review, so a request file written some other way, such as by hand, still starts a review, timed by
+    /// when the file was written, rather than staying in the requests folder for good.
+    /// </summary>
+    private DateTimeOffset ReadRequestTime(string requestPath, string content)
+    {
+        if (content.StartsWith(RequestReviewWikiCommandHandler.ContentPrefix, StringComparison.Ordinal)
+            && DateTimeOffset.TryParse(
+                content[RequestReviewWikiCommandHandler.ContentPrefix.Length..].Trim(),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out DateTimeOffset requestedAt))
+        {
+            return requestedAt;
+        }
+
+        logger.UnreadableReviewRequestTime(requestPath);
+        return new DateTimeOffset(File.GetLastWriteTimeUtc(requestPath), TimeSpan.Zero);
     }
 }

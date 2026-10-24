@@ -13,6 +13,9 @@ internal sealed class RequestReviewWikiCommandHandler(
     CreateFileHandler fileHandler,
     IOptions<WikiConfigurationSettings> options)
 {
+    /// <summary>A request file holds this prefix followed by the round-trip ("O") time of the request.</summary>
+    public const string ContentPrefix = "Review - ";
+
     private readonly WikiConfigurationSettings _settings = options.Value;
 
     public async Task<Result<string, Error>> Handle(
@@ -20,7 +23,7 @@ internal sealed class RequestReviewWikiCommandHandler(
         CancellationToken cancellationToken)
     {
         string fileName = CreateFileHandle(command.ReviewDate);
-        CreateFileRequest createFileRequest = new(fileName, $"Review - {command.ReviewDate:O}", MediaTypeNames.Text.Markdown);
+        CreateFileRequest createFileRequest = new(fileName, $"{ContentPrefix}{command.ReviewDate:O}", MediaTypeNames.Text.Markdown);
         return await fileHandler.Handle(createFileRequest, cancellationToken);
     }
 

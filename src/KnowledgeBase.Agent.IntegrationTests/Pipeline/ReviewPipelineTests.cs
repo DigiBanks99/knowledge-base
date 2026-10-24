@@ -90,4 +90,28 @@ public sealed class ReviewPipelineTests : IAsyncDisposable
 
         void ItShouldRunTheEditorOnceForAllTheFindings() => _wiki.Editor.Prompts.ShouldHaveSingleItem();
     }
+
+    [Test]
+    public async Task AReviewIsRequestedByHand()
+    {
+        await _wiki.InitialiseAsync();
+        _wiki.Start();
+
+        _wiki.Write(_wiki.Settings.ReviewRequestDirectory, "please-review.md", "Please review the people pages.");
+        bool settled = await Eventually.Until(async () =>
+            TestWiki.FileNames(_wiki.Settings.CompletedReviewRequestDirectory).Count == 1 && await _wiki.RunsFinishedAsync(1));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+
+        ItShouldStillReviewTheWiki();
+        ItShouldCompleteTheRequest();
+
+        void ItShouldStillReviewTheWiki() => _wiki.Reviewer.Prompts.ShouldHaveSingleItem();
+
+        void ItShouldCompleteTheRequest()
+        {
+            settled.ShouldBeTrue(pipeline);
+            TestWiki.FileNames(_wiki.Settings.CompletedReviewRequestDirectory).ShouldBe(["please-review.md"]);
+            TestWiki.FileNames(_wiki.Settings.ReviewRequestDirectory).ShouldBeEmpty();
+        }
+    }
 }
