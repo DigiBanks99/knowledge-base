@@ -1,5 +1,14 @@
+using System.Runtime.InteropServices;
+
 using Aspire.Hosting.Docker.Resources.ServiceNodes;
 using Aspire.Hosting.JavaScript;
+using Aspire.Hosting.Publishing;
+
+const int ApiPort = 7321;
+const int RedisPort = 7322;
+const int DashboardPort = 7323;
+const int DashboardOtlpPort = 7324;
+const string ContainerWikiRoot = "/data";
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
@@ -107,14 +116,14 @@ IResourceBuilder<ViteAppResource> web = builder
 
 api.PublishWithContainerFiles(web, "wwwroot");
 
-builder.Build().Run();
+// The images are built on the machine that runs them (the deployment VM's runner), so they target its architecture
+// rather than Aspire's default of linux/amd64, which cannot run on an ARM64 host. The API is experimental.
+#pragma warning disable ASPIREPIPELINES003
+ContainerTargetPlatform hostPlatform = RuntimeInformation.OSArchitecture == Architecture.Arm64
+    ? ContainerTargetPlatform.LinuxArm64
+    : ContainerTargetPlatform.LinuxAmd64;
+api.WithContainerBuildOptions(context => context.TargetPlatform = hostPlatform);
+web.WithContainerBuildOptions(context => context.TargetPlatform = hostPlatform);
+#pragma warning restore ASPIREPIPELINES003
 
-internal partial class Program
-{
-    /// <summary>The loopback port the Cloudflare tunnel forwards to.</summary>
-    private const int ApiPort = 7321;
-    private const int RedisPort = 7322;
-    private const int DashboardPort = 7323;
-    private const int DashboardOtlpPort = 7324;
-    private const string ContainerWikiRoot = "/data";
-}
+builder.Build().Run();
