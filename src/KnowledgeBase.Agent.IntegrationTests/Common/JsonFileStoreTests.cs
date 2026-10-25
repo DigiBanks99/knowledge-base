@@ -26,6 +26,42 @@ public sealed class JsonFileStoreTests : IDisposable
     }
 
     [Test]
+    [NotInParallel] // Hundreds of writes keep the virus scanner busy enough to slow the watcher tests running alongside.
+    public async Task ADocumentIsReplacedWhileItIsBeingRead()
+    {
+        string path = _directory.File("document.json");
+        await JsonFileStore.WriteAsync(path, new Document("version", 0), CancellationToken.None);
+        using CancellationTokenSource stopReading = new();
+        Task reading = Task.Run(async () =>
+        {
+            // Polls as often as Eventually.Until does while a test waits on a run.
+            while (!stopReading.IsCancellationRequested)
+            {
+                await JsonFileStore.ReadAllAsync<Document>(_directory.Path, CancellationToken.None);
+                await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken.None);
+            }
+        });
+
+        Exception? exception = await Catch.ExceptionAsync(async () =>
+        {
+            for (int version = 1; version <= 200; version++)
+            {
+                await JsonFileStore.WriteAsync(path, new Document("version", version), CancellationToken.None);
+            }
+        });
+        await stopReading.CancelAsync();
+        await reading;
+        Document? read = await JsonFileStore.ReadAsync<Document>(path, CancellationToken.None);
+
+        ItShouldNotFailAnyWrite();
+        ItShouldReadTheLatestVersion();
+
+        void ItShouldNotFailAnyWrite() => exception.ShouldBeNull();
+
+        void ItShouldReadTheLatestVersion() => read.ShouldBe(new Document("version", 200));
+    }
+
+    [Test]
     public async Task AMissingDocumentIsRead()
     {
         Document? read = await JsonFileStore.ReadAsync<Document>(_directory.File("missing.json"), CancellationToken.None);
