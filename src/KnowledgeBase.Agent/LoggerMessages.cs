@@ -8,6 +8,9 @@ internal static partial class LoggerMessages
     [LoggerMessage(LogLevel.Warning, "Watcher for '{Directory}' reported an error; rescanning the directory.")]
     public static partial void DirectoryWatcherFailed(this ILogger logger, string directory, Exception exception);
 
+    [LoggerMessage(LogLevel.Error, "Could not rescan '{Directory}'; files arriving there are not picked up until the next start.")]
+    public static partial void DirectoryWatcherRescanFailed(this ILogger logger, string directory, Exception exception);
+
     [LoggerMessage(LogLevel.Error, "Failed to handle '{FilePath}'.")]
     public static partial void DirectoryWatcherHandlerFailed(this ILogger logger, string filePath, Exception exception);
 

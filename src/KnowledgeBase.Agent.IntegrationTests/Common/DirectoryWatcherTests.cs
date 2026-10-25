@@ -155,6 +155,39 @@ public sealed class DirectoryWatcherTests : IDisposable
         }
     }
 
+    [Test]
+    public async Task TheWatchedDirectoryIsDeleted()
+    {
+        string watched = Directory.CreateDirectory(_directory.File("new")).FullName;
+        using ProblemLog problems = new();
+        using DirectoryWatcher watcher = new(problems.CreateLogger("Watcher"), TimeProvider.System, watched, "*.md", HandleAsync);
+        watcher.Start();
+        string file = Path.Combine(watched, "a.md");
+        await File.WriteAllTextAsync(file, "A");
+        // The handler deletes the file; waiting for that keeps its delete from racing the directory's.
+        bool handled = await Eventually.Until(() => _handled.Count == 1 && !File.Exists(file));
+
+        Directory.Delete(watched, recursive: true);
+        // Windows reports the lost directory as a watcher error; Linux raises nothing, so only surviving it is checked.
+        bool reported = await Eventually.Until(
+            () => problems.Entries.Any(entry => entry.Contains("Could not rescan", StringComparison.Ordinal)),
+            TimeSpan.FromSeconds(2));
+
+        ItShouldHandleFilesUntilThen();
+        ItShouldReportTheLostDirectory();
+
+        void ItShouldHandleFilesUntilThen() => handled.ShouldBeTrue();
+
+        void ItShouldReportTheLostDirectory()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                reported.ShouldBeTrue();
+                problems.Entries.ShouldNotContain(entry => entry.Contains("Failed to handle", StringComparison.Ordinal));
+            }
+        }
+    }
+
     /// <summary>Behaves like the pipeline's handlers: reads the file and moves it on, here by deleting it.</summary>
     private Task HandleAsync(string path)
     {
