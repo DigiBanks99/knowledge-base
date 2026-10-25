@@ -112,6 +112,9 @@ jobs:
           Parameters__EntraClientSecret: ${{ secrets.ENTRA_CLIENT_SECRET }}
           Parameters__OpenAICompatibleEndpoint: ${{ vars.OPENAI_COMPATIBLE_ENDPOINT }}
           Parameters__OpenAICompatibleApiKey: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
+          # The backup deploy key stays in this folder on the VM; only its location is passed, never the key.
+          Parameters__WikiBackupRemote: ${{ vars.WIKI_BACKUP_REMOTE }}
+          Parameters__WikiBackupKeyDirectory: ${{ vars.WIKI_BACKUP_KEY_DIRECTORY }}
           Parameters__FactFinderProvider: ${{ vars.FACTFINDER_PROVIDER }}
           Parameters__FactFinderModel: ${{ vars.FACTFINDER_MODEL }}
           Parameters__ThreadWeaverProvider: ${{ vars.THREADWEAVER_PROVIDER }}

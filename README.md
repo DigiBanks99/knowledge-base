@@ -76,6 +76,8 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `{Agent}Model`            |        | Model per agent, e.g. `claude-sonnet-5-5`. One each for the five agents.               |
 | `OpenAICompatibleEndpoint`|        | Base address of the OpenAI-compatible server (default `http://localhost:8080/v1`).     |
 | `OpenAICompatibleApiKey`  |   ✓    | The server's API key, if it was started with one (default empty).                      |
+| `WikiBackupRemote`        |        | SSH URL of a private repository the wiki is pushed to (default empty: backup off). See [Wiki backup](#wiki-backup). |
+| `WikiBackupKeyDirectory`  |        | Folder holding the backup deploy key and pinned host keys (default empty: your own SSH setup). |
 
 `{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor` and `Librarian`. The provider and
 OpenAI-compatible defaults live in the AppHost's `appsettings.json`; override them with user secrets or
@@ -238,3 +240,47 @@ To move existing wiki data to the VM, copy the wiki root directory into the data
 deployment, then give it to uid 1654: `sudo chown -R 1654:1654 /srv/knowledge-base`.
 
 To deploy without a new commit: `gh workflow run CD --ref main`.
+
+### Wiki backup
+
+After each commit, and once at start, the API pushes the wiki to an optional private repository. It authenticates with
+an SSH deploy key that has write access to that one repository and never leaves the VM: not in GitHub secrets, the
+logs or this repository. Only the remote URL and the key folder's path are AppHost parameters. The folder is mounted
+read-only into the API container, and git connects with only that key and with strict checking against the host keys
+pinned there, so it never trusts a host on first use. A failed push is logged and shown on the Status page; the next
+commit sends everything still missing. Without `WikiBackupRemote`, backup is off.
+
+The push never forces. If the wiki's history and the backup's diverge (for example after the wiki's `.git` was lost
+and recreated), every push is refused and the Backup signal stays degraded until you reconcile them by hand, such as by
+pulling the backup into the wiki or pushing the new history to a fresh repository.
+
+1. Create an empty private repository for the backup, such as `<owner>/knowledge-base-wiki`.
+2. On the VM, generate the key and pin github.com's published host keys (fetched over HTTPS, not from an SSH
+   connection):
+
+   ```shell
+   key_dir=/srv/knowledge-base-backup-key
+   sudo mkdir -p "$key_dir" && sudo chown "$USER" "$key_dir"
+   ssh-keygen -q -t ed25519 -N '' -C "knowledge-base wiki backup" -f "$key_dir/id_ed25519"
+   curl -fsSL https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com " + .' > "$key_dir/known_hosts"
+   ```
+
+3. Register the public key on the backup repository with write access (from any machine signed in to `gh`):
+
+   ```shell
+   gh repo deploy-key add id_ed25519.pub --repo <owner>/knowledge-base-wiki --title "knowledge-base VM" --allow-write
+   ```
+
+   Copy `id_ed25519.pub` off the VM for this, or run `gh` there. Never copy the private key.
+4. Give the folder to the container user, which SSH requires to own a private key it uses:
+
+   ```shell
+   sudo chown -R 1654:1654 "$key_dir" && sudo chmod 700 "$key_dir" && sudo chmod 600 "$key_dir/id_ed25519"
+   ```
+
+5. Set `WIKI_BACKUP_REMOTE` (`git@github.com:<owner>/knowledge-base-wiki.git`) and `WIKI_BACKUP_KEY_DIRECTORY`
+   (`/srv/knowledge-base-backup-key`) as `production` variables, with `setup-github.ps1` or `gh variable set --env
+   production`, and deploy. The Backup signal on the Status page shows the last commit, the last successful push and
+   any push error.
+
+To rotate the key, generate a new one in the folder, register it and delete the old deploy key; the next push uses the new one.

@@ -21,6 +21,7 @@ public sealed class WikiVersioningObserverTests
         []);
 
     private readonly ILogger<WikiVersioningObserver> _logger = Substitute.For<ILogger<WikiVersioningObserver>>();
+    private readonly ILogger<PushWikiCommandHandler> _pushLogger = Substitute.For<ILogger<PushWikiCommandHandler>>();
     private readonly IGitClient _git = Substitute.For<IGitClient>();
     private readonly WikiVersioningObserver _observer;
 
@@ -29,13 +30,69 @@ public sealed class WikiVersioningObserverTests
         IOptions<WikiConfigurationSettings> options = Substitute.For<IOptions<WikiConfigurationSettings>>();
         options.Value.Returns(new WikiConfigurationSettings { RootDirectory = Path.Combine(Path.GetTempPath(), "kb") });
         _logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+        _pushLogger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
 
         _git.HasRepository(Arg.Any<string>()).Returns(true);
         _git.StageAllAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _git.HasStagedChangesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _git.CommitAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _git.SetRemoteAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _git.PushAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(true);
 
-        _observer = new WikiVersioningObserver(_logger, new CommitWikiRunCommandHandler(_git, options));
+        PushWikiCommandHandler pushHandler = new(
+            _pushLogger,
+            _git,
+            new WikiBackupState(TimeProvider.System),
+            options,
+            Options.Create(new WikiBackupSettings { Remote = "git@github.com:owner/wiki-backup.git" }));
+        _observer = new WikiVersioningObserver(_logger, new CommitWikiRunCommandHandler(_git, options), pushHandler);
+    }
+
+    [Test]
+    public async Task AWikiWritingRunCommitsAChange()
+    {
+        await _observer.OnRunCompletedAsync(Run, CancellationToken.None);
+
+        ItShouldPushAfterCommitting();
+
+        void ItShouldPushAfterCommitting() => Received.InOrder(() =>
+        {
+            _git.CommitAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            _git.PushAsync(Arg.Any<string>(), "backup", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Test]
+    public async Task AWikiWritingRunChangesNothing()
+    {
+        _git.HasStagedChangesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        await _observer.OnRunCompletedAsync(Run, CancellationToken.None);
+
+        await ItShouldNotPush();
+
+        async Task ItShouldNotPush() => await _git.DidNotReceiveWithAnyArgs().PushAsync(default!, default!, default, default);
+    }
+
+    [Test]
+    public async Task ThePushFails()
+    {
+        GitCommandFailedError failure = new("push", "exit code 128. ssh: connect to host github.com port 22: Network is unreachable");
+        _git.PushAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(failure);
+
+        Exception? exception = await Catch.ExceptionAsync(() => _observer.OnRunCompletedAsync(Run, CancellationToken.None));
+
+        ItShouldNotThrow();
+        ItShouldLogThePushFailure();
+
+        void ItShouldNotThrow() => exception.ShouldBeNull();
+
+        void ItShouldLogThePushFailure() => _pushLogger
+            .ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name == nameof(ILogger.Log))
+            .Select(call => ((EventId)call.GetArguments()[1]!).Name)
+            .ShouldBe([nameof(Agent.Wiki.LoggerMessages.FailedToPushWiki)]);
     }
 
     [Test]

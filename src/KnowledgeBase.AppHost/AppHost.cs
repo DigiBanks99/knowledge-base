@@ -9,6 +9,7 @@ const int RedisPort = 7322;
 const int DashboardPort = 7323;
 const int DashboardOtlpPort = 7324;
 const string ContainerWikiRoot = "/data";
+const string ContainerWikiBackupKeyDirectory = "/run/wiki-backup";
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
@@ -32,6 +33,13 @@ IResourceBuilder<ParameterResource> openAICompatibleEndpoint = builder
     .AddParameter("OpenAICompatibleEndpoint");
 IResourceBuilder<ParameterResource> openAICompatibleApiKey = builder
     .AddParameter("OpenAICompatibleApiKey", secret: true);
+
+// An optional private repository the wiki's history is pushed to over SSH, and the folder on the host holding its
+// deploy key and pinned host keys. Neither is secret: the key itself never leaves that folder.
+IResourceBuilder<ParameterResource> wikiBackupRemote = builder
+    .AddParameter("WikiBackupRemote");
+IResourceBuilder<ParameterResource> wikiBackupKeyDirectory = builder
+    .AddParameter("WikiBackupKeyDirectory");
 
 // Deployed with Docker Compose to a single machine, where a Cloudflare tunnel forwards to the API on loopback. Nothing
 // is published beyond loopback; the dashboard is reached over an SSH tunnel.
@@ -60,7 +68,9 @@ IResourceBuilder<ProjectResource> api = builder
     .WithEnvironment("Authentication__ClientId", entraClientId)
     .WithEnvironment("Authentication__ClientSecret", entraClientSecret)
     .WithEnvironment("OpenAICompatible__Endpoint", openAICompatibleEndpoint)
-    .WithEnvironment("OpenAICompatible__ApiKey", openAICompatibleApiKey);
+    .WithEnvironment("OpenAICompatible__ApiKey", openAICompatibleApiKey)
+    .WithEnvironment("Wiki__Backup__Remote", wikiBackupRemote)
+    .WithEnvironment("Wiki__Backup__KeyDirectory", wikiBackupKeyDirectory);
 
 foreach (string agent in agents)
 {
@@ -105,6 +115,23 @@ api.PublishAsDockerComposeService((resource, service) =>
     service.Environment["ConnectionStrings__cache"] =
         $"127.0.0.1:{RedisPort},password={cache.Resource.PasswordParameter!.AsEnvironmentPlaceholder(resource)}";
     service.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://127.0.0.1:{DashboardOtlpPort}";
+
+    // The deploy key folder is mounted read-only, so nothing in the container can change the key or the pinned host
+    // keys. Compose refuses a bind mount whose folder does not exist, and backup is optional, so the mount is only
+    // added when a folder is configured (aspire deploy reads the parameters from its own configuration).
+    service.Environment.Remove("Wiki__Backup__KeyDirectory");
+    if (!string.IsNullOrWhiteSpace(builder.Configuration[$"Parameters:{wikiBackupKeyDirectory.Resource.Name}"]))
+    {
+        service.Volumes.Add(new Volume
+        {
+            Name = "wiki-backup-key",
+            Type = "bind",
+            Source = wikiBackupKeyDirectory.AsEnvironmentPlaceholder(resource),
+            Target = ContainerWikiBackupKeyDirectory,
+            ReadOnly = true,
+        });
+        service.Environment["Wiki__Backup__KeyDirectory"] = ContainerWikiBackupKeyDirectory;
+    }
 });
 
 // A fixed port, so the local sign-in redirect address (http://localhost:5173/signin-oidc) can be registered in Entra.
