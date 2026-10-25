@@ -1,0 +1,77 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet restore *)",
+      "Bash(dotnet format *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet list *)",
+      "Bash(pnpm install --frozen-lockfile*)",
+      "Bash(pnpm run lint*)",
+      "Bash(pnpm run build*)",
+      "Bash(pnpm audit *)",
+      "Bash(pnpm exec tsc *)",
+      "Bash(pnpm exec oxlint *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show *)",
+      "Bash(git branch --show-current)",
+      "Bash(git rev-parse *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list*)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh run list*)",
+      "Bash(gh run view *)",
+      "Edit(/src/**)"
+    ],
+    "deny": [
+      "Bash(git reset --hard*)",
+      "Bash(git clean *)",
+      "Bash(git checkout -- *)",
+      "Edit(/src/KnowledgeBase.Agent/local/**)",
+      "Read(/.env*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint-web.mjs\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-gate.mjs\"",
+            "timeout": 600,
+            "statusMessage": "Running CI checks on changed code..."
+          }
+        ]
+      }
+    ]
+  }
+}
