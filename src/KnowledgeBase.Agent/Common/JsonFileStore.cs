@@ -9,6 +9,16 @@ namespace KnowledgeBase.Agent.Common;
 /// </summary>
 internal static class JsonFileStore
 {
+    private static readonly TimeSpan[] ReplaceRetryDelays =
+    [
+        TimeSpan.FromMilliseconds(10),
+        TimeSpan.FromMilliseconds(25),
+        TimeSpan.FromMilliseconds(50),
+        TimeSpan.FromMilliseconds(100),
+        TimeSpan.FromMilliseconds(200),
+        TimeSpan.FromMilliseconds(400)
+    ];
+
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
@@ -18,13 +28,58 @@ internal static class JsonFileStore
     public static async Task WriteAsync<T>(string filePath, T document, CancellationToken cancellationToken)
     {
         string temporaryPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
-        await using (FileStream stream = File.Create(temporaryPath))
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, document, Options, cancellationToken);
-        }
+            await using (FileStream stream = File.Create(temporaryPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, document, Options, cancellationToken);
+            }
 
-        File.Move(temporaryPath, filePath, overwrite: true);
+            await ReplaceAsync(temporaryPath, filePath, cancellationToken);
+        }
+        catch
+        {
+            DeleteLeftover(temporaryPath);
+            throw;
+        }
     }
+
+    private static void DeleteLeftover(string temporaryPath)
+    {
+        try
+        {
+            File.Delete(temporaryPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The write's own failure is the one worth reporting; a leftover temporary file is harmless.
+        }
+    }
+
+    /// <summary>
+    /// Windows refuses to replace a file while another handle has it open, even one that shares delete access: a reader
+    /// listing documents, or a virus scanner looking at the one just written. Those handles are short-lived, so
+    /// waiting them out keeps the write.
+    /// </summary>
+    private static async Task ReplaceAsync(string temporaryPath, string filePath, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Move(temporaryPath, filePath, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsFileInUse(ex) && attempt < ReplaceRetryDelays.Length)
+            {
+                await Task.Delay(ReplaceRetryDelays[attempt], cancellationToken);
+            }
+        }
+    }
+
+    private static bool IsFileInUse(Exception exception) =>
+        exception is UnauthorizedAccessException
+        || exception is IOException and not (FileNotFoundException or DirectoryNotFoundException);
 
     public static async Task<T?> ReadAsync<T>(string filePath, CancellationToken cancellationToken)
     {
@@ -50,7 +105,7 @@ internal static class JsonFileStore
                     documents.Add(document);
                 }
             }
-            catch (Exception ex) when (ex is JsonException or IOException)
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
             {
                 // A document that is being replaced or is corrupt is skipped rather than failing the whole listing.
             }
