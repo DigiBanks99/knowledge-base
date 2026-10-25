@@ -18,6 +18,12 @@
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 
+  <!-- The deployed image needs git for the wiki's version history. The CD workflow builds a base image that adds it
+       (docker/api-base.Dockerfile) and passes it in; everywhere else the stock base image is used. -->
+  <PropertyGroup Condition="'$(ApiBaseImage)' != ''">
+    <ContainerBaseImage>$(ApiBaseImage)</ContainerBaseImage>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="KnowledgeBase.Agent.Tests" />
     <InternalsVisibleTo Include="KnowledgeBase.Agent.IntegrationTests" />

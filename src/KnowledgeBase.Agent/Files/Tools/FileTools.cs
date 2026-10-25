@@ -69,7 +69,7 @@ internal sealed class FileTools(
     {
         Result<IEnumerable<string>, Error> result = listFilesHandler
             .Handle(new ListFilesRequest(wikiPaths.Resolve(desiredDirectoryPath), IncludeDirectories: true))
-            .Map(paths => paths.Select(wikiPaths.ToRelative))
+            .Map(paths => paths.Where(path => !wikiPaths.IsRepositoryPath(path)).Select(wikiPaths.ToRelative))
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -143,7 +143,10 @@ internal sealed class FileTools(
         }
 
         List<string> matches = [];
-        foreach (string filePath in Directory.EnumerateFiles(wikiPaths.Root, "*.md", SearchOption.AllDirectories))
+        IEnumerable<string> pages = Directory
+            .EnumerateFiles(wikiPaths.Root, "*.md", SearchOption.AllDirectories)
+            .Where(filePath => !wikiPaths.IsRepositoryPath(filePath));
+        foreach (string filePath in pages)
         {
             string[] lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
             for (int index = 0; index < lines.Length && matches.Count < maxMatches; index++)

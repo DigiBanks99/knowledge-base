@@ -12,6 +12,7 @@ using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Wiki.Commands;
 using KnowledgeBase.Agent.Wiki.Jobs;
 using KnowledgeBase.Agent.Wiki.Tools;
+using KnowledgeBase.Agent.Wiki.Versioning;
 
 namespace KnowledgeBase.Agent.Wiki;
 
@@ -29,7 +30,8 @@ internal static class WikiDependencyInjection
             .AddRuns()
             .AddTools()
             .AddReview()
-            .AddSettings();
+            .AddSettings()
+            .AddWikiVersioning();
 
         private WebApplicationBuilder AddSettings()
         {

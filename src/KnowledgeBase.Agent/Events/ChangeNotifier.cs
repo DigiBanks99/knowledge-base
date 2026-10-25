@@ -77,8 +77,11 @@ internal sealed class ChangeNotifier(
     private void OnChanged(object sender, FileSystemEventArgs e)
     {
         string relativePath = Path.GetRelativePath(_rootDirectory, e.FullPath);
-        string area = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[0];
-        if (Areas.Contains(area))
+        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string area = segments[0];
+
+        // Every commit rewrites the wiki repository's index and objects; that is not a change anyone needs to see.
+        if (Areas.Contains(area) && !segments.Skip(1).Any(WikiPaths.IsRepositoryName))
         {
             Notify(area);
         }

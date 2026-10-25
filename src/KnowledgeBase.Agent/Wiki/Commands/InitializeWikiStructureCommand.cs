@@ -1,6 +1,7 @@
 using System.Net.Mime;
 
 using KnowledgeBase.Agent.Files;
+using KnowledgeBase.Agent.Wiki.Versioning;
 
 using Microsoft.Extensions.Options;
 
@@ -12,6 +13,7 @@ internal sealed class InitializeWikiStructureCommandHandler(
     ILogger<InitializeWikiStructureCommandHandler> logger,
     CreateDirectoryHandler directoryHandler,
     CreateFileHandler createFileHandler,
+    InitializeWikiRepositoryCommandHandler repositoryHandler,
     IOptions<WikiConfigurationSettings> settingsOptions)
 {
     private readonly WikiConfigurationSettings settings = settingsOptions.Value;
@@ -24,8 +26,17 @@ internal sealed class InitializeWikiStructureCommandHandler(
 
         return await CreateDirectories()
             .Bind(_ => SeedIndexPages(cancellationToken))
+            .Tap(_ => InitializeRepository(cancellationToken))
             .TapError(logger.FailedToInitializeWikiStructure);
     }
+
+    /// <summary>
+    /// Without git the wiki still works, just unversioned, so a repository that cannot be created is logged rather
+    /// than stopping the app.
+    /// </summary>
+    private async Task InitializeRepository(CancellationToken cancellationToken) => await repositoryHandler
+        .Handle(new InitializeWikiRepositoryCommand(), cancellationToken)
+        .TapError(logger.FailedToInitializeWikiRepository);
 
     private Result<bool, Error> CreateDirectories()
     {
