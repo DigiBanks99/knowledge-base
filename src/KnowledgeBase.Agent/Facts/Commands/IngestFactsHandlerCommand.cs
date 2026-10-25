@@ -62,6 +62,7 @@ internal sealed class IngestFactsCommandHandler(
                 KnownAgents.ThreadWeaver,
                 new AgentRunTrigger(AgentRunTriggerKind.Facts, factFileName),
                 origin,
+                document?.Topic,
                 token => threadWeaver.RunAsync(prompt, cancellationToken: token),
                 cancellationToken);
         }

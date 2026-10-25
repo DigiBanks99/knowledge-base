@@ -111,6 +111,7 @@ public sealed class AgentRunTrackerTests
             KnownAgents.ThreadWeaver,
             Trigger,
             FactOrigin.Research,
+            "projects/knowledge-base",
             cancellationToken =>
             {
                 originDuringTheRun = _tracker.Current?.Origin;
@@ -119,11 +120,13 @@ public sealed class AgentRunTrackerTests
             CancellationToken.None);
 
         ItShouldShowToolsTheOriginDuringTheRun();
-        ItShouldRecordTheOrigin();
+        ItShouldRecordTheOriginAndTopic();
 
         void ItShouldShowToolsTheOriginDuringTheRun() => originDuringTheRun.ShouldBe(FactOrigin.Research);
 
-        void ItShouldRecordTheOrigin() => _observedRuns.ShouldHaveSingleItem().Origin.ShouldBe(FactOrigin.Research);
+        void ItShouldRecordTheOriginAndTopic() => _observedRuns.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            run => run.Origin.ShouldBe(FactOrigin.Research),
+            run => run.Topic.ShouldBe("projects/knowledge-base"));
     }
 
     [Test]
@@ -146,7 +149,9 @@ public sealed class AgentRunTrackerTests
         void ItShouldTreatTheRunAsTheAuthors()
         {
             originDuringTheRun.ShouldBe(FactOrigin.Author);
-            _observedRuns.ShouldHaveSingleItem().Origin.ShouldBe(FactOrigin.Author);
+            _observedRuns.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+                run => run.Origin.ShouldBe(FactOrigin.Author),
+                run => run.Topic.ShouldBeNull());
         }
     }
 

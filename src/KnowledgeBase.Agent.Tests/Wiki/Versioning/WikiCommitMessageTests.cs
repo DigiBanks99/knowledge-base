@@ -1,3 +1,4 @@
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki.Versioning;
 
@@ -32,7 +33,22 @@ public sealed class WikiCommitMessageTests
             "",
             "Run: 20261025-093000-threadweaver-0123456789",
             "Status: Succeeded",
-            "Trigger: Facts feedback-from-susan.json"
+            "Trigger: Facts feedback-from-susan.json",
+            "Origin: Author"
+        ]);
+    }
+
+    [Test]
+    public void ARunOverResearchSucceeded()
+    {
+        string message = WikiCommitMessage.For(Run with { Origin = FactOrigin.Research, Topic = "projects/knowledge-base" });
+
+        ItShouldNameTheOriginAndTheTopicInTheBody();
+
+        void ItShouldNameTheOriginAndTheTopicInTheBody() => message.Split('\n')[^2..].ShouldBe(
+        [
+            "Origin: Research",
+            "Topic: projects/knowledge-base"
         ]);
     }
 

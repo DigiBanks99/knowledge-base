@@ -24,9 +24,9 @@ public sealed record AgentRunTrigger(AgentRunTriggerKind Kind, string Reference)
 public sealed record AgentToolCall(string Tool, string? Target, DateTimeOffset At, bool Succeeded, string? Error);
 
 /// <summary>
-/// A recorded agent run. <see cref="Origin"/> is where the content the run works on came from; runs over research are
-/// restricted in what their tools may change, and runs stored before origins were recorded read as
-/// <see cref="FactOrigin.Author"/>.
+/// A recorded agent run. <see cref="Origin"/> is where the content the run works on came from, and <see cref="Topic"/>
+/// the wiki topic research was gathered for. Runs over research are restricted in what their tools may change, and runs
+/// stored before origins were recorded read as <see cref="FactOrigin.Author"/>.
 /// </summary>
 public sealed record AgentRun(
     string Id,
@@ -38,4 +38,5 @@ public sealed record AgentRun(
     string? Summary,
     string? Error,
     IReadOnlyList<AgentToolCall> ToolCalls,
-    FactOrigin Origin = FactOrigin.Author);
+    FactOrigin Origin = FactOrigin.Author,
+    string? Topic = null);
