@@ -45,10 +45,13 @@ which ones. Do not start blocked work, even partially.
 ## 4. Plan
 
 1. Explore the code the ticket touches. Prefer existing seams and patterns named in the parent spec's testing decisions.
-2. Enter plan mode and write a plan that maps **every acceptance criterion** to the change and the test that
+2. List every decision the plan depends on that the ticket's `## Decisions`, its parent and `AGENTS.md` don't
+   settle. Ask them all in one round (a single question tool call or message), each with the context the user needs
+   and your recommendation. Don't drip questions across the session, and don't start planning around a guess.
+3. Enter plan mode and write a plan that maps **every acceptance criterion** to the change and the test that
    satisfies it. Call out any criterion that can't be verified in this environment, such as needing llama-server, the
    deploy VM, real secrets or Entra sign-in.
-3. Wait for the user to approve the plan. If the ticket is ambiguous or contradicts the spec or `AGENTS.md`, ask
+4. Wait for the user to approve the plan. If the ticket is ambiguous or contradicts the spec or `AGENTS.md`, ask
    here rather than guessing.
 
 ## 5. Implement
