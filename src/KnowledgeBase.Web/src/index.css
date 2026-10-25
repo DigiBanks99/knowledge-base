@@ -281,14 +281,16 @@ details.card summary {
 .badge-succeeded,
 .badge-processed,
 .badge-low,
-.badge-healthy {
+.badge-healthy,
+.badge-allowed {
   background: var(--success-soft);
   color: var(--success);
 }
 
 .badge-failed,
 .badge-high,
-.badge-unhealthy {
+.badge-unhealthy,
+.badge-denied {
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -316,6 +318,7 @@ details.card summary {
 .items,
 .findings,
 .signals,
+.deny-list,
 .tree-list {
   list-style: none;
   padding: 0;
@@ -342,6 +345,10 @@ details.card summary {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.deny-list .item-title button {
+  margin-left: auto;
 }
 
 .preview {
