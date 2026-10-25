@@ -12,7 +12,8 @@ internal static class RunsDependencyInjection
                 .AddSingleton<AgentRunStore>()
                 .AddSingleton<IAgentRunStore>(services => services.GetRequiredService<AgentRunStore>())
                 .AddSingleton<AgentRunTracker>()
-                .AddSingleton<ChangeNotifier>();
+                .AddSingleton<ChangeNotifier>()
+                .AddSingleton<IChangePublisher>(services => services.GetRequiredService<ChangeNotifier>());
 
             return builder;
         }

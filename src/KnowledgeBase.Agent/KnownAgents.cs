@@ -7,4 +7,6 @@ public static class KnownAgents
     public const string ThreadWeaver = "ThreadWeaver";
     public const string Reviewer = "Reviewer";
     public const string Librarian = "Librarian";
+
+    public static readonly string[] All = [Editor, FactFinder, ThreadWeaver, Reviewer, Librarian];
 }

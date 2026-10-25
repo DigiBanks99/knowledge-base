@@ -19,7 +19,7 @@ internal sealed class ChangeNotifier(
     ILogger<ChangeNotifier> logger,
     IOptions<WikiConfigurationSettings> settings,
     TimeProvider timeProvider)
-    : IDisposable
+    : IChangePublisher, IDisposable
 {
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(500);
 
@@ -64,6 +64,8 @@ internal sealed class ChangeNotifier(
             _subscribers.TryRemove(id, out _);
         }
     }
+
+    public void Publish(string area) => Notify(area);
 
     public void Dispose()
     {

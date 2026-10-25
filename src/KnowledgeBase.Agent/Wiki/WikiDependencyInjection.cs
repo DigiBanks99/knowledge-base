@@ -9,6 +9,7 @@ using KnowledgeBase.Agent.Notes.Watchers;
 using KnowledgeBase.Agent.Review;
 using KnowledgeBase.Agent.Review.Watchers;
 using KnowledgeBase.Agent.Runs;
+using KnowledgeBase.Agent.Status;
 using KnowledgeBase.Agent.Wiki.Commands;
 using KnowledgeBase.Agent.Wiki.Jobs;
 using KnowledgeBase.Agent.Wiki.Tools;
@@ -31,6 +32,7 @@ internal static class WikiDependencyInjection
             .AddTools()
             .AddReview()
             .AddSettings()
+            .AddStatus()
             .AddWikiVersioning();
 
         private WebApplicationBuilder AddSettings()
@@ -103,6 +105,7 @@ internal static class WikiDependencyInjection
                 .MapNotesEndpoints()
                 .MapReviewEndpoints()
                 .MapRunEndpoints()
+                .MapStatusEndpoints()
                 .MapWikiEndpoints();
 
             return api;
