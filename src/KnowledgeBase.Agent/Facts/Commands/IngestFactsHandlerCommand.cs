@@ -42,7 +42,9 @@ internal sealed class IngestFactsCommandHandler(
         }
 
         string factFileName = Path.GetFileName(request.FactPath);
-        string? notePath = FindSourceNote(factsResult.Value);
+        FactDocument? document = ReadDocument(factsResult.Value);
+        string? notePath = FindSourceNote(document);
+        FactOrigin origin = document?.Origin ?? FactOrigin.Research;
 
         string prompt =
         $"""
@@ -59,6 +61,7 @@ internal sealed class IngestFactsCommandHandler(
             run = await runTracker.RunAsync(
                 KnownAgents.ThreadWeaver,
                 new AgentRunTrigger(AgentRunTriggerKind.Facts, factFileName),
+                origin,
                 token => threadWeaver.RunAsync(prompt, cancellationToken: token),
                 cancellationToken);
         }
@@ -83,21 +86,28 @@ internal sealed class IngestFactsCommandHandler(
     }
 
     /// <summary>
-    /// The note the facts came from, while it is still processing. Fact files from before notes were recorded on
-    /// them fall back to the note currently processing, as only one note is processed at a time.
+    /// The fact document, or <c>null</c> for a file that is not one. A file whose origin cannot be read is woven as
+    /// research, so content of unknown provenance never runs with the author's freedom.
     /// </summary>
-    private string? FindSourceNote(string factsJson)
+    private static FactDocument? ReadDocument(string factsJson)
     {
-        string? sourceNote = null;
         try
         {
-            sourceNote = JsonSerializer.Deserialize<FactDocument>(factsJson, JsonSerializerOptions.Web)?.SourceNote;
+            return JsonSerializer.Deserialize<FactDocument>(factsJson, JsonSerializerOptions.Web);
         }
         catch (JsonException)
         {
-            // Not a fact document; fall back to the processing note.
+            return null;
         }
+    }
 
+    /// <summary>
+    /// The note the facts came from, while it is still processing. Fact files from before notes were recorded on
+    /// them fall back to the note currently processing, as only one note is processed at a time.
+    /// </summary>
+    private string? FindSourceNote(FactDocument? document)
+    {
+        string? sourceNote = document?.SourceNote;
         if (sourceNote is not null)
         {
             string sourceNotePath = Path.Combine(_settings.ProcessingNotesDirectory, Path.GetFileName(sourceNote));

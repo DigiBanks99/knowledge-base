@@ -1,3 +1,4 @@
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Runs.Models;
 
@@ -99,6 +100,54 @@ public sealed class AgentRunTrackerTests
             .ShouldHaveSingleItem()
             .ToolCalls.Select(call => (call.Tool, call.Target, call.Succeeded))
             .ShouldBe([("CreateFile", "projects/foo/index.md", true), ("PatchFile", "learning/bar.md", false)]);
+    }
+
+    [Test]
+    public async Task ARunOverResearchStarts()
+    {
+        FactOrigin? originDuringTheRun = null;
+
+        await _tracker.RunAsync(
+            KnownAgents.ThreadWeaver,
+            Trigger,
+            FactOrigin.Research,
+            cancellationToken =>
+            {
+                originDuringTheRun = _tracker.Current?.Origin;
+                return Answer(cancellationToken);
+            },
+            CancellationToken.None);
+
+        ItShouldShowToolsTheOriginDuringTheRun();
+        ItShouldRecordTheOrigin();
+
+        void ItShouldShowToolsTheOriginDuringTheRun() => originDuringTheRun.ShouldBe(FactOrigin.Research);
+
+        void ItShouldRecordTheOrigin() => _observedRuns.ShouldHaveSingleItem().Origin.ShouldBe(FactOrigin.Research);
+    }
+
+    [Test]
+    public async Task ARunStartsWithoutAnOrigin()
+    {
+        FactOrigin? originDuringTheRun = null;
+
+        await _tracker.RunAsync(
+            KnownAgents.ThreadWeaver,
+            Trigger,
+            cancellationToken =>
+            {
+                originDuringTheRun = _tracker.Current?.Origin;
+                return Answer(cancellationToken);
+            },
+            CancellationToken.None);
+
+        ItShouldTreatTheRunAsTheAuthors();
+
+        void ItShouldTreatTheRunAsTheAuthors()
+        {
+            originDuringTheRun.ShouldBe(FactOrigin.Author);
+            _observedRuns.ShouldHaveSingleItem().Origin.ShouldBe(FactOrigin.Author);
+        }
     }
 
     [Test]

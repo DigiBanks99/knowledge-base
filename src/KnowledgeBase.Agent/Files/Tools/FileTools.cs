@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Net.Mime;
 
+using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Wiki;
 
 namespace KnowledgeBase.Agent.Files.Tools;
@@ -8,6 +9,7 @@ namespace KnowledgeBase.Agent.Files.Tools;
 internal sealed class FileTools(
     ILogger<FileTools> logger,
     WikiPaths wikiPaths,
+    AgentRunTracker runTracker,
     CreateDirectoryHandler createDirectoryHandler,
     CreateFileHandler createFileHandler,
     DeleteFileHandler deleteFileHandler,
@@ -21,8 +23,10 @@ internal sealed class FileTools(
         [Description("The path of the directory to be created, relative to the wiki root.")]
         string desiredDirectoryPath)
     {
+        string directoryPath = wikiPaths.Resolve(desiredDirectoryPath);
+        EnsureAllowed(nameof(CreateDirectory), directoryPath);
         Result<string, Error> result = createDirectoryHandler
-            .Handle(CreateDirectoryRequest.Create(wikiPaths.Resolve(desiredDirectoryPath)))
+            .Handle(CreateDirectoryRequest.Create(directoryPath))
             .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
@@ -40,8 +44,10 @@ internal sealed class FileTools(
         string mimeType = MediaTypeNames.Text.Markdown,
         CancellationToken cancellationToken = default)
     {
+        string filePath = wikiPaths.Resolve(desiredFilePath);
+        EnsureAllowed(nameof(CreateFile), filePath);
         Result<string, Error> result = await createFileHandler
-            .Handle(new CreateFileRequest(wikiPaths.Resolve(desiredFilePath), content, mimeType), cancellationToken)
+            .Handle(new CreateFileRequest(filePath, content, mimeType), cancellationToken)
             .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
@@ -54,8 +60,10 @@ internal sealed class FileTools(
         [Description("The path of the file to be deleted, relative to the wiki root.")]
         string desiredFilePath)
     {
+        string filePath = wikiPaths.Resolve(desiredFilePath);
+        EnsureAllowed(nameof(DeleteFile), filePath);
         Result<bool, Error> result = await deleteFileHandler
-            .Handle(new DeleteFileRequest(wikiPaths.Resolve(desiredFilePath)))
+            .Handle(new DeleteFileRequest(filePath))
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -83,8 +91,11 @@ internal sealed class FileTools(
         [Description("The path of the destination where the file should be moved, relative to the wiki root.")]
         string destinationFilePath)
     {
+        string sourcePath = wikiPaths.Resolve(sourceFilePath);
+        string destinationPath = wikiPaths.Resolve(destinationFilePath);
+        EnsureAllowed(nameof(MoveFile), sourcePath, destinationPath);
         Result<string, Error> result = moveFileHandler
-            .Handle(new MoveFileRequest(wikiPaths.Resolve(sourceFilePath), wikiPaths.Resolve(destinationFilePath)))
+            .Handle(new MoveFileRequest(sourcePath, destinationPath))
             .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
@@ -102,8 +113,10 @@ internal sealed class FileTools(
         string patchedContent,
         CancellationToken cancellationToken = default)
     {
+        string fullPath = wikiPaths.Resolve(filePath);
+        EnsureAllowed(nameof(PatchFile), fullPath);
         Result<string, Error> result = await patchFileHandler
-            .Handle(new PatchFileRequest(wikiPaths.Resolve(filePath), originalContent, patchedContent), cancellationToken)
+            .Handle(new PatchFileRequest(fullPath, originalContent, patchedContent), cancellationToken)
             .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
@@ -165,5 +178,15 @@ internal sealed class FileTools(
         }
 
         return matches;
+    }
+
+    /// <summary>Refuses a call the current run may not make (see <see cref="RunToolPolicy"/>) before anything changes.</summary>
+    private void EnsureAllowed(string tool, params string[] fullPaths)
+    {
+        string? refusal = RunToolPolicy.Refusal(runTracker.CurrentOrigin, tool, [.. fullPaths.Select(wikiPaths.ToRelative)]);
+        if (refusal is not null)
+        {
+            throw new InvalidOperationException(refusal);
+        }
     }
 }
