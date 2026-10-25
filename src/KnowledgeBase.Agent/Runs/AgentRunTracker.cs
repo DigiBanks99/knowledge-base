@@ -24,6 +24,9 @@ internal sealed class AgentRunTracker(
 {
     private static readonly AsyncLocal<RunRecorder?> CurrentRecorder = new();
 
+    private static readonly TimeSpan[] CompletedSaveRetryDelays =
+        [TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(200)];
+
     /// <summary>The run executing in the current async context, if any.</summary>
     public AgentRun? Current => CurrentRecorder.Value?.Snapshot();
 
@@ -82,7 +85,7 @@ internal sealed class AgentRunTracker(
             CurrentRecorder.Value = null;
         }
 
-        await SaveAsync(recorder);
+        await SaveCompletedAsync(recorder);
         AgentRun completed = recorder.Snapshot();
         await NotifyObserversAsync(completed, cancellationToken);
         return completed.Status == AgentRunStatus.Succeeded
@@ -124,10 +127,36 @@ internal sealed class AgentRunTracker(
         {
             await recorder.SaveAsync(store);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Tracking must never break the pipeline; the next save will catch up.
             logger.FailedToSaveRun(ex);
+        }
+    }
+
+    /// <summary>
+    /// Saves a completed run, retrying briefly: no later save would catch up, so a lost write would leave the run
+    /// marked as running until a restart fails it.
+    /// </summary>
+    private async Task SaveCompletedAsync(RunRecorder recorder)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await recorder.SaveAsync(store);
+                return;
+            }
+            catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException) && attempt < CompletedSaveRetryDelays.Length)
+            {
+                await Task.Delay(CompletedSaveRetryDelays[attempt], timeProvider);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                AgentRun run = recorder.Snapshot();
+                logger.FailedToSaveCompletedRun(run.Agent, run.Id, ex);
+                return;
+            }
         }
     }
 
