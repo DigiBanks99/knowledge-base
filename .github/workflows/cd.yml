@@ -30,6 +30,10 @@ jobs:
     environment:
       name: production
     timeout-minutes: 30
+    # Pushing and pulling the API base image (see "Build the API base image").
+    permissions:
+      contents: read
+      packages: write
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
@@ -79,11 +83,28 @@ jobs:
           dotnet tool update Aspire.Cli --version "$version" --tool-path "$RUNNER_TOOL_CACHE/aspire-cli"
           echo "$RUNNER_TOOL_CACHE/aspire-cli" >> "$GITHUB_PATH"
 
+      # The stock ASP.NET image has no git, which the wiki's version history needs. The API image is built on a base
+      # image that adds it. SDK container publishing pulls its base image from a registry, so the base image is
+      # pushed to this repository's private package on GitHub Container Registry first.
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build the API base image
+        id: base-image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/knowledge-base-api-base:10.0"
+          docker build --pull --tag "$image" --file docker/api-base.Dockerfile docker
+          docker push "$image"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
       # Builds the images on the VM and runs them with Docker Compose. Every AppHost parameter comes from the
       # production environment; keys are kept in secrets so they never show in the public logs.
       - name: Deploy
         working-directory: src/KnowledgeBase.AppHost
         env:
+          ApiBaseImage: ${{ steps.base-image.outputs.image }}
           Parameters__WikiRootDirectory: ${{ vars.WIKI_ROOT_DIRECTORY }}
           Parameters__AnthropicApiKey: ${{ secrets.ANTHROPIC_API_KEY }}
           Parameters__EntraTenantId: ${{ vars.ENTRA_TENANT_ID }}
@@ -112,6 +133,11 @@ jobs:
       - name: Remove generated secrets
         if: always()
         run: rm -f src/KnowledgeBase.AppHost/aspire-output/.env*
+
+      # The runner's Docker credentials persist between jobs; never leave the registry token behind.
+      - name: Log out of GitHub Container Registry
+        if: always()
+        run: docker logout ghcr.io
 
       - name: Remove dangling images
         if: always()

@@ -202,6 +202,12 @@ The API container shares the host's network so it reaches llama-server on the VM
 (`http://127.0.0.1:9931/v1`) without opening it to containers. The wiki root directory on the VM is mounted at
 `/data`, and the sign-in keys are kept in its `keys` folder so deployments do not sign you out.
 
+The `wiki` folder in the wiki root is a git repository, created on the first start. Every ThreadWeaver and Editor
+run ends with a commit authored by that agent and naming the run, so `git -C <wiki root>/wiki log --author=Editor`
+shows what the Editor changed and `git revert <commit>` undoes one run. The stock ASP.NET image has no git, so the
+workflow first builds [`docker/api-base.Dockerfile`](docker/api-base.Dockerfile), pushes it to the repository's
+private GitHub Container Registry package and builds the API image on top of it.
+
 ### Setting it up
 
 Run the setup script on your machine. It uses the GitHub CLI and asks before each change:
