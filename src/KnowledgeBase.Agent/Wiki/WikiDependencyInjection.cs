@@ -67,7 +67,7 @@ internal static class WikiDependencyInjection
                 .GetResult();
 
             app.Services
-                .GetRequiredService<AgentRunStore>()
+                .GetRequiredService<IAgentRunStore>()
                 .FailInterruptedRunsAsync(CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();

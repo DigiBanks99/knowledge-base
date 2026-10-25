@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 namespace KnowledgeBase.Agent.Runs;
 
 internal sealed class AgentRunStore(IOptions<WikiConfigurationSettings> options, TimeProvider timeProvider)
+    : IAgentRunStore
 {
     private readonly WikiConfigurationSettings _settings = options.Value;
 
@@ -35,9 +36,6 @@ internal sealed class AgentRunStore(IOptions<WikiConfigurationSettings> options,
             .ToList();
     }
 
-    /// <summary>
-    /// Runs still marked as running when the app starts were cut off by a restart or crash.
-    /// </summary>
     public async Task FailInterruptedRunsAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<AgentRun> runs = await JsonFileStore.ReadAllAsync<AgentRun>(_settings.RunsDirectory, cancellationToken);
