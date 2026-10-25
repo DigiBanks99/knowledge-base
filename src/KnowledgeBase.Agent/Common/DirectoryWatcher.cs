@@ -57,10 +57,21 @@ internal sealed class DirectoryWatcher(
 
     private void OnRenamed(object sender, RenamedEventArgs e) => Dispatch(e.FullPath);
 
+    /// <remarks>
+    /// Runs on a thread-pool callback, where an exception would end the process. Windows reports an error when the
+    /// directory itself goes (deleted, or its volume lost), so the rescan that follows can fail and is only logged.
+    /// </remarks>
     private void OnError(object sender, ErrorEventArgs e)
     {
         logger.DirectoryWatcherFailed(directory, e.GetException());
-        Rescan();
+        try
+        {
+            Rescan();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.DirectoryWatcherRescanFailed(directory, ex);
+        }
     }
 
     private void Rescan()
@@ -108,7 +119,9 @@ internal sealed class DirectoryWatcher(
     /// The app moves the files it writes into place complete, so this is for files written by other programs, such as a
     /// note dropped into the folder by hand. An exclusive open is no test on Linux, where file locks are advisory: other
     /// programs do not take them, and a .NET writer takes its lock just after creating the file, so a watcher holding
-    /// one at that moment makes the writer fail.
+    /// one at that moment makes the writer fail. Windows locks are enforced, so there a stable file must also open for
+    /// reading: a writer that paused can still have it open, and a virus scanner opens a file once it is written, and
+    /// either would make the handler's read fail.
     /// </remarks>
     private async Task<bool> WaitUntilReady(string filePath)
     {
@@ -127,7 +140,12 @@ internal sealed class DirectoryWatcher(
             stablePolls = current.Length > 0 && current == previous ? stablePolls + 1 : 0;
             if (stablePolls >= ReadyStablePolls)
             {
-                return true;
+                if (!OperatingSystem.IsWindows() || CanBeRead(filePath))
+                {
+                    return true;
+                }
+
+                stablePolls = 0;
             }
 
             previous = current;
@@ -136,5 +154,18 @@ internal sealed class DirectoryWatcher(
 
         logger.FileNotReady(filePath);
         return false;
+    }
+
+    private static bool CanBeRead(string filePath)
+    {
+        try
+        {
+            using FileStream stream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }
