@@ -26,4 +26,6 @@ public class WikiConfigurationSettings
     public string ReviewOpenFindingsDirectory => Path.Combine(ReviewFindingsDirectory, "open");
     public string ReviewClosedFindingsDirectory => Path.Combine(ReviewFindingsDirectory, "closed");
     public string WikiDirectory => Path.Combine(RootDirectory, "wiki");
+    public string ResearchDirectory => Path.Combine(RootDirectory, "research");
+    public string DenyListPath => Path.Combine(ResearchDirectory, "denylist.json");
 }

@@ -6,6 +6,8 @@ using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Health;
 using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Notes.Watchers;
+using KnowledgeBase.Agent.Research;
+using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Review;
 using KnowledgeBase.Agent.Review.Watchers;
 using KnowledgeBase.Agent.Runs;
@@ -28,6 +30,7 @@ internal static class WikiDependencyInjection
             .AddHandlers()
             .AddJobs()
             .AddNotes()
+            .AddResearch()
             .AddRuns()
             .AddTools()
             .AddReview()
@@ -70,6 +73,14 @@ internal static class WikiDependencyInjection
                 .GetAwaiter()
                 .GetResult();
 
+            // Before the watchers start, so notes are processed with the people already in the wiki denied. A failure is
+            // logged and retried on the next start.
+            app.Services
+                .GetRequiredService<SeedDenyListFromPeopleCommandHandler>()
+                .Handle(new SeedDenyListFromPeopleCommand(), CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
             app.Services
                 .GetRequiredService<IAgentRunStore>()
                 .FailInterruptedRunsAsync(CancellationToken.None)
@@ -103,6 +114,7 @@ internal static class WikiDependencyInjection
                 .MapConversationEndpoints()
                 .MapEventEndpoints()
                 .MapNotesEndpoints()
+                .MapResearchEndpoints()
                 .MapReviewEndpoints()
                 .MapRunEndpoints()
                 .MapStatusEndpoints()

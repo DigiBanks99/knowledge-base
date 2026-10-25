@@ -3,6 +3,8 @@ using System.Text.Json;
 using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Notes.Commands;
+using KnowledgeBase.Agent.Research;
+using KnowledgeBase.Agent.Research.Models;
 using KnowledgeBase.Agent.Runs.Models;
 
 namespace KnowledgeBase.Agent.IntegrationTests.Pipeline;
@@ -182,7 +184,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
         _wiki.FactFinder.Behaviour = async (_, cancellationToken) => await _wiki.CallToolAsync(
             nameof(FactTools.FactWriterTool),
             Collection,
-            () => _wiki.Get<FactTools>().FactWriterTool(AgentFrameworkFacts(ResearchSource), Collection, cancellationToken));
+            () => _wiki.Get<FactTools>().FactWriterTool(AgentFrameworkFacts(ResearchSource, SubjectKind.Organisation), Collection, cancellationToken));
         await StartAsync();
 
         await CaptureAsync(NoteName, ResearchNote);
@@ -190,11 +192,13 @@ public sealed class NotePipelineTests : IAsyncDisposable
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
         string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
         FactDocument? document = settled ? await ReadProcessedFactsAsync() : null;
+        DenyList denyList = await ReadDenyListAsync();
 
         ItShouldFinish();
         ItShouldTellTheFactFinderItIsResearch();
         ItShouldRecordTheFactsAsResearchOnTheTopic();
         ItShouldKeepTheSourcesOfEachObservation();
+        ItShouldNotDenyTheOrganisationsItNames();
 
         void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
 
@@ -208,6 +212,8 @@ public sealed class NotePipelineTests : IAsyncDisposable
 
         void ItShouldKeepTheSourcesOfEachObservation() => document.ShouldNotBeNull()
             .Facts.Single().Observations.Single().Sources.ShouldBe([ResearchSource]);
+
+        void ItShouldNotDenyTheOrganisationsItNames() => denyList.Entries.ShouldBeEmpty();
     }
 
     [Test]
@@ -224,11 +230,13 @@ public sealed class NotePipelineTests : IAsyncDisposable
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
         string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
         FactDocument? document = settled ? await ReadProcessedFactsAsync() : null;
+        DenyList denyList = await ReadDenyListAsync();
 
         ItShouldFinish();
         ItShouldNotTellTheFactFinderItIsResearch();
         ItShouldRecordTheFactsAsTheAuthors();
         ItShouldDropTheSourcesTheFactFinderGave();
+        ItShouldKeepThePersonOutOfSearchQueries();
 
         void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
 
@@ -242,6 +250,9 @@ public sealed class NotePipelineTests : IAsyncDisposable
 
         void ItShouldDropTheSourcesTheFactFinderGave() =>
             document.ShouldNotBeNull().Facts.Single().Observations.Single().Sources.ShouldBeNull();
+
+        void ItShouldKeepThePersonOutOfSearchQueries() => denyList.Entries.ShouldHaveSingleItem()
+            .ShouldBe(new DenyListEntry("Agent Framework", SubjectKind.Person, DenyListSource.Auto, DenyListState.Denied));
     }
 
     [Test]
@@ -366,6 +377,9 @@ public sealed class NotePipelineTests : IAsyncDisposable
     private async Task<FactDocument?> ReadProcessedFactsAsync() => JsonSerializer.Deserialize<FactDocument>(
         await File.ReadAllTextAsync(Path.Combine(_wiki.Settings.ProcessedFactsDirectory, $"{Collection}.json")),
         JsonSerializerOptions.Web);
+
+    private async Task<DenyList> ReadDenyListAsync() =>
+        (await _wiki.Get<IResearchStore>().ReadDenyListAsync(CancellationToken.None)).Value;
 
     private async Task StartAsync()
     {

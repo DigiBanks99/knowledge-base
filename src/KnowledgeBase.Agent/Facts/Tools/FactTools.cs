@@ -5,6 +5,7 @@ using System.Text.Json;
 using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Notes;
+using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki;
@@ -18,7 +19,8 @@ internal sealed class FactTools(
     IOptions<WikiConfigurationSettings> settings,
     AgentRunTracker runTracker,
     CreateFileHandler createFileHandler,
-    ReadFileHandler readFileHandler)
+    ReadFileHandler readFileHandler,
+    RecordFactSubjectsCommandHandler recordSubjectsHandler)
 {
     private readonly WikiConfigurationSettings _settings = settings.Value;
 
@@ -44,6 +46,7 @@ internal sealed class FactTools(
         facts = provenance.Origin == FactOrigin.Research
             ? EnsureSourcesAreFromTheNote(facts, provenance)
             : WithoutSources(facts);
+        await DenyPrivateSubjectsAsync(facts, provenance.Origin, cancellationToken);
 
         logger.SerializingFactsToFile(factFilePath);
         CreateFileRequest createFileCommand = new(
@@ -80,6 +83,20 @@ internal sealed class FactTools(
         return provenance.IsFailure
             ? throw new InvalidOperationException($"Failed to read the provenance of note '{sourceNote}'. Error: {provenance.Error}")
             : provenance.Value;
+    }
+
+    /// <summary>
+    /// Done before the facts are written, so no fact document reaches the rest of the pipeline while the people and
+    /// organisations it names are still allowed in search queries.
+    /// </summary>
+    private async Task DenyPrivateSubjectsAsync(Fact[] facts, FactOrigin origin, CancellationToken cancellationToken)
+    {
+        Result<int, Error> result = await recordSubjectsHandler
+            .Handle(new RecordFactSubjectsCommand(facts, origin), cancellationToken);
+        if (result.IsFailure)
+        {
+            throw new InvalidOperationException($"Failed to add the people and organisations to the deny-list. Error: {result.Error}");
+        }
     }
 
     private static void EnsureEverySubjectHasAKind(Fact[] facts)
