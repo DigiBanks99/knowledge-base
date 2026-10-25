@@ -40,13 +40,13 @@ internal static class RunEndpoints
         [FromQuery, Description("Only runs started by this kind of trigger.")] AgentRunTriggerKind? triggerKind,
         [FromQuery, Description("Only runs started for this file, e.g. a note name.")] string? trigger,
         [FromQuery, Description("The maximum number of runs to return.")] int? limit,
-        AgentRunStore store,
+        IAgentRunStore store,
         CancellationToken cancellationToken) =>
         await store.ListAsync(agent, triggerKind, trigger, Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit), cancellationToken);
 
     private static async Task<Microsoft.AspNetCore.Http.IResult> GetRun(
         string id,
-        AgentRunStore store,
+        IAgentRunStore store,
         CancellationToken cancellationToken) =>
         await store.GetAsync(id, cancellationToken) is { } run
             ? Results.Ok(run)
