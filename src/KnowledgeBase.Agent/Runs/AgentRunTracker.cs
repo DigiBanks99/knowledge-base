@@ -12,11 +12,13 @@ public sealed class AgentRunFailedError(AgentRun run)
 
 /// <summary>
 /// Records pipeline agent runs: their trigger, status, outcome and every tool call. The run being executed flows
-/// with the async context, so tool-call middleware and tools can find it without it being passed around.
+/// with the async context, so tool-call middleware and tools can find it without it being passed around. When a run
+/// ends, every registered <see cref="IAgentRunObserver"/> is told about it.
 /// </summary>
 internal sealed class AgentRunTracker(
     ILogger<AgentRunTracker> logger,
-    AgentRunStore store,
+    IAgentRunStore store,
+    IEnumerable<IAgentRunObserver> observers,
     TimeProvider timeProvider)
 {
     private static readonly AsyncLocal<RunRecorder?> CurrentRecorder = new();
@@ -60,6 +62,7 @@ internal sealed class AgentRunTracker(
 
         await SaveAsync(recorder);
         AgentRun completed = recorder.Snapshot();
+        await NotifyObserversAsync(completed, cancellationToken);
         return completed.Status == AgentRunStatus.Succeeded
             ? completed
             : new AgentRunFailedError(completed);
@@ -75,6 +78,22 @@ internal sealed class AgentRunTracker(
 
         recorder.Add(new AgentToolCall(tool, target, timeProvider.GetUtcNow(), error is null, error));
         await SaveAsync(recorder);
+    }
+
+    private async Task NotifyObserversAsync(AgentRun run, CancellationToken cancellationToken)
+    {
+        foreach (IAgentRunObserver observer in observers)
+        {
+            try
+            {
+                await observer.OnRunCompletedAsync(run, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                // An observer reacts to a run; it must never change the run's outcome or silence the others.
+                logger.RunObserverFailed(observer.GetType().Name, run.Agent, run.Id, ex);
+            }
+        }
     }
 
     private async Task SaveAsync(RunRecorder recorder)
@@ -121,7 +140,7 @@ internal sealed class AgentRunTracker(
             }
         }
 
-        public async Task SaveAsync(AgentRunStore store)
+        public async Task SaveAsync(IAgentRunStore store)
         {
             await _saveGate.WaitAsync();
             try
