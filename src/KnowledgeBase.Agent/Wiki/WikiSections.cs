@@ -1,6 +1,7 @@
 namespace KnowledgeBase.Agent.Wiki;
 
-public sealed record WikiSection(string Folder, string Title, string Purpose);
+/// <param name="Personal">Whether the section is about the author or the people around them, which research never writes into.</param>
+public sealed record WikiSection(string Folder, string Title, string Purpose, bool Personal = false);
 
 /// <summary>
 /// The top-level sections of the wiki, seeded with an index page on startup so agents always find a structure to
@@ -10,8 +11,8 @@ public static class WikiSections
 {
     public static IReadOnlyList<WikiSection> All { get; } =
     [
-        new("me", "Me", "The author's own growth, feedback received, goals and achievements."),
-        new("people", "People", "Anyone with a relationship to the author."),
+        new("me", "Me", "The author's own growth, feedback received, goals and achievements.", Personal: true),
+        new("people", "People", "Anyone with a relationship to the author.", Personal: true),
         new("projects", "Projects", "Initiatives with a defined scope and goal."),
         new("learning", "Learning", "Knowledge gained or referenced, both journaled learning and factual recall."),
         new("plans", "Plans", "Time-boxed intentions, weekly or otherwise."),

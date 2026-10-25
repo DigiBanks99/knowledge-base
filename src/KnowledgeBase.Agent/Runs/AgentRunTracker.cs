@@ -1,3 +1,4 @@
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Runs.Models;
 
 using Microsoft.Agents.AI;
@@ -26,9 +27,27 @@ internal sealed class AgentRunTracker(
     /// <summary>The run executing in the current async context, if any.</summary>
     public AgentRun? Current => CurrentRecorder.Value?.Snapshot();
 
+    /// <summary>
+    /// The origin of the run executing in the current async context, or <see cref="FactOrigin.Author"/> outside a run.
+    /// Cheaper than <see cref="Current"/>, which copies the run's tool calls.
+    /// </summary>
+    public FactOrigin CurrentOrigin => CurrentRecorder.Value?.Origin ?? FactOrigin.Author;
+
+    public Task<Result<AgentRun, Error>> RunAsync(
+        string agent,
+        AgentRunTrigger trigger,
+        Func<CancellationToken, Task<AgentResponse>> run,
+        CancellationToken cancellationToken) =>
+        RunAsync(agent, trigger, FactOrigin.Author, run, cancellationToken);
+
+    /// <summary>
+    /// Runs an agent over content of the given origin. The origin flows with the run, so tools can refuse what a run
+    /// over research may not do.
+    /// </summary>
     public async Task<Result<AgentRun, Error>> RunAsync(
         string agent,
         AgentRunTrigger trigger,
+        FactOrigin origin,
         Func<CancellationToken, Task<AgentResponse>> run,
         CancellationToken cancellationToken)
     {
@@ -41,7 +60,8 @@ internal sealed class AgentRunTracker(
             null,
             null,
             null,
-            []));
+            [],
+            origin));
         CurrentRecorder.Value = recorder;
         await SaveAsync(recorder);
 
@@ -115,6 +135,8 @@ internal sealed class AgentRunTracker(
         private readonly SemaphoreSlim _saveGate = new(1, 1);
         private readonly List<AgentToolCall> _toolCalls = [];
         private AgentRun _run = run;
+
+        public FactOrigin Origin { get; } = run.Origin;
 
         public AgentRun Snapshot()
         {
