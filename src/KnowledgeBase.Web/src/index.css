@@ -151,6 +151,19 @@ textarea:focus {
   flex: 1;
 }
 
+.status-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .live.on {
   color: var(--success);
 }
@@ -267,20 +280,23 @@ details.card summary {
 
 .badge-succeeded,
 .badge-processed,
-.badge-low {
+.badge-low,
+.badge-healthy {
   background: var(--success-soft);
   color: var(--success);
 }
 
 .badge-failed,
-.badge-high {
+.badge-high,
+.badge-unhealthy {
   background: var(--danger-soft);
   color: var(--danger);
 }
 
 .badge-running,
 .badge-processing,
-.badge-medium {
+.badge-medium,
+.badge-degraded {
   background: var(--warning-soft);
   color: var(--warning);
 }
@@ -299,6 +315,7 @@ details.card summary {
 
 .items,
 .findings,
+.signals,
 .tree-list {
   list-style: none;
   padding: 0;

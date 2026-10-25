@@ -8,6 +8,7 @@ import { ReviewsPage } from './pages/ReviewsPage'
 import { EditsPage } from './pages/EditsPage'
 import { WikiPage } from './pages/WikiPage'
 import { AskPage } from './pages/AskPage'
+import { StatusPage } from './pages/StatusPage'
 
 const sections = [
   { to: '/capture', label: 'Capture' },
@@ -21,6 +22,7 @@ const sections = [
 export function App() {
   const connected = useLiveUpdates()
   const me = useQuery({ queryKey: ['me'], queryFn: api.me, retry: false, staleTime: Infinity })
+  const status = useQuery({ queryKey: ['status'], queryFn: api.status })
 
   return (
     <div className="app">
@@ -32,6 +34,10 @@ export function App() {
           </NavLink>
         ))}
         <span className="spacer" />
+        <NavLink to="/status" title={statusTitle(status.data?.isDegraded, status.isError)}>
+          Status
+          {status.data?.isDegraded && <span className="status-badge">!</span>}
+        </NavLink>
         <span className={`live ${connected ? 'on' : 'off'}`} title={connected ? 'Live updates on' : 'Reconnecting…'}>
           ●
         </span>
@@ -54,9 +60,16 @@ export function App() {
           <Route path="/wiki" element={<WikiPage />} />
           <Route path="/ask" element={<AskPage />} />
           <Route path="/ask/:conversationId" element={<AskPage />} />
+          <Route path="/status" element={<StatusPage />} />
           <Route path="*" element={<Navigate to="/capture" replace />} />
         </Routes>
       </main>
     </div>
   )
+}
+
+function statusTitle(isDegraded: boolean | undefined, isError: boolean): string {
+  if (isError) return 'The status could not be loaded'
+  if (isDegraded === undefined) return 'Loading the status…'
+  return isDegraded ? 'Something is degraded' : 'Everything is healthy'
 }
