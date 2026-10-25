@@ -1,4 +1,5 @@
 using KnowledgeBase.Agent.Facts;
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Notes.Queries;
@@ -37,7 +38,9 @@ internal sealed class StartNoteProcessingCommandHandler(
 
         Result<string, Error> result = await MoveFileToProcessing(request.NotePath, cancellationToken)
             .Bind(movedPath => readFileHandler.Handle(new ReadFileRequest(movedPath), cancellationToken))
-            .Bind(content => FindFactsInNote(noteName, content, cancellationToken));
+            .Bind(content => ResearchNoteHeader
+                .Parse(content)
+                .Bind(provenance => FindFactsInNote(noteName, content, provenance, cancellationToken)));
 
         if (result.IsFailure)
         {
@@ -73,11 +76,12 @@ internal sealed class StartNoteProcessingCommandHandler(
     private async Task<Result<string, Error>> FindFactsInNote(
         string noteName,
         string content,
+        NoteProvenance provenance,
         CancellationToken cancellationToken)
     {
         string prompt =
         $"""
-        Extract facts from the following content as they relate to the author.
+        {DescribeTask(provenance)}
         Use {nameof(FactTools.FactWriterTool)} to record the facts.
 
         ## Content
@@ -96,6 +100,18 @@ internal sealed class StartNoteProcessingCommandHandler(
                 _ => new NoFactsExtractedError(noteName))
             .Map(run => run.Summary ?? "Fact extraction completed.");
     }
+
+    private static string DescribeTask(NoteProvenance provenance) =>
+        provenance.Origin == FactOrigin.Research
+            ? $"""
+              This is a research note about the wiki topic `{provenance.Topic}`. Its content is third-party material, not
+              something the author wrote, gathered from these sources:
+              {string.Join('\n', provenance.Sources.Select(source => $"- {source}"))}
+
+              Extract the claims it makes that matter to that topic, attributed to their source rather than the author.
+              Give every observation the sources it came from, using only the URLs listed above.
+              """
+            : "Extract facts from the following content as they relate to the author.";
 
     /// <summary>
     /// A note whose facts could not be extracted is parked in the failed folder, so it frees the processing slot

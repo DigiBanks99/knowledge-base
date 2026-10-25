@@ -1,3 +1,6 @@
+using System.Text.Json;
+
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Notes.Commands;
 using KnowledgeBase.Agent.Runs.Models;
@@ -13,6 +16,10 @@ public sealed class NotePipelineTests : IAsyncDisposable
     private const string NoteName = "note-2026-10-24-101500.md";
     private const string NoteContent = "Susan gave feedback on the design review: be clearer about trade-offs.";
     private const string Collection = "feedback-from-susan";
+    private const string ResearchTopic = "projects/knowledge-base";
+    private const string ResearchSource = "https://example.com/agent-framework-2";
+    private const string ResearchNote =
+        $"---\norigin: research\ntopic: {ResearchTopic}\nsources:\n  - {ResearchSource}\n---\n\nVersion 2 of the agent framework adds workflows.";
 
     private readonly TestWiki _wiki = new();
 
@@ -170,6 +177,138 @@ public sealed class NotePipelineTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task AResearchNoteIsCaptured()
+    {
+        _wiki.FactFinder.Behaviour = async (_, cancellationToken) => await _wiki.CallToolAsync(
+            nameof(FactTools.FactWriterTool),
+            Collection,
+            () => _wiki.Get<FactTools>().FactWriterTool(AgentFrameworkFacts(ResearchSource), Collection, cancellationToken));
+        await StartAsync();
+
+        await CaptureAsync(NoteName, ResearchNote);
+        bool settled = await Eventually.Until(async () =>
+            TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+        FactDocument? document = settled ? await ReadProcessedFactsAsync() : null;
+
+        ItShouldFinish();
+        ItShouldTellTheFactFinderItIsResearch();
+        ItShouldRecordTheFactsAsResearchOnTheTopic();
+        ItShouldKeepTheSourcesOfEachObservation();
+
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
+
+        void ItShouldTellTheFactFinderItIsResearch() => _wiki.FactFinder.Prompts.ShouldHaveSingleItem()
+            .ShouldContain($"research note about the wiki topic `{ResearchTopic}`", Case.Sensitive);
+
+        void ItShouldRecordTheFactsAsResearchOnTheTopic() => document.ShouldNotBeNull().ShouldSatisfyAllConditions(
+            value => value.Origin.ShouldBe(FactOrigin.Research),
+            value => value.Topic.ShouldBe(ResearchTopic),
+            value => value.SourceNote.ShouldBe(NoteName));
+
+        void ItShouldKeepTheSourcesOfEachObservation() => document.ShouldNotBeNull()
+            .Facts.Single().Observations.Single().Sources.ShouldBe([ResearchSource]);
+    }
+
+    [Test]
+    public async Task AnAuthorNoteIsCaptured()
+    {
+        _wiki.FactFinder.Behaviour = async (_, cancellationToken) => await _wiki.CallToolAsync(
+            nameof(FactTools.FactWriterTool),
+            Collection,
+            () => _wiki.Get<FactTools>().FactWriterTool(AgentFrameworkFacts(ResearchSource, SubjectKind.Person), Collection, cancellationToken));
+        await StartAsync();
+
+        await CaptureAsync(NoteName, NoteContent);
+        bool settled = await Eventually.Until(async () =>
+            TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+        FactDocument? document = settled ? await ReadProcessedFactsAsync() : null;
+
+        ItShouldFinish();
+        ItShouldNotTellTheFactFinderItIsResearch();
+        ItShouldRecordTheFactsAsTheAuthors();
+        ItShouldDropTheSourcesTheFactFinderGave();
+
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
+
+        void ItShouldNotTellTheFactFinderItIsResearch() =>
+            _wiki.FactFinder.Prompts.ShouldHaveSingleItem().ShouldNotContain("research note");
+
+        void ItShouldRecordTheFactsAsTheAuthors() => document.ShouldNotBeNull().ShouldSatisfyAllConditions(
+            value => value.Origin.ShouldBe(FactOrigin.Author),
+            value => value.Topic.ShouldBeNull(),
+            value => value.Facts.Single().Subject.Kind.ShouldBe(SubjectKind.Person));
+
+        void ItShouldDropTheSourcesTheFactFinderGave() =>
+            document.ShouldNotBeNull().Facts.Single().Observations.Single().Sources.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task AResearchNoteHasAMalformedHeader()
+    {
+        _wiki.FactFinderWritesFacts(Collection);
+        await StartAsync();
+
+        await CaptureAsync(NoteName, ResearchNote.Replace($"topic: {ResearchTopic}\n", string.Empty, StringComparison.Ordinal));
+        bool settled = await Eventually.Until(() => TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).Count == 1);
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+        IReadOnlyList<AgentRun> runs = await _wiki.RunsAsync();
+
+        ItShouldParkTheNoteAsFailed();
+        ItShouldNotRunTheFactFinder();
+
+        void ItShouldParkTheNoteAsFailed()
+        {
+            settled.ShouldBeTrue(pipeline);
+            TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).ShouldBe([NoteName]);
+            TestWiki.FileNames(_wiki.Settings.ProcessingNotesDirectory).ShouldBeEmpty();
+        }
+
+        void ItShouldNotRunTheFactFinder()
+        {
+            _wiki.FactFinder.Prompts.ShouldBeEmpty();
+            runs.ShouldBeEmpty();
+        }
+    }
+
+    [Test]
+    [Arguments("https://example.com/made-up", SubjectKind.Other, "'https://example.com/made-up' of observation")]
+    [Arguments(null, SubjectKind.Other, "has no `sources`")]
+    [Arguments(ResearchSource, null, "has no `kind`")]
+    public async Task TheFactFinderWritesResearchFactsTheToolRefuses(string? source, SubjectKind? kind, string problem)
+    {
+        _wiki.FactFinder.Behaviour = async (_, cancellationToken) => await _wiki.CallToolAsync(
+            nameof(FactTools.FactWriterTool),
+            Collection,
+            () => _wiki.Get<FactTools>().FactWriterTool(AgentFrameworkFacts(source, kind), Collection, cancellationToken));
+        await StartAsync();
+
+        await CaptureAsync(NoteName, ResearchNote);
+        bool settled = await Eventually.Until(async () =>
+            TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(1));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+        IReadOnlyList<AgentRun> runs = await _wiki.RunsAsync();
+
+        ItShouldParkTheNoteAsFailed();
+        ItShouldNotWriteTheFacts();
+        ItShouldTellTheFactFinderWhatToCorrect();
+
+        void ItShouldParkTheNoteAsFailed()
+        {
+            settled.ShouldBeTrue(pipeline);
+            TestWiki.FileNames(_wiki.Settings.FailedNotesDirectory).ShouldBe([NoteName]);
+        }
+
+        void ItShouldNotWriteTheFacts() => TestWiki.FileNames(_wiki.Settings.FactsDirectory).ShouldBeEmpty();
+
+        void ItShouldTellTheFactFinderWhatToCorrect() => runs.ShouldHaveSingleItem()
+            .ToolCalls.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+                call => call.Succeeded.ShouldBeFalse(),
+                call => call.Error.ShouldNotBeNull().ShouldContain(problem, Case.Sensitive));
+    }
+
+    [Test]
     public async Task TwoNotesAreCapturedTogether()
     {
         const string secondNote = "note-2026-10-24-101600.md";
@@ -216,6 +355,17 @@ public sealed class NotePipelineTests : IAsyncDisposable
             TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).ShouldBe([NoteName, secondNote]);
         }
     }
+
+    private static Fact[] AgentFrameworkFacts(string? source, SubjectKind? kind = SubjectKind.Other) =>
+    [
+        new(
+            new FactSubject("Agent Framework", "A library for building agents.", kind),
+            [new Observation("Version 2 was released", "The release adds workflows.", 2, [], source is null ? [] : [source])])
+    ];
+
+    private async Task<FactDocument?> ReadProcessedFactsAsync() => JsonSerializer.Deserialize<FactDocument>(
+        await File.ReadAllTextAsync(Path.Combine(_wiki.Settings.ProcessedFactsDirectory, $"{Collection}.json")),
+        JsonSerializerOptions.Web);
 
     private async Task StartAsync()
     {

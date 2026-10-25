@@ -9,7 +9,7 @@ internal static class AgentScripts
     public static readonly Fact[] SampleFacts =
     [
         new(
-            new FactSubject("Susan", "A colleague on the platform team."),
+            new FactSubject("Susan", "A colleague on the platform team.", SubjectKind.Person),
             [new Observation("Gave feedback on the design review", "Asked for clearer trade-offs.", 2, [])])
     ];
 
