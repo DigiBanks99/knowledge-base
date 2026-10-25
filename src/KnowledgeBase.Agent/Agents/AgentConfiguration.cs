@@ -101,7 +101,8 @@ internal static class AgentConfiguration
             instructions,
             agentName,
             tools: tools,
-            defaultMaxTokens: options.MaxOutputTokens);
+            defaultMaxTokens: options.MaxOutputTokens,
+            clientFactory: WithDetailedToolErrors);
     }
 
     private static Func<AITool[], AIAgent> CreateOpenAICompatibleAgent(
@@ -128,8 +129,18 @@ internal static class AgentConfiguration
         });
         ChatClient chatClient = client.GetChatClient(options.Model);
 
-        return tools => chatClient.AsAIAgent(instructions, agentName, tools: tools);
+        return tools => chatClient.AsAIAgent(instructions, agentName, tools: tools, clientFactory: WithDetailedToolErrors);
     }
+
+    /// <summary>
+    /// Invokes tools with their exception messages passed back to the model. By default the model is only told that a
+    /// function failed, but the tools' errors (and refusals) are written for the model to correct its call or continue
+    /// with what it may do.
+    /// </summary>
+    private static IChatClient WithDetailedToolErrors(IChatClient chatClient) => chatClient
+        .AsBuilder()
+        .UseFunctionInvocation(configure: invoker => invoker.IncludeDetailedErrors = true)
+        .Build();
 
     private static async ValueTask<object?> RecordToolCall(
         AgentRunTracker runTracker,
