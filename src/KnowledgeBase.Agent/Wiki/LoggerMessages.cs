@@ -22,4 +22,10 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Error, "Failed to commit the wiki changes of {Agent} run '{RunId}': {Error}")]
     public static partial void FailedToCommitWikiRun(this ILogger logger, string agent, string runId, Error error);
+
+    [LoggerMessage(LogLevel.Information, "Pushed the wiki to the backup remote.")]
+    public static partial void PushedWiki(this ILogger logger);
+
+    [LoggerMessage(LogLevel.Warning, "Failed to push the wiki to the backup remote; the next commit retries it: {Error}")]
+    public static partial void FailedToPushWiki(this ILogger logger, Error error);
 }

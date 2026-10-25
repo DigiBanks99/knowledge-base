@@ -11,11 +11,13 @@ namespace KnowledgeBase.Agent.Wiki.Versioning;
 /// ThreadWeaver and Editor runs execute while their caller holds <see cref="WikiLock"/>, and observers are called
 /// before the run returns, so the commit is taken under that lock and never captures a page another run is halfway
 /// through. The lock cannot be re-entered: this observer relies on the caller's hold and must never acquire it.
-/// A failed commit is logged and never affects the run.
+/// A new commit is then pushed to the backup remote, when one is configured, under the same lock. A failed commit or
+/// push is logged and never affects the run.
 /// </remarks>
 internal sealed class WikiVersioningObserver(
     ILogger<WikiVersioningObserver> logger,
-    CommitWikiRunCommandHandler commitHandler) : IAgentRunObserver
+    CommitWikiRunCommandHandler commitHandler,
+    PushWikiCommandHandler pushHandler) : IAgentRunObserver
 {
     private static readonly HashSet<string> WikiWritingAgents = [KnownAgents.ThreadWeaver, KnownAgents.Editor];
 
@@ -39,6 +41,13 @@ internal sealed class WikiVersioningObserver(
                     logger.NothingToCommitForWikiRun(run.Agent, run.Id);
                 }
             })
-            .TapError(error => logger.FailedToCommitWikiRun(run.Agent, run.Id, error));
+            .TapError(error => logger.FailedToCommitWikiRun(run.Agent, run.Id, error))
+            .Tap(async committed =>
+            {
+                if (committed)
+                {
+                    await pushHandler.Handle(new PushWikiCommand(), cancellationToken);
+                }
+            });
     }
 }

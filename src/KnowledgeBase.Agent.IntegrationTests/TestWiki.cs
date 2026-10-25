@@ -28,10 +28,11 @@ internal sealed class TestWiki : IAsyncDisposable
     private readonly ProblemLog _problems = new();
     private readonly WebApplication _app;
 
-    public TestWiki()
+    /// <param name="settings">More configuration for the API, such as a backup remote.</param>
+    public TestWiki(IReadOnlyDictionary<string, string?>? settings = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>())
         {
             [$"{WikiConfigurationSettings.SectionName}:{nameof(WikiConfigurationSettings.RootDirectory)}"] = _root.Path
         });

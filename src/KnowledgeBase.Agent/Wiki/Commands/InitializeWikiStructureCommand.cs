@@ -14,6 +14,7 @@ internal sealed class InitializeWikiStructureCommandHandler(
     CreateDirectoryHandler directoryHandler,
     CreateFileHandler createFileHandler,
     InitializeWikiRepositoryCommandHandler repositoryHandler,
+    PushWikiCommandHandler pushHandler,
     IOptions<WikiConfigurationSettings> settingsOptions)
 {
     private readonly WikiConfigurationSettings settings = settingsOptions.Value;
@@ -32,11 +33,14 @@ internal sealed class InitializeWikiStructureCommandHandler(
 
     /// <summary>
     /// Without git the wiki still works, just unversioned, so a repository that cannot be created is logged rather
-    /// than stopping the app.
+    /// than stopping the app. Once it exists, any commits the backup remote is missing (such as a new wiki's initial
+    /// commit, or ones a failed push left behind before a restart) are pushed rather than waiting for the next agent
+    /// run; a failed push is only logged.
     /// </summary>
     private async Task InitializeRepository(CancellationToken cancellationToken) => await repositoryHandler
         .Handle(new InitializeWikiRepositoryCommand(), cancellationToken)
-        .TapError(logger.FailedToInitializeWikiRepository);
+        .TapError(logger.FailedToInitializeWikiRepository)
+        .Tap(() => pushHandler.Handle(new PushWikiCommand(OnlyWhenBehind: true), cancellationToken));
 
     private Result<bool, Error> CreateDirectories()
     {

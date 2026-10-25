@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace KnowledgeBase.Agent.Wiki.Versioning;
 
@@ -47,10 +48,67 @@ internal sealed class GitClient : IGitClient
         await RunAsync(directory, ["commit", "--quiet", $"--author={author}", "--message", message], cancellationToken)
             .Bind(Succeeded);
 
+    public async Task<Result<bool, Error>> SetRemoteAsync(
+        string directory,
+        string name,
+        string url,
+        CancellationToken cancellationToken) =>
+        await RunAsync(directory, ["remote", "get-url", name], cancellationToken)
+            .Bind(async output => output.ExitCode switch
+            {
+                0 when output.StandardOutput.Trim() == url => Result.Success<bool, Error>(false),
+                0 => await RunAsync(directory, ["remote", "set-url", name, url], cancellationToken).Bind(Succeeded),
+                // git answers 2 when there is no such remote.
+                2 => await RunAsync(directory, ["remote", "add", name, url], cancellationToken).Bind(Succeeded),
+                _ => Failed(output)
+            });
+
+    public async Task<Result<bool, Error>> PushAsync(
+        string directory,
+        string remote,
+        string? sshCommand,
+        CancellationToken cancellationToken) =>
+        await RunAsync(
+                directory,
+                ["push", "--quiet", "--set-upstream", remote, "HEAD"],
+                cancellationToken,
+                sshCommand is null ? [] : [new KeyValuePair<string, string>("GIT_SSH_COMMAND", sshCommand)])
+            .Bind(Succeeded);
+
+    // Commits reachable from HEAD but from none of the remote's branches. Unlike @{u}..HEAD, this also answers before
+    // the first push, when there is no upstream yet.
+    public async Task<Result<int, Error>> CountUnpushedCommitsAsync(
+        string directory,
+        string remote,
+        CancellationToken cancellationToken) =>
+        await RunAsync(directory, ["rev-list", "--count", "HEAD", "--not", $"--remotes={remote}"], cancellationToken)
+            .Bind(output => output.ExitCode == 0 && int.TryParse(output.StandardOutput.Trim(), out int count)
+                ? Result.Success<int, Error>(count)
+                : Result.Failure<int, Error>(Failed(output).Error));
+
+    public async Task<Result<GitCommit?, Error>> GetLastCommitAsync(string directory, CancellationToken cancellationToken) =>
+        await RunAsync(directory, ["log", "-1", "--format=%h%x00%cI%x00%s"], cancellationToken)
+            .Bind(output =>
+            {
+                if (output.ExitCode != 0)
+                {
+                    // A branch without commits has nothing to log yet; that is not a failure.
+                    return output.StandardError.Contains("does not have any commits", StringComparison.Ordinal)
+                        ? Result.Success<GitCommit?, Error>(null)
+                        : Result.Failure<GitCommit?, Error>(Failed(output).Error);
+                }
+
+                string[] fields = output.StandardOutput.TrimEnd('\n', '\r').Split('\0');
+                return fields.Length == 3 && DateTimeOffset.TryParse(fields[1], CultureInfo.InvariantCulture, out DateTimeOffset committedAt)
+                    ? Result.Success<GitCommit?, Error>(new GitCommit(fields[0], committedAt, fields[2]))
+                    : Result.Failure<GitCommit?, Error>(new GitCommandFailedError(output.Command, $"its output could not be read: {output.StandardOutput}"));
+            });
+
     private static async Task<Result<GitOutput, Error>> RunAsync(
         string directory,
         string[] arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEnumerable<KeyValuePair<string, string>>? environment = null)
     {
         string command = string.Join(' ', arguments.TakeWhile(argument => !argument.StartsWith('-')));
         ProcessStartInfo startInfo = new("git")
@@ -78,6 +136,12 @@ internal sealed class GitClient : IGitClient
         }
 
         startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        // Messages stay in English whatever the machine's locale, because some outcomes are recognised by their text.
+        startInfo.Environment["LC_ALL"] = "C";
+        foreach ((string name, string value) in environment ?? [])
+        {
+            startInfo.Environment[name] = value;
+        }
 
         using Process process = new() { StartInfo = startInfo };
         try

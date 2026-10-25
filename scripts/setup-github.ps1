@@ -217,6 +217,8 @@ try {
         [pscustomobject]@{ Name = 'EntraClientSecret'; GitHub = 'ENTRA_CLIENT_SECRET'; Secret = $true; Required = $true; OnVm = $false; Default = $null; Help = 'A client secret of the Entra app registration.' }
         [pscustomobject]@{ Name = 'OpenAICompatibleEndpoint'; GitHub = 'OPENAI_COMPATIBLE_ENDPOINT'; Secret = $false; Required = $true; OnVm = $true; Default = 'http://127.0.0.1:9931/v1'; Help = 'The llama-server API on the VM, as the API container sees it (it shares the host network).' }
         [pscustomobject]@{ Name = 'OpenAICompatibleApiKey'; GitHub = 'OPENAI_COMPATIBLE_API_KEY'; Secret = $true; Required = $false; OnVm = $true; Default = $null; Help = 'Only if llama-server was started with --api-key; skip otherwise.' }
+        [pscustomobject]@{ Name = 'WikiBackupRemote'; GitHub = 'WIKI_BACKUP_REMOTE'; Secret = $false; Required = $false; OnVm = $true; Default = $null; Help = 'SSH URL of the private wiki backup repository (git@github.com:<owner>/<repo>.git); skip to leave backup off. See "Wiki backup" in the README.' }
+        [pscustomobject]@{ Name = 'WikiBackupKeyDirectory'; GitHub = 'WIKI_BACKUP_KEY_DIRECTORY'; Secret = $false; Required = $false; OnVm = $true; Default = $null; Help = 'Folder on the VM holding the backup deploy key (id_ed25519) and known_hosts, e.g. /srv/knowledge-base-backup-key. It must exist; skip to leave backup off.' }
     )
     foreach ($agent in $agents) {
         $upper = $agent.ToUpperInvariant()
