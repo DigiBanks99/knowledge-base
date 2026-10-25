@@ -14,6 +14,18 @@ Outside the pipeline, the **Librarian** answers the author's questions in a conv
 ## Contracts between stages
 
 - **Facts** (FactFinder → ThreadWeaver): a JSON document of subjects, each with observations. A subject is named as fully as the note allows (full name rather than first name, organisation names spelled out) because the ThreadWeaver matches subjects to existing wiki pages by name. Each observation carries a short summary, the supporting detail from the note, a priority and the other subjects it relates to.
+  - Every subject has a kind: `Person`, `Organisation` or `Other`. People and organisations are private: their names are never sent outside the wiki.
+  - Every fact document records its origin. `Author` facts come from a note the author wrote. `Research` facts come from a research note gathered from the web for a wiki topic, which the document names. Research facts are third-party claims, not the author's knowledge, and each of their observations carries the source URLs it came from.
+- **Research notes**: a research note starts with a header naming its origin, the wiki topic it was gathered for and its sources. The pipeline reads the header itself, so a document's origin never depends on an agent; a note with a malformed header fails before any agent sees it.
+
+  ```markdown
+  ---
+  origin: research
+  topic: projects/example
+  sources:
+    - https://example.com/article
+  ---
+  ```
 - **Findings** (Reviewer → Editor): each finding names the wiki page it concerns, describes the problem and gives a concrete, actionable recommendation the Editor can carry out without re-doing the review. Findings are recorded with the review tools, never as free text.
 
 ## Universal rules
