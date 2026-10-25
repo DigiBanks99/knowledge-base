@@ -35,6 +35,9 @@ pnpm run build   # tsc -b && vite build
 ```
 
 - If `dotnet format --verify-no-changes` fails, run `dotnet format KnowledgeBase.slnx` and review the diff.
+- The shell starts in the repository root; don't prefix commands with `cd` to it.
+- Create and change repository files with the file editing tools, not shell heredocs, `sed -i` or inline scripts.
+  Those break on quoting and can write a BOM or CRLF line endings that `dotnet format` then rejects.
 - Run the app with `aspire run` (prefer the Aspire skills / MCP tools for starting, stopping and reading logs). It needs
   real secrets and Entra sign-in, so it may not start in an agent environment; say so rather than guessing.
 
@@ -133,6 +136,10 @@ pnpm run build   # tsc -b && vite build
   `config/` submodule as markdown files loaded by `Common/ConfigFiles.cs`. The submodule may be absent (public CI,
   other people's clones); the build must keep working without it. `config.template/` holds the public, generic
   versions that the AppHost's `scaffold-config` command copies in; a new config file needs a template too.
+- A change to a `config.template/` file (a new rule or instruction) also belongs in the matching `config/` file when
+  the submodule is present, since that is the copy the author's deployment uses. The private files have diverged
+  from the templates, so merge the change in rather than copying the template over. Commit it in the submodule and
+  leave pushing to the author.
 
 ## Git
 
