@@ -3,8 +3,8 @@
 ##
 ## Get latest from `dotnet new gitattributes`
 
-# Auto detect text files and perform LF normalization
-* text=auto
+# Auto detect text files and check them out with LF, whatever core.autocrlf says, to match .editorconfig
+* text=auto eol=lf
 
 #
 # The above will handle all files NOT found below
