@@ -94,6 +94,16 @@ export interface StatusReport {
   checkedAt: string
 }
 
+export type SubjectKind = 'Person' | 'Organisation' | 'Other'
+export type DenyListSource = 'Auto' | 'Manual'
+export type DenyListState = 'Denied' | 'Allowed'
+export interface DenyListEntry {
+  name: string
+  kind: SubjectKind
+  source: DenyListSource
+  state: DenyListState
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -143,6 +153,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
+const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
 
 export const api = {
   me: () => request<{ name: string }>('/api/me'),
@@ -168,6 +179,10 @@ export const api = {
   wikiPage: (path: string) => request<WikiPage>(`/api/wiki/page?path=${encodeURIComponent(path)}`),
 
   status: () => request<StatusReport>('/api/status'),
+
+  denyList: () => request<DenyListEntry[]>('/api/research/deny-list'),
+  setDenyListState: (name: string, state: DenyListState) =>
+    put<DenyListEntry>('/api/research/deny-list/state', { name, state }),
 
   conversations: () => request<ConversationSummary[]>('/api/conversations'),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${id}`),
