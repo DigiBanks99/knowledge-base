@@ -23,6 +23,14 @@ public sealed class AgentRunTrackerTests
     {
         TimeProvider timeProvider = Substitute.For<TimeProvider>();
         timeProvider.GetUtcNow().Returns(new DateTimeOffset(2026, 10, 25, 9, 30, 0, TimeSpan.Zero));
+        // Back-off delays elapse at once, so retries don't wait on the real clock.
+        timeProvider
+            .CreateTimer(Arg.Any<TimerCallback>(), Arg.Any<object?>(), Arg.Any<TimeSpan>(), Arg.Any<TimeSpan>())
+            .Returns(call =>
+            {
+                ThreadPool.QueueUserWorkItem(state => call.Arg<TimerCallback>()(state), call.ArgAt<object?>(1));
+                return Substitute.For<ITimer>();
+            });
         _logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
         _firstObserver
             .OnRunCompletedAsync(Arg.Do<AgentRun>(_observedRuns.Add), Arg.Any<CancellationToken>())
@@ -175,6 +183,65 @@ public sealed class AgentRunTrackerTests
             _secondObserver.Received(1).OnRunCompletedAsync(Arg.Any<AgentRun>(), Arg.Any<CancellationToken>());
 
         void ItShouldLogTheFailure() => _logger
+            .ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name == nameof(ILogger.Log))
+            .Select(call => call.GetArguments())
+            .ShouldContain(arguments => (LogLevel)arguments[0]! == LogLevel.Error && arguments[3] == failure);
+    }
+
+    [Test]
+    public async Task TheFinalSaveIsBlockedOnce()
+    {
+        List<AgentRunStatus> storedStatuses = [];
+        int blockedSaves = 0;
+        _store
+            .SaveAsync(Arg.Any<AgentRun>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                AgentRun run = call.Arg<AgentRun>();
+                if (run.Status == AgentRunStatus.Succeeded && blockedSaves++ == 0)
+                {
+                    return Task.FromException(new IOException("The run file is open in another process."));
+                }
+
+                storedStatuses.Add(run.Status);
+                return Task.CompletedTask;
+            });
+
+        Result<AgentRun, Error> result = await _tracker.RunAsync(KnownAgents.Editor, Trigger, Answer, CancellationToken.None);
+
+        ItShouldSucceed();
+        ItShouldStillStoreTheCompletedRun();
+
+        void ItShouldSucceed() => result.IsSuccess.ShouldBeTrue();
+
+        void ItShouldStillStoreTheCompletedRun() => storedStatuses.ShouldBe([AgentRunStatus.Running, AgentRunStatus.Succeeded]);
+    }
+
+    [Test]
+    public async Task TheFinalSaveKeepsFailing()
+    {
+        IOException failure = new("The run file is open in another process.");
+        _store
+            .SaveAsync(Arg.Is<AgentRun>(run => run.Status == AgentRunStatus.Succeeded), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(failure));
+
+        Result<AgentRun, Error> result = await _tracker.RunAsync(KnownAgents.Editor, Trigger, Answer, CancellationToken.None);
+
+        ItShouldStillSucceed();
+        ItShouldNotifyObservers();
+        ItShouldGiveUpAfterAFewAttempts();
+        ItShouldLogTheLostRun();
+
+        void ItShouldStillSucceed() => result.IsSuccess.ShouldBeTrue();
+
+        void ItShouldNotifyObservers() => _observedRuns.ShouldHaveSingleItem().Status.ShouldBe(AgentRunStatus.Succeeded);
+
+        void ItShouldGiveUpAfterAFewAttempts() => _store
+            .Received(4)
+            .SaveAsync(Arg.Is<AgentRun>(run => run.Status == AgentRunStatus.Succeeded), Arg.Any<CancellationToken>());
+
+        void ItShouldLogTheLostRun() => _logger
             .ReceivedCalls()
             .Where(call => call.GetMethodInfo().Name == nameof(ILogger.Log))
             .Select(call => call.GetArguments())
