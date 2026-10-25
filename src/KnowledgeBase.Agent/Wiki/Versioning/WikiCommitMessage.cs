@@ -19,18 +19,21 @@ internal static class WikiCommitMessage
 
     /// <summary>
     /// The subject names the agent and what it did (or why it failed); the body identifies the run, so the commit can
-    /// be traced back to it on the Runs page.
+    /// be traced back to it on the Runs page, and where its content came from, so <c>git log --grep "Origin: Research"</c>
+    /// finds every change research made.
     /// </summary>
     public static string For(AgentRun run)
     {
         bool failed = run.Status == AgentRunStatus.Failed;
         string summary = SummaryLine(failed ? run.Error : run.Summary) ?? (failed ? "Run failed" : "Run finished");
+        string topic = run.Topic is null ? string.Empty : $"\nTopic: {run.Topic}";
         return $"""
             {run.Agent}: {summary}
 
             Run: {run.Id}
             Status: {run.Status}
             Trigger: {run.Trigger.Kind} {run.Trigger.Reference}
+            Origin: {run.Origin}{topic}
             """;
     }
 

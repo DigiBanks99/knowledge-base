@@ -289,6 +289,7 @@ public sealed class NotePipelineTests : IAsyncDisposable
 
         void ItShouldRecordTheRunAsResearch() => threadWeaver.ShouldSatisfyAllConditions(
             run => run.Origin.ShouldBe(FactOrigin.Research),
+            run => run.Topic.ShouldBe(ResearchTopic),
             run => run.Status.ShouldBe(AgentRunStatus.Succeeded));
 
         void ItShouldRefuseToDeleteOrMovePages()

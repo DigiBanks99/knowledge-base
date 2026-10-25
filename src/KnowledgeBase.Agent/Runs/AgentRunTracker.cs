@@ -38,16 +38,17 @@ internal sealed class AgentRunTracker(
         AgentRunTrigger trigger,
         Func<CancellationToken, Task<AgentResponse>> run,
         CancellationToken cancellationToken) =>
-        RunAsync(agent, trigger, FactOrigin.Author, run, cancellationToken);
+        RunAsync(agent, trigger, FactOrigin.Author, null, run, cancellationToken);
 
     /// <summary>
-    /// Runs an agent over content of the given origin. The origin flows with the run, so tools can refuse what a run
-    /// over research may not do.
+    /// Runs an agent over content of the given origin and, for research, the topic it was gathered for. The origin
+    /// flows with the run, so tools can refuse what a run over research may not do.
     /// </summary>
     public async Task<Result<AgentRun, Error>> RunAsync(
         string agent,
         AgentRunTrigger trigger,
         FactOrigin origin,
+        string? topic,
         Func<CancellationToken, Task<AgentResponse>> run,
         CancellationToken cancellationToken)
     {
@@ -61,7 +62,8 @@ internal sealed class AgentRunTracker(
             null,
             null,
             [],
-            origin));
+            origin,
+            topic));
         CurrentRecorder.Value = recorder;
         await SaveAsync(recorder);
 
