@@ -23,7 +23,7 @@ internal sealed class ChangeNotifier(
 {
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(500);
 
-    public static readonly string[] Areas = ["notes", "facts", "review", "wiki", "runs", "conversations"];
+    public static readonly string[] Areas = ["notes", "facts", "review", "wiki", "runs", "conversations", "research"];
 
     private readonly string _rootDirectory = Path.GetFullPath(settings.Value.RootDirectory);
     private readonly ConcurrentDictionary<Guid, Channel<ChangeEvent>> _subscribers = new();

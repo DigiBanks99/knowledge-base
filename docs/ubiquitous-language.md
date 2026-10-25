@@ -63,6 +63,13 @@ ThreadWeaver fails on its facts.
 
 "Fact" is the unit of knowledge between FactFinder and ThreadWeaver. Don't call it a "note" or an "entry".
 
+## Research
+
+| Term          | Meaning                                                                                                                                                                                                     | In code                         |
+|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
+| **Deny-list** | The names of people and organisations that never go into a search query, stored in `research/denylist.json`. Filled automatically from the author's own notes and, once, from the wiki's `people/` folders. | `DenyList`, `DenyListMatcher`   |
+| **Deny-list entry** | One name on the deny-list with its kind, its **source** (`Auto` from classification, `Manual` from the author in the UI) and its state (`Denied` or `Allowed`). Classification never changes a `Manual` entry. | `DenyListEntry`                 |
+
 ## Review
 
 | Term               | Meaning                                                                                                                                                                                                                          | In code                              |
