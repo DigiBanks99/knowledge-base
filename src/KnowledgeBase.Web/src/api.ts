@@ -82,6 +82,18 @@ export interface Conversation extends ConversationSummary {
   messages: ConversationMessage[]
 }
 
+export type StatusSignalState = 'Healthy' | 'Degraded' | 'Unhealthy'
+export interface StatusSignal {
+  name: string
+  state: StatusSignalState
+  detail: string | null
+}
+export interface StatusReport {
+  signals: StatusSignal[]
+  isDegraded: boolean
+  checkedAt: string
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -154,6 +166,8 @@ export const api = {
 
   wikiTree: () => request<WikiNode>('/api/wiki/tree'),
   wikiPage: (path: string) => request<WikiPage>(`/api/wiki/page?path=${encodeURIComponent(path)}`),
+
+  status: () => request<StatusReport>('/api/status'),
 
   conversations: () => request<ConversationSummary[]>('/api/conversations'),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${id}`),

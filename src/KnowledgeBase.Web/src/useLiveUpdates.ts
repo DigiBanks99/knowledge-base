@@ -9,6 +9,7 @@ const queriesByArea: Record<string, string[][]> = {
   review: [['findings'], ['reports']],
   wiki: [['wiki-tree'], ['wiki-page']],
   conversations: [['conversations']],
+  status: [['status']],
 }
 
 /**
