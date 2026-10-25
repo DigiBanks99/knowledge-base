@@ -151,6 +151,8 @@ The agents depend on tool calling, so the server must support it. For `llama-ser
 - A single-model server ignores the model name, so `{Agent}Model` can be any label.
 - A completion may take up to `OpenAICompatible:NetworkTimeout` (default 10 minutes) before the API gives up. Keep
   llama-server's own `--timeout` at least as long.
+- The app's Status page checks the server's `/health` route (the endpoint with `/v1` replaced) every 30 seconds and
+  shows a badge in the header while it is unreachable. `/health` on the API then reports `Degraded`, not `Unhealthy`.
 
 In the [deployment](#deployment), the API container shares the host's network, so a llama-server bound to
 `127.0.0.1` on the same machine is reached at its loopback address. Do not expose the llama-server port publicly. If
