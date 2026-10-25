@@ -82,6 +82,52 @@ public sealed class WikiPathsTests
     }
 
     [Test]
+    [Arguments(".git")]
+    [Arguments(".git/hooks/pre-commit")]
+    [Arguments("people/../.GIT/config")]
+    [Arguments(".gitignore")]
+    [Arguments("projects/.gitattributes")]
+    public void APathReachesIntoTheVersionHistory(string path)
+    {
+        bool resolved = _paths.TryResolve(path, out _);
+        Exception? exception = Catch.Exception(() => _paths.Resolve(path));
+
+        ItShouldBeRefused();
+        ItShouldExplainTheRefusal();
+
+        void ItShouldBeRefused() => resolved.ShouldBeFalse();
+
+        void ItShouldExplainTheRefusal() => exception
+            .ShouldBeOfType<InvalidOperationException>()
+            .Message.ShouldBe($"The path '{path}' belongs to the wiki's version history (git), which cannot be read or changed. Use the wiki's pages instead.");
+    }
+
+    [Test]
+    [Arguments("GIT~1/config")]
+    [Arguments("projects/gitign~1")]
+    public void AShortNameReachesIntoTheVersionHistoryOnWindows(string path)
+    {
+        bool resolved = _paths.TryResolve(path, out _);
+
+        ItShouldBeRefusedOnWindowsOnly();
+
+        // Only Windows has 8.3 short names; elsewhere these are ordinary (if odd) page names.
+        void ItShouldBeRefusedOnWindowsOnly() => resolved.ShouldBe(!OperatingSystem.IsWindows());
+    }
+
+    [Test]
+    [Arguments("projects/.github-notes.md")]
+    [Arguments("learning/git/index.md")]
+    public void APageNameMentionsGit(string path)
+    {
+        bool resolved = _paths.TryResolve(path, out _);
+
+        ItShouldBeAllowed();
+
+        void ItShouldBeAllowed() => resolved.ShouldBeTrue();
+    }
+
+    [Test]
     public void AnAbsolutePathOutsideTheWikiIsGiven()
     {
         string outside = Path.Combine(Path.GetTempPath(), "elsewhere", "page.md");

@@ -66,6 +66,7 @@ internal static class WikiEndpoints
     {
         IEnumerable<WikiNode> directories = directory
             .EnumerateDirectories()
+            .Where(child => !wikiPaths.IsRepositoryPath(child.FullName))
             .OrderBy(child => child.Name, StringComparer.OrdinalIgnoreCase)
             .Select(child => BuildNode(wikiPaths, child));
         IEnumerable<WikiNode> pages = directory
