@@ -115,21 +115,23 @@ jobs:
           # The backup deploy key stays in this folder on the VM; only its location is passed, never the key.
           Parameters__WikiBackupRemote: ${{ vars.WIKI_BACKUP_REMOTE }}
           Parameters__WikiBackupKeyDirectory: ${{ vars.WIKI_BACKUP_KEY_DIRECTORY }}
+          # An unset variable arrives as an empty string, which the API cannot read as a boolean and fails to start, so
+          # the EnableThinking parameters fall back to the AppHost's default.
           Parameters__FactFinderProvider: ${{ vars.FACTFINDER_PROVIDER }}
           Parameters__FactFinderModel: ${{ vars.FACTFINDER_MODEL }}
-          Parameters__FactFinderEnableThinking: ${{ vars.FACTFINDER_ENABLE_THINKING }}
+          Parameters__FactFinderEnableThinking: ${{ vars.FACTFINDER_ENABLE_THINKING || 'true' }}
           Parameters__ThreadWeaverProvider: ${{ vars.THREADWEAVER_PROVIDER }}
           Parameters__ThreadWeaverModel: ${{ vars.THREADWEAVER_MODEL }}
-          Parameters__ThreadWeaverEnableThinking: ${{ vars.THREADWEAVER_ENABLE_THINKING }}
+          Parameters__ThreadWeaverEnableThinking: ${{ vars.THREADWEAVER_ENABLE_THINKING || 'true' }}
           Parameters__ReviewerProvider: ${{ vars.REVIEWER_PROVIDER }}
           Parameters__ReviewerModel: ${{ vars.REVIEWER_MODEL }}
-          Parameters__ReviewerEnableThinking: ${{ vars.REVIEWER_ENABLE_THINKING }}
+          Parameters__ReviewerEnableThinking: ${{ vars.REVIEWER_ENABLE_THINKING || 'true' }}
           Parameters__EditorProvider: ${{ vars.EDITOR_PROVIDER }}
           Parameters__EditorModel: ${{ vars.EDITOR_MODEL }}
-          Parameters__EditorEnableThinking: ${{ vars.EDITOR_ENABLE_THINKING }}
+          Parameters__EditorEnableThinking: ${{ vars.EDITOR_ENABLE_THINKING || 'true' }}
           Parameters__LibrarianProvider: ${{ vars.LIBRARIAN_PROVIDER }}
           Parameters__LibrarianModel: ${{ vars.LIBRARIAN_MODEL }}
-          Parameters__LibrarianEnableThinking: ${{ vars.LIBRARIAN_ENABLE_THINKING }}
+          Parameters__LibrarianEnableThinking: ${{ vars.LIBRARIAN_ENABLE_THINKING || 'true' }}
         run: aspire deploy --environment production --non-interactive
 
       - name: Check health
