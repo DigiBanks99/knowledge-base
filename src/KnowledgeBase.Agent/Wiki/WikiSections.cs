@@ -1,7 +1,8 @@
 namespace KnowledgeBase.Agent.Wiki;
 
 /// <param name="Personal">Whether the section is about the author or the people around them, which research never writes into.</param>
-public sealed record WikiSection(string Folder, string Title, string Purpose, bool Personal = false);
+/// <param name="Researched">Whether each top-level entry of the section is a research topic.</param>
+public sealed record WikiSection(string Folder, string Title, string Purpose, bool Personal = false, bool Researched = false);
 
 /// <summary>
 /// The top-level sections of the wiki, seeded with an index page on startup so agents always find a structure to
@@ -13,9 +14,9 @@ public static class WikiSections
     [
         new("me", "Me", "The author's own growth, feedback received, goals and achievements.", Personal: true),
         new("people", "People", "Anyone with a relationship to the author.", Personal: true),
-        new("projects", "Projects", "Initiatives with a defined scope and goal."),
-        new("learning", "Learning", "Knowledge gained or referenced, both journaled learning and factual recall."),
-        new("plans", "Plans", "Time-boxed intentions, weekly or otherwise."),
+        new("projects", "Projects", "Initiatives with a defined scope and goal.", Researched: true),
+        new("learning", "Learning", "Knowledge gained or referenced, both journaled learning and factual recall.", Researched: true),
+        new("plans", "Plans", "Time-boxed intentions, weekly or otherwise.", Researched: true),
         new("decisions", "Decisions", "Choices made or being weighed, with rationale."),
         new("reflections", "Reflections", "Processing an experience or feeling.")
     ];

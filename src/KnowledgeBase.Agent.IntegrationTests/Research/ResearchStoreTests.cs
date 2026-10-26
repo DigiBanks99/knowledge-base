@@ -11,6 +11,7 @@ namespace KnowledgeBase.Agent.IntegrationTests.Research;
 public sealed class ResearchStoreTests : IDisposable
 {
     private static readonly DenyListEntry JaneDoe = new("Jane Doe", SubjectKind.Person, DenyListSource.Auto, DenyListState.Denied);
+    private static readonly DateTimeOffset Discovered = new(2026, 10, 25, 9, 30, 0, TimeSpan.Zero);
 
     private readonly TemporaryDirectory _root = new();
     private readonly WikiConfigurationSettings _settings;
@@ -82,6 +83,88 @@ public sealed class ResearchStoreTests : IDisposable
         void ItShouldReturnTheFailure() => result.Error.ShouldBeOfType<DenyListEntryNotFoundError>();
 
         void ItShouldKeepTheDenyListAsItWas() => read.Value.Entries.ShouldBe([JaneDoe]);
+    }
+
+    [Test]
+    public async Task ATopicIsDiscovered()
+    {
+        ResearchTopic topic = ResearchTopic.New("projects/garden", Discovered);
+
+        await _store.UpdateTopicAsync(topic.Path, _ => Maybe.From(topic), CancellationToken.None);
+        Result<IReadOnlyList<ResearchTopic>, Error> read = await new ResearchStore(Options.Create(_settings)).ListTopicsAsync(CancellationToken.None);
+
+        ItShouldKeepItUnderItsSlug();
+        ItShouldReadItBack();
+
+        void ItShouldKeepItUnderItsSlug() =>
+            TestWiki.FileNames(_settings.ResearchTopicsDirectory).ShouldBe(["projects--garden.json"]);
+
+        void ItShouldReadItBack() => read.Value.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            stored => stored.Path.ShouldBe(topic.Path),
+            stored => stored.Queries.ShouldBeEmpty(),
+            stored => stored.CreatedAt.ShouldBe(Discovered));
+    }
+
+    [Test]
+    public async Task CurationIsRequestedTwiceForATopic()
+    {
+        await _store.RequestCurationAsync(new CurationRequest("projects/garden", ["projects/garden/a.md"], Discovered), CancellationToken.None);
+        await _store.RequestCurationAsync(new CurationRequest("projects/garden", ["projects/garden/b.md"], Discovered.AddHours(1)), CancellationToken.None);
+        Result<IReadOnlyList<CurationRequest>, Error> read = await _store.ListCurationRequestsAsync(CancellationToken.None);
+
+        ItShouldKeepOneRequestFile();
+        ItShouldMergeTheChanges();
+
+        void ItShouldKeepOneRequestFile() =>
+            TestWiki.FileNames(_settings.CurationRequestsDirectory).ShouldBe(["projects--garden.json"]);
+
+        void ItShouldMergeTheChanges() => read.Value.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            request => request.ChangedPaths.ShouldBe(["projects/garden/a.md", "projects/garden/b.md"]),
+            request => request.RequestedAt.ShouldBe(Discovered.AddHours(1)));
+    }
+
+    [Test]
+    public async Task ATopicIsPruned()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.RequestCurationAsync(new CurationRequest("projects/garden", [], Discovered), CancellationToken.None);
+
+        Result<Maybe<ResearchTopic>, Error> result = await _store.UpdateTopicAsync("projects/garden", _ => Maybe<ResearchTopic>.None, CancellationToken.None);
+
+        ItShouldSucceed();
+        ItShouldRemoveItsState();
+        ItShouldRemoveItsWaitingRequest();
+
+        void ItShouldSucceed() => result.IsSuccess.ShouldBeTrue();
+
+        void ItShouldRemoveItsState() => TestWiki.FileNames(_settings.ResearchTopicsDirectory).ShouldBeEmpty();
+
+        void ItShouldRemoveItsWaitingRequest() => TestWiki.FileNames(_settings.CurationRequestsDirectory).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ATopicsStateIsCorrupt()
+    {
+        Directory.CreateDirectory(_settings.ResearchTopicsDirectory);
+        string topicPath = Path.Combine(_settings.ResearchTopicsDirectory, "projects--garden.json");
+        await File.WriteAllTextAsync(topicPath, "{ not json");
+
+        Result<Maybe<ResearchTopic>, Error> updated = await _store.UpdateTopicAsync(
+            "projects/garden",
+            _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)),
+            CancellationToken.None);
+        Result<IReadOnlyList<ResearchTopic>, Error> listed = await _store.ListTopicsAsync(CancellationToken.None);
+
+        ItShouldRefuseToOverwriteIt();
+        ItShouldSkipItInTheListing();
+
+        void ItShouldRefuseToOverwriteIt()
+        {
+            updated.Error.ShouldBeOfType<ResearchStoreError>();
+            File.ReadAllText(topicPath).ShouldBe("{ not json");
+        }
+
+        void ItShouldSkipItInTheListing() => listed.Value.ShouldBeEmpty();
     }
 
     [Test]

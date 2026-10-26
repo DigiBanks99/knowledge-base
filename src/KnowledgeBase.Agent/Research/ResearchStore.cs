@@ -12,9 +12,19 @@ namespace KnowledgeBase.Agent.Research;
 internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings) : IResearchStore, IDisposable
 {
     private readonly string _denyListPath = settings.Value.DenyListPath;
+    private readonly string _topicsDirectory = settings.Value.ResearchTopicsDirectory;
+    private readonly string _curationRequestsDirectory = settings.Value.CurationRequestsDirectory;
+    private readonly string _curationFailedDirectory = settings.Value.CurationFailedDirectory;
     private readonly SemaphoreSlim _denyListLock = new(1, 1);
 
-    public void Dispose() => _denyListLock.Dispose();
+    // One lock for topics and their curation requests, so pruning a topic never races a request being merged for it.
+    private readonly SemaphoreSlim _topicsLock = new(1, 1);
+
+    public void Dispose()
+    {
+        _denyListLock.Dispose();
+        _topicsLock.Dispose();
+    }
 
     // Writes replace the file whole, so a read never sees half of one and needs no lock.
     public Task<Result<DenyList, Error>> ReadDenyListAsync(CancellationToken cancellationToken) =>
@@ -45,6 +55,67 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         }
     }
 
+    public Task<Result<IReadOnlyList<ResearchTopic>, Error>> ListTopicsAsync(CancellationToken cancellationToken) =>
+        ReadAllAsync<ResearchTopic>(_topicsDirectory, cancellationToken);
+
+    public async Task<Result<Maybe<ResearchTopic>, Error>> UpdateTopicAsync(
+        string topic,
+        Func<Maybe<ResearchTopic>, Result<Maybe<ResearchTopic>, Error>> update,
+        CancellationToken cancellationToken)
+    {
+        string topicPath = TopicFilePath(_topicsDirectory, topic);
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Result<Maybe<ResearchTopic>, Error> current = await ReadDocumentAsync<ResearchTopic>(topicPath, cancellationToken);
+            if (current.IsFailure)
+            {
+                return current;
+            }
+
+            Result<Maybe<ResearchTopic>, Error> updated = update(current.Value);
+            if (updated.IsFailure || Equals(updated.Value, current.Value))
+            {
+                return updated;
+            }
+
+            return updated.Value.HasValue
+                ? await WriteDocumentAsync(topicPath, updated.Value.Value, cancellationToken).Map(written => Maybe.From(written))
+                : Delete(topicPath)
+                    .Bind(() => Delete(TopicFilePath(_curationRequestsDirectory, topic)))
+                    .Bind(() => Delete(TopicFilePath(_curationFailedDirectory, topic)))
+                    .Map(() => Maybe<ResearchTopic>.None);
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    public Task<Result<IReadOnlyList<CurationRequest>, Error>> ListCurationRequestsAsync(CancellationToken cancellationToken) =>
+        ReadAllAsync<CurationRequest>(_curationRequestsDirectory, cancellationToken);
+
+    public async Task<Result<CurationRequest, Error>> RequestCurationAsync(
+        CurationRequest request,
+        CancellationToken cancellationToken)
+    {
+        string requestPath = TopicFilePath(_curationRequestsDirectory, request.Topic);
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            return await ReadDocumentAsync<CurationRequest>(requestPath, cancellationToken)
+                .Map(waiting => waiting.HasValue ? waiting.Value.Merge(request) : request)
+                .Bind(merged => WriteDocumentAsync(requestPath, merged, cancellationToken));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    private static string TopicFilePath(string directory, string topic) =>
+        Path.Combine(directory, $"{TopicPaths.Slug(topic)}.json");
+
     /// <summary>
     /// A corrupt deny-list is an error rather than an empty list: reading it as empty would let denied names into
     /// queries, and the next change would overwrite every entry.
@@ -67,17 +138,68 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         }
     }
 
-    private async Task<Result<DenyList, Error>> WriteAsync(DenyList denyList, CancellationToken cancellationToken)
+    private async Task<Result<DenyList, Error>> WriteAsync(DenyList denyList, CancellationToken cancellationToken) =>
+        await WriteDocumentAsync(_denyListPath, denyList, cancellationToken);
+
+    private static async Task<Result<IReadOnlyList<T>, Error>> ReadAllAsync<T>(
+        string directory,
+        CancellationToken cancellationToken)
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_denyListPath)!);
-            await JsonFileStore.WriteAsync(_denyListPath, denyList, cancellationToken);
-            return denyList;
+            return Directory.Exists(directory)
+                ? Result.Success<IReadOnlyList<T>, Error>(await JsonFileStore.ReadAllAsync<T>(directory, cancellationToken))
+                : Result.Success<IReadOnlyList<T>, Error>([]);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new ResearchStoreError(_denyListPath, ex.Message);
+            return new ResearchStoreError(directory, ex.Message);
+        }
+    }
+
+    /// <summary>A document that cannot be read is an error, so an update never overwrites state it could not see.</summary>
+    private static async Task<Result<Maybe<T>, Error>> ReadDocumentAsync<T>(string filePath, CancellationToken cancellationToken)
+        where T : class
+    {
+        try
+        {
+            return Maybe.From(await JsonFileStore.ReadAsync<T>(filePath, cancellationToken));
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(filePath, ex.Message);
+        }
+    }
+
+    private static async Task<Result<T, Error>> WriteDocumentAsync<T>(string filePath, T document, CancellationToken cancellationToken)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+            await JsonFileStore.WriteAsync(filePath, document, cancellationToken);
+            return document;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(filePath, ex.Message);
+        }
+    }
+
+    private static UnitResult<Error> Delete(string filePath)
+    {
+        try
+        {
+            // File.Delete ignores a missing file but not a missing folder, and the curation folders may not exist yet.
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            return UnitResult.Success<Error>();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(filePath, ex.Message);
         }
     }
 }

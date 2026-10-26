@@ -28,4 +28,8 @@ public class WikiConfigurationSettings
     public string WikiDirectory => Path.Combine(RootDirectory, "wiki");
     public string ResearchDirectory => Path.Combine(RootDirectory, "research");
     public string DenyListPath => Path.Combine(ResearchDirectory, "denylist.json");
+    public string ResearchTopicsDirectory => Path.Combine(ResearchDirectory, "topics");
+    public string CurationDirectory => Path.Combine(ResearchDirectory, "curation");
+    public string CurationRequestsDirectory => Path.Combine(CurationDirectory, "requests");
+    public string CurationFailedDirectory => Path.Combine(CurationDirectory, "failed");
 }

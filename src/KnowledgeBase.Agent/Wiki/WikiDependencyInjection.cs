@@ -81,6 +81,14 @@ internal static class WikiDependencyInjection
                 .GetAwaiter()
                 .GetResult();
 
+            // Before the watchers start, so the runs they trigger find the existing topics known. A failure is logged and
+            // retried on the next start.
+            app.Services
+                .GetRequiredService<DiscoverTopicsCommandHandler>()
+                .Handle(new DiscoverTopicsCommand(), CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
             app.Services
                 .GetRequiredService<IAgentRunStore>()
                 .FailInterruptedRunsAsync(CancellationToken.None)

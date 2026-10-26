@@ -69,6 +69,9 @@ ThreadWeaver fails on its facts.
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
 | **Deny-list** | The names of people and organisations that never go into a search query, stored in `research/denylist.json`. Filled automatically from the author's own notes and, once, from the wiki's `people/` folders. | `DenyList`, `DenyListMatcher`   |
 | **Deny-list entry** | One name on the deny-list with its kind, its **source** (`Auto` from classification, `Manual` from the author in the UI) and its state (`Denied` or `Allowed`). Classification never changes a `Manual` entry. | `DenyListEntry`                 |
+| **Topic** | A subject the wiki is kept informed about: every top-level folder or page under `projects/`, `learning/` and `plans/` (`projects/foo`, `learning/bar.md`). Discovered as agent runs change the wiki, pruned when its page is deleted or moved. Its state is in `research/topics/<slug>.json`, where the slug is the path with `/` replaced by `--`. | `ResearchTopic`, `TopicPaths` |
+| **Muted** | A topic the author has stopped researching from the UI, without moving it in the wiki. Only the author changes it. | `ResearchTopic.Muted` |
+| **Curation request** | A file in `research/curation/requests` asking the Pleb to revisit a topic's brief and queries. One per topic: a new request merges into a waiting one. | `CurationRequest` |
 
 ## Review
 

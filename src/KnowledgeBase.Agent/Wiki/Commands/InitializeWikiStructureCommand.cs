@@ -66,7 +66,11 @@ internal sealed class InitializeWikiStructureCommandHandler(
             CreateDirectoryRequest.Create(settings.ReviewOpenFindingsDirectory),
             CreateDirectoryRequest.Create(settings.ReviewClosedFindingsDirectory),
             CreateDirectoryRequest.Create(settings.WikiDirectory),
-            CreateDirectoryRequest.Create(settings.ResearchDirectory)
+            CreateDirectoryRequest.Create(settings.ResearchDirectory),
+            CreateDirectoryRequest.Create(settings.ResearchTopicsDirectory),
+            CreateDirectoryRequest.Create(settings.CurationDirectory),
+            CreateDirectoryRequest.Create(settings.CurationRequestsDirectory),
+            CreateDirectoryRequest.Create(settings.CurationFailedDirectory)
         ];
 
         return Result.Combine(directories.Select(directoryHandler.Handle));
