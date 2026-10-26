@@ -104,6 +104,16 @@ export interface DenyListEntry {
   state: DenyListState
 }
 
+export type TopicState = 'Idle' | 'AwaitingCuration' | 'Muted'
+export interface TopicSummary {
+  path: string
+  slug: string
+  state: TopicState
+  brief: string | null
+  queries: string[]
+  muted: boolean
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -183,6 +193,9 @@ export const api = {
   denyList: () => request<DenyListEntry[]>('/api/research/deny-list'),
   setDenyListState: (name: string, state: DenyListState) =>
     put<DenyListEntry>('/api/research/deny-list/state', { name, state }),
+  topics: () => request<TopicSummary[]>('/api/research/topics'),
+  setTopicMuted: (slug: string, muted: boolean) =>
+    put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/muted`, { muted }),
 
   conversations: () => request<ConversationSummary[]>('/api/conversations'),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${id}`),

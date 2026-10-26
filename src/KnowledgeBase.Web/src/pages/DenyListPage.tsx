@@ -11,8 +11,7 @@ export function DenyListPage() {
   })
 
   return (
-    <section className="page narrow">
-      <h1>Deny-list</h1>
+    <>
       <p className="muted">
         Names that never go into a search query. People and organisations from your own notes are added automatically;
         allow one you do want researched. A choice you make here is kept: automatic classification never changes it.
@@ -34,7 +33,7 @@ export function DenyListPage() {
           ))}
         </ul>
       )}
-    </section>
+    </>
   )
 }
 
