@@ -25,11 +25,12 @@ internal static class RetryNote
         }
     }
 
-    private static Microsoft.AspNetCore.Http.IResult Handle(
+    private static async Task<Microsoft.AspNetCore.Http.IResult> Handle(
         string name,
         NoteCatalog catalog,
         MoveFileHandler moveFileHandler,
-        IOptions<WikiConfigurationSettings> settings)
+        IOptions<WikiConfigurationSettings> settings,
+        CancellationToken cancellationToken)
     {
         if (catalog.Find(name) is not (NoteState state, string filePath))
         {
@@ -41,8 +42,8 @@ internal static class RetryNote
             return Results.Problem($"Only failed notes can be retried; this note is {state}.", statusCode: StatusCodes.Status409Conflict);
         }
 
-        return moveFileHandler
-            .Handle(new MoveFileRequest(filePath, Path.Combine(settings.Value.NewNotesDirectory, name)))
+        return await moveFileHandler
+            .Handle(new MoveFileRequest(filePath, Path.Combine(settings.Value.NewNotesDirectory, name)), cancellationToken)
             .Match(
                 _ => Results.Accepted(),
                 error => Results.Problem(error.Message, statusCode: StatusCodes.Status500InternalServerError));

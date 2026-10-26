@@ -69,21 +69,21 @@ internal sealed class IngestFactsCommandHandler(
 
         if (run.IsFailure)
         {
-            MoveFailed(request.FactPath, _settings.FailedFactsDirectory);
+            await MoveFailed(request.FactPath, _settings.FailedFactsDirectory);
             if (notePath is not null)
             {
-                MoveFailed(notePath, _settings.FailedNotesDirectory);
+                await MoveFailed(notePath, _settings.FailedNotesDirectory);
             }
 
             return run.Error;
         }
 
-        return moveFileHandler
-            .Handle(new MoveFileRequest(request.FactPath, Path.Combine(_settings.ProcessedFactsDirectory, factFileName)))
+        return await moveFileHandler
+            .Handle(new MoveFileRequest(request.FactPath, Path.Combine(_settings.ProcessedFactsDirectory, factFileName)), cancellationToken)
             .Bind(_ => notePath is not null
                 ? Result.Success<string, Error>(notePath)
                 : Result.Failure<string, Error>(new NoNoteProcessingError()))
-            .Bind(note => noteProcessedHandler.Handle(new RecordWikiNoteProcessedCommand(note)));
+            .Bind(note => noteProcessedHandler.Handle(new RecordWikiNoteProcessedCommand(note), cancellationToken));
     }
 
     /// <summary>
@@ -121,7 +121,8 @@ internal sealed class IngestFactsCommandHandler(
             .GetValueOrDefault();
     }
 
-    private void MoveFailed(string filePath, string failedDirectory) => moveFileHandler
-        .Handle(new MoveFileRequest(filePath, Path.Combine(failedDirectory, Path.GetFileName(filePath))))
+    /// <remarks>Not cancellable: a run that was cancelled must still give up its files.</remarks>
+    private Task MoveFailed(string filePath, string failedDirectory) => moveFileHandler
+        .Handle(new MoveFileRequest(filePath, Path.Combine(failedDirectory, Path.GetFileName(filePath))), CancellationToken.None)
         .TapError(logger.ErrorOccurred);
 }

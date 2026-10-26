@@ -89,13 +89,14 @@ internal sealed class FileTools(
         [Description("The path of the file to be moved, relative to the wiki root.")]
         string sourceFilePath,
         [Description("The path of the destination where the file should be moved, relative to the wiki root.")]
-        string destinationFilePath)
+        string destinationFilePath,
+        CancellationToken cancellationToken = default)
     {
         string sourcePath = wikiPaths.Resolve(sourceFilePath);
         string destinationPath = wikiPaths.Resolve(destinationFilePath);
         EnsureAllowed(nameof(MoveFile), sourcePath, destinationPath);
-        Result<string, Error> result = moveFileHandler
-            .Handle(new MoveFileRequest(sourcePath, destinationPath))
+        Result<string, Error> result = await moveFileHandler
+            .Handle(new MoveFileRequest(sourcePath, destinationPath), cancellationToken)
             .Map(wikiPaths.ToRelative)
             .TapError(logger.ErrorOccurred);
         return result.Match(
