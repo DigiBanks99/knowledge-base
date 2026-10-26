@@ -11,7 +11,9 @@ internal static class ResearchEndpoints
             endpoints.MapGroup("research")
                 .WithTags("research")
                 .MapListDenyList()
-                .MapSetDenyListEntryState();
+                .MapSetDenyListEntryState()
+                .MapListTopics()
+                .MapSetTopicMuted();
 
             return endpoints;
         }

@@ -96,6 +96,73 @@ public sealed class ResearchApiTests : IDisposable
         void ItShouldBeRefused() => response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Test]
+    public async Task TheTopicsAreRequested()
+    {
+        await DiscoverAsync("projects/garden", "learning/rust.md");
+
+        HttpResponseMessage response = await _api.Client().GetAsync("/api/research/topics");
+        IReadOnlyList<TopicSummary> topics = await TestApi.ReadAsync<IReadOnlyList<TopicSummary>>(response);
+
+        ItShouldSucceed();
+        ItShouldListEveryTopicByPath();
+
+        void ItShouldSucceed() => response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        void ItShouldListEveryTopicByPath() => topics.Select(topic => (topic.Path, topic.Slug, topic.State)).ShouldBe(
+        [
+            ("learning/rust.md", "learning--rust.md", TopicState.Idle),
+            ("projects/garden", "projects--garden", TopicState.Idle)
+        ]);
+    }
+
+    [Test]
+    public async Task TheAuthorMutesATopic()
+    {
+        await DiscoverAsync("projects/garden");
+
+        HttpResponseMessage response = await _api.Client().PutAsJsonAsync(
+            "/api/research/topics/projects--garden/muted",
+            new { muted = true },
+            TestApi.Json);
+        IReadOnlyList<ResearchTopic> stored = (await _api.Get<IResearchStore>().ListTopicsAsync(CancellationToken.None)).Value;
+
+        ItShouldSucceed();
+        ItShouldStoreTheDecision();
+
+        void ItShouldSucceed() => response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        void ItShouldStoreTheDecision() => stored.ShouldHaveSingleItem().Muted.ShouldBeTrue();
+    }
+
+    [Test]
+    [Arguments("projects--unknown", HttpStatusCode.NotFound)]
+    [Arguments("people--jane-doe", HttpStatusCode.BadRequest)]
+    [Arguments("..--notes", HttpStatusCode.BadRequest)]
+    public async Task TheAuthorMutesSomethingThatIsNotAKnownTopic(string slug, HttpStatusCode status)
+    {
+        HttpResponseMessage response = await _api.Client().PutAsJsonAsync(
+            $"/api/research/topics/{slug}/muted",
+            new { muted = true },
+            TestApi.Json);
+
+        ItShouldBeRefused();
+
+        void ItShouldBeRefused() => response.StatusCode.ShouldBe(status);
+    }
+
+    private async Task DiscoverAsync(params string[] topics)
+    {
+        IResearchStore store = _api.Get<IResearchStore>();
+        foreach (string topic in topics)
+        {
+            await store.UpdateTopicAsync(
+                topic,
+                _ => Maybe.From(ResearchTopic.New(topic, DateTimeOffset.UnixEpoch)),
+                CancellationToken.None);
+        }
+    }
+
     private async Task DenyAsync(params DenyListEntry[] entries)
     {
         // Reaching the services starts the app, which seeds the deny-list first; the entries are added after it.
