@@ -12,11 +12,11 @@ internal sealed class RecordWikiNoteProcessedCommandHandler(
 {
     private readonly WikiConfigurationSettings _settings = settings.Value;
 
-    public Result<string, Error> Handle(RecordWikiNoteProcessedCommand request)
+    public Task<Result<string, Error>> Handle(RecordWikiNoteProcessedCommand request, CancellationToken cancellationToken)
     {
         string destinationPath = Path.Combine(_settings.ProcessedNotesDirectory, Path.GetFileName(request.NotePath));
         MoveFileRequest moveFileRequest = new(request.NotePath, destinationPath);
 
-        return moveFileHandler.Handle(moveFileRequest);
+        return moveFileHandler.Handle(moveFileRequest, cancellationToken);
     }
 }

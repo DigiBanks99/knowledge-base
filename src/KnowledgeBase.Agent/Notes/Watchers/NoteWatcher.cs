@@ -22,7 +22,7 @@ internal sealed class NoteWatcher(
 
     public void Register()
     {
-        RequeueInterruptedNotes();
+        RequeueInterruptedNotes().GetAwaiter().GetResult();
 
         _newNotesWatcher = new DirectoryWatcher(logger, timeProvider, _wikiConfigurationSettings.NewNotesDirectory, "*.md", OnNewNote);
         _newNotesWatcher.Start();
@@ -42,7 +42,7 @@ internal sealed class NoteWatcher(
     /// (for example by a restart), and would block the processing slot forever. Move it back so it is processed again.
     /// Notes whose facts are still waiting are left alone; weaving those facts completes them.
     /// </summary>
-    private void RequeueInterruptedNotes()
+    private async Task RequeueInterruptedNotes()
     {
         bool hasPendingFacts = Directory
             .EnumerateFiles(_wikiConfigurationSettings.FactsDirectory, "*.json", SearchOption.TopDirectoryOnly)
@@ -56,8 +56,8 @@ internal sealed class NoteWatcher(
         {
             logger.RequeueingInterruptedNote(notePath);
             string newPath = Path.Combine(_wikiConfigurationSettings.NewNotesDirectory, Path.GetFileName(notePath));
-            moveFileHandler
-                .Handle(new MoveFileRequest(notePath, newPath))
+            await moveFileHandler
+                .Handle(new MoveFileRequest(notePath, newPath), CancellationToken.None)
                 .TapError(error => logger.FailedToProcessNewNote(notePath, error));
         }
     }

@@ -44,7 +44,7 @@ internal sealed class StartNoteProcessingCommandHandler(
 
         if (result.IsFailure)
         {
-            MoveFailedNote(noteName);
+            await MoveFailedNote(noteName);
         }
 
         return result.Tap(logger.FactFinderFinishReason);
@@ -65,7 +65,7 @@ internal sealed class StartNoteProcessingCommandHandler(
             }
 
             string destinationPath = Path.Combine(_wikiConfigurationSettings.ProcessingNotesDirectory, Path.GetFileName(notePath));
-            return moveFileHandler.Handle(new MoveFileRequest(notePath, destinationPath));
+            return await moveFileHandler.Handle(new MoveFileRequest(notePath, destinationPath), cancellationToken);
         }
         finally
         {
@@ -115,9 +115,9 @@ internal sealed class StartNoteProcessingCommandHandler(
 
     /// <summary>
     /// A note whose facts could not be extracted is parked in the failed folder, so it frees the processing slot
-    /// and can be retried.
+    /// and can be retried. It is not cancellable, as a note whose processing was cancelled must free the slot too.
     /// </summary>
-    private void MoveFailedNote(string noteName)
+    private async Task MoveFailedNote(string noteName)
     {
         string processingPath = Path.Combine(_wikiConfigurationSettings.ProcessingNotesDirectory, noteName);
         if (!File.Exists(processingPath))
@@ -125,8 +125,8 @@ internal sealed class StartNoteProcessingCommandHandler(
             return;
         }
 
-        moveFileHandler
-            .Handle(new MoveFileRequest(processingPath, Path.Combine(_wikiConfigurationSettings.FailedNotesDirectory, noteName)))
+        await moveFileHandler
+            .Handle(new MoveFileRequest(processingPath, Path.Combine(_wikiConfigurationSettings.FailedNotesDirectory, noteName)), CancellationToken.None)
             .TapError(logger.ErrorOccurred);
     }
 
