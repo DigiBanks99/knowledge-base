@@ -224,6 +224,7 @@ try {
         $upper = $agent.ToUpperInvariant()
         $parameters += [pscustomobject]@{ Name = "${agent}Provider"; GitHub = "${upper}_PROVIDER"; Secret = $false; Required = $true; OnVm = $true; Default = 'Anthropic'; Help = "Anthropic or OpenAICompatible (the local model) for the $agent." }
         $parameters += [pscustomobject]@{ Name = "${agent}Model"; GitHub = "${upper}_MODEL"; Secret = $false; Required = $true; OnVm = $false; Default = $null; Help = "Model for the $agent, e.g. claude-sonnet-5-5, or any label (such as qwen) for the local model." }
+        $parameters += [pscustomobject]@{ Name = "${agent}EnableThinking"; GitHub = "${upper}_ENABLE_THINKING"; Secret = $false; Required = $true; OnVm = $true; Default = 'true'; Help = "true, or false to stop the local model reasoning before it answers for the $agent (Anthropic ignores it)." }
     }
 
     $localSecrets = Get-LocalUserSecrets

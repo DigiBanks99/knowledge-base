@@ -117,14 +117,19 @@ jobs:
           Parameters__WikiBackupKeyDirectory: ${{ vars.WIKI_BACKUP_KEY_DIRECTORY }}
           Parameters__FactFinderProvider: ${{ vars.FACTFINDER_PROVIDER }}
           Parameters__FactFinderModel: ${{ vars.FACTFINDER_MODEL }}
+          Parameters__FactFinderEnableThinking: ${{ vars.FACTFINDER_ENABLE_THINKING }}
           Parameters__ThreadWeaverProvider: ${{ vars.THREADWEAVER_PROVIDER }}
           Parameters__ThreadWeaverModel: ${{ vars.THREADWEAVER_MODEL }}
+          Parameters__ThreadWeaverEnableThinking: ${{ vars.THREADWEAVER_ENABLE_THINKING }}
           Parameters__ReviewerProvider: ${{ vars.REVIEWER_PROVIDER }}
           Parameters__ReviewerModel: ${{ vars.REVIEWER_MODEL }}
+          Parameters__ReviewerEnableThinking: ${{ vars.REVIEWER_ENABLE_THINKING }}
           Parameters__EditorProvider: ${{ vars.EDITOR_PROVIDER }}
           Parameters__EditorModel: ${{ vars.EDITOR_MODEL }}
+          Parameters__EditorEnableThinking: ${{ vars.EDITOR_ENABLE_THINKING }}
           Parameters__LibrarianProvider: ${{ vars.LIBRARIAN_PROVIDER }}
           Parameters__LibrarianModel: ${{ vars.LIBRARIAN_MODEL }}
+          Parameters__LibrarianEnableThinking: ${{ vars.LIBRARIAN_ENABLE_THINKING }}
         run: aspire deploy --environment production --non-interactive
 
       - name: Check health

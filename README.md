@@ -74,6 +74,7 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `EntraClientSecret`       |   ✓    | A client secret of the app registration.                                               |
 | `{Agent}Provider`         |        | `Anthropic` (default) or `OpenAICompatible`. See [Local models](#local-models-llamacpp). |
 | `{Agent}Model`            |        | Model per agent, e.g. `claude-sonnet-5-5`. One each for the five agents.               |
+| `{Agent}EnableThinking`   |        | `true` (default) or `false` to stop a local model reasoning before it answers. Ignored by `Anthropic`. |
 | `OpenAICompatibleEndpoint`|        | Base address of the OpenAI-compatible server (default `http://localhost:8080/v1`).     |
 | `OpenAICompatibleApiKey`  |   ✓    | The server's API key, if it was started with one (default empty).                      |
 | `WikiBackupRemote`        |        | SSH URL of a private repository the wiki is pushed to (default empty: backup off). See [Wiki backup](#wiki-backup). |
@@ -151,6 +152,9 @@ The agents depend on tool calling, so the server must support it. For `llama-ser
 - Give it enough context (`-c`). The Reviewer reads the whole wiki in one run. The context is split between parallel
   slots (`-np`), so `-c 32768 -np 2` gives each request 16k tokens.
 - A single-model server ignores the model name, so `{Agent}Model` can be any label.
+- Reasoning models such as Qwen 3 think before every answer, which on a CPU can take minutes. Set
+  `{Agent}EnableThinking` to `false` to send `chat_template_kwargs.enable_thinking = false` with each request, so the
+  chat template skips it.
 - A completion may take up to `OpenAICompatible:NetworkTimeout` (default 10 minutes) before the API gives up. Keep
   llama-server's own `--timeout` at least as long.
 - The app's Status page checks the server's `/health` route (the endpoint with `/v1` replaced) every 30 seconds and

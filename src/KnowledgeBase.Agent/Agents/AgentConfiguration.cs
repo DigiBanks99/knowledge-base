@@ -129,8 +129,35 @@ internal static class AgentConfiguration
         });
         ChatClient chatClient = client.GetChatClient(options.Model);
 
-        return tools => chatClient.AsAIAgent(instructions, agentName, tools: tools, clientFactory: WithDetailedToolErrors);
+        return tools => chatClient.AsAIAgent(
+            instructions,
+            agentName,
+            tools: tools,
+            clientFactory: inner => WithDetailedToolErrors(options.EnableThinking ? inner : WithoutThinking(inner)));
     }
+
+    /// <summary>
+    /// Asks the server's chat template to skip reasoning on every request, by sending llama.cpp's (and vLLM's)
+    /// <c>chat_template_kwargs.enable_thinking = false</c>. The OpenAI API has no such field, so it is patched into
+    /// the request body.
+    /// </summary>
+    internal static IChatClient WithoutThinking(IChatClient chatClient) => chatClient
+        .AsBuilder()
+        .ConfigureOptions(options =>
+        {
+            Func<IChatClient, object?>? previous = options.RawRepresentationFactory;
+            options.RawRepresentationFactory = client =>
+            {
+                ChatCompletionOptions completionOptions =
+                    previous?.Invoke(client) as ChatCompletionOptions ?? new ChatCompletionOptions();
+                // JsonPatch is the client's supported way to send fields the OpenAI API doesn't define.
+#pragma warning disable SCME0001
+                completionOptions.Patch.Set("$.chat_template_kwargs.enable_thinking"u8, false);
+#pragma warning restore SCME0001
+                return completionOptions;
+            };
+        })
+        .Build();
 
     /// <summary>
     /// Invokes tools with their exception messages passed back to the model. By default the model is only told that a
