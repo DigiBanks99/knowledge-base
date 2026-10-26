@@ -17,7 +17,7 @@ public sealed class ReadFileHandlerTests : IDisposable
         string path = _directory.File("a.md");
         await File.WriteAllTextAsync(path, "A");
 
-        // Its writer still finishing with it. Windows refuses the read while it has the file open; Linux allows it.
+        // Its writer still finishing with it, sharing nothing. .NET refuses the read meanwhile, on Linux too.
         Result<string, Error> read;
         Task released;
         using (FileStream writer = new(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))

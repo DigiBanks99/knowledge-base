@@ -3,16 +3,13 @@ namespace KnowledgeBase.Agent.Common;
 /// <summary>
 /// Retries a file operation that Windows refused because another handle has the file open: a reader, the program that
 /// wrote it, or a virus scanner looking at a file just written. Those handles are short-lived, so waiting them out
-/// briefly keeps the operation. Any other failure is thrown at once.
+/// briefly keeps the operation. A file or folder that is gone fails at once.
 /// </summary>
 /// <remarks>
 /// The delays are real time rather than a <see cref="TimeProvider"/>'s, as they wait on other programs.
 /// </remarks>
 internal static class FileInUseRetry
 {
-    private const int ErrorSharingViolation = unchecked((int)0x80070020);
-    private const int ErrorLockViolation = unchecked((int)0x80070021);
-
     private static readonly TimeSpan[] RetryDelays =
     [
         TimeSpan.FromMilliseconds(10),
@@ -24,12 +21,13 @@ internal static class FileInUseRetry
     ];
 
     /// <summary>
-    /// Whether the file was in use. Windows reports a file open elsewhere as a sharing or lock violation, or as access
-    /// denied when replacing or moving it. Linux locks are advisory, so there it is never the cause.
+    /// Whether the file may have been in use. Windows reports a file open elsewhere as a sharing violation, or as access
+    /// denied when replacing or moving it. On Linux, .NET enforces its own file shares with advisory locks and reports
+    /// a conflict with the platform's error number, so any I/O failure other than a missing file or folder counts.
     /// </summary>
     public static bool IsFileInUse(Exception exception) =>
         exception is UnauthorizedAccessException
-        || exception is IOException { HResult: ErrorSharingViolation or ErrorLockViolation };
+        || exception is IOException and not (FileNotFoundException or DirectoryNotFoundException);
 
     public static async Task<T> RunAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
     {
