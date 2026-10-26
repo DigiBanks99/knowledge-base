@@ -10,6 +10,8 @@ import { WikiPage } from './pages/WikiPage'
 import { AskPage } from './pages/AskPage'
 import { StatusPage } from './pages/StatusPage'
 import { DenyListPage } from './pages/DenyListPage'
+import { ResearchPage } from './pages/ResearchPage'
+import { TopicsPage } from './pages/TopicsPage'
 
 const sections = [
   { to: '/capture', label: 'Capture' },
@@ -18,7 +20,7 @@ const sections = [
   { to: '/edits', label: 'Edits' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/ask', label: 'Ask' },
-  { to: '/research/deny-list', label: 'Deny-list' },
+  { to: '/research', label: 'Research' },
 ]
 
 export function App() {
@@ -62,7 +64,11 @@ export function App() {
           <Route path="/wiki" element={<WikiPage />} />
           <Route path="/ask" element={<AskPage />} />
           <Route path="/ask/:conversationId" element={<AskPage />} />
-          <Route path="/research/deny-list" element={<DenyListPage />} />
+          <Route path="/research" element={<ResearchPage />}>
+            <Route index element={<Navigate to="topics" replace />} />
+            <Route path="topics" element={<TopicsPage />} />
+            <Route path="deny-list" element={<DenyListPage />} />
+          </Route>
           <Route path="/status" element={<StatusPage />} />
           <Route path="*" element={<Navigate to="/capture" replace />} />
         </Routes>

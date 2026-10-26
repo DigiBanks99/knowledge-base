@@ -282,7 +282,8 @@ details.card summary {
 .badge-processed,
 .badge-low,
 .badge-healthy,
-.badge-allowed {
+.badge-allowed,
+.badge-idle {
   background: var(--success-soft);
   color: var(--success);
 }
@@ -303,6 +304,12 @@ details.card summary {
   color: var(--warning);
 }
 
+.badge-muted {
+  background: transparent;
+  color: var(--muted);
+  outline: 1px solid var(--muted);
+}
+
 .capture {
   min-height: 280px;
 }
@@ -319,6 +326,7 @@ details.card summary {
 .findings,
 .signals,
 .deny-list,
+.topics,
 .tree-list {
   list-style: none;
   padding: 0;
@@ -347,8 +355,35 @@ details.card summary {
   flex-wrap: wrap;
 }
 
-.deny-list .item-title button {
+.deny-list .item-title button,
+.topics .item-title button {
   margin-left: auto;
+}
+
+.topics .queries {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs a {
+  padding: 0.4rem 0;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs a.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
 }
 
 .preview {
