@@ -77,7 +77,8 @@ foreach (string agent in agents)
     api
         .WithEnvironment($"{agent}__Provider", builder.AddParameter($"{agent}Provider"))
         .WithEnvironment($"{agent}__ApiKey", apiKey)
-        .WithEnvironment($"{agent}__Model", builder.AddParameter($"{agent}Model"));
+        .WithEnvironment($"{agent}__Model", builder.AddParameter($"{agent}Model"))
+        .WithEnvironment($"{agent}__EnableThinking", builder.AddParameter($"{agent}EnableThinking"));
 }
 
 // The instructions and wiki rules are markdown files in the private configuration submodule. A deployment builds them

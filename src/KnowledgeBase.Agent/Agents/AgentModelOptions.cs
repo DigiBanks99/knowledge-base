@@ -27,6 +27,13 @@ public sealed class AgentModelOptions
     /// </summary>
     public int MaxOutputTokens { get; init; } = 16384;
 
+    /// <summary>
+    /// Whether the model may reason ("think") before it answers. Only the OpenAI-compatible provider uses it: when
+    /// <c>false</c>, each request asks the server's chat template to skip reasoning, so a small local model answers
+    /// directly instead of spending minutes and context on hidden reasoning. Anthropic agents ignore it.
+    /// </summary>
+    public bool EnableThinking { get; init; } = true;
+
     public required string Instructions { get; init; }
 }
 
