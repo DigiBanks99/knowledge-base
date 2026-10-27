@@ -289,6 +289,7 @@ details.card summary {
 }
 
 .badge-failed,
+.badge-curationfailed,
 .badge-high,
 .badge-unhealthy,
 .badge-denied {
