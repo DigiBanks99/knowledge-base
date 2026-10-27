@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type TopicState, type TopicSummary } from '../api'
 import { Badge, Empty, ErrorMessage, Loading } from '../components'
+import { formatDate } from '../format'
 
 const stateLabels: Record<TopicState, string> = {
   Idle: 'Idle',
   AwaitingCuration: 'Awaiting curation',
+  CurationFailed: 'Curation failed',
   Muted: 'Muted',
 }
 
@@ -61,7 +63,10 @@ function TopicItem({
           {topic.muted ? 'Unmute' : 'Mute'}
         </button>
       </div>
-      {topic.brief ? <p className="small">{topic.brief}</p> : <p className="muted small">Not curated yet.</p>}
+      {topic.brief && <p className="small">{topic.brief}</p>}
+      <p className="muted small">
+        {topic.lastCuratedAt ? `Last curated ${formatDate(topic.lastCuratedAt)}` : 'Not curated yet.'}
+      </p>
       {topic.queries.length > 0 && (
         <ul className="queries">
           {topic.queries.map((query) => (

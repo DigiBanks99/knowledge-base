@@ -13,9 +13,9 @@ export interface NoteDetail {
   content: string
 }
 
-export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor'
+export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb'
 export type AgentRunStatus = 'Running' | 'Succeeded' | 'Failed'
-export type AgentRunTriggerKind = 'Note' | 'Facts' | 'ReviewRequest' | 'Findings'
+export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'ReviewRequest' | 'Findings'
 export interface AgentToolCall {
   tool: string
   target: string | null
@@ -104,7 +104,7 @@ export interface DenyListEntry {
   state: DenyListState
 }
 
-export type TopicState = 'Idle' | 'AwaitingCuration' | 'Muted'
+export type TopicState = 'Idle' | 'AwaitingCuration' | 'CurationFailed' | 'Muted'
 export interface TopicSummary {
   path: string
   slug: string
@@ -112,6 +112,7 @@ export interface TopicSummary {
   brief: string | null
   queries: string[]
   muted: boolean
+  lastCuratedAt: string | null
 }
 
 export class ApiError extends Error {
