@@ -36,4 +36,28 @@ public sealed class ListTopicsQueryHandlerTests
         void ItShouldGiveEachItsSlug() =>
             result.Value.Select(topic => topic.Slug).ShouldBe(["learning--rust.md", "plans--q4.md", "projects--zeta"]);
     }
+
+    [Test]
+    public async Task ATopicsCurationFailed()
+    {
+        DateTimeOffset curated = Discovered.AddDays(1);
+        _state.Topics["projects/atlas"] = ResearchTopic.New("projects/atlas", Discovered) with { LastCuratedAt = curated };
+        _state.Topics["projects/beta"] = ResearchTopic.New("projects/beta", Discovered);
+        CurationRequest failed = new("projects/atlas", [], Discovered);
+        _state.FailedCurations["projects/atlas"] = new FailedCuration(failed, "No verdict.", Discovered);
+        _state.FailedCurations["projects/beta"] = new FailedCuration(new CurationRequest("projects/beta", [], Discovered), "No verdict.", Discovered);
+        _state.CurationRequests["projects/beta"] = new CurationRequest("projects/beta", ["projects/beta/index.md"], curated);
+
+        Result<IReadOnlyList<TopicSummary>, Error> result = await _handler.Handle(new ListTopicsQuery(), CancellationToken.None);
+
+        ItShouldShowTheFailure();
+        ItShouldShowANewerRequestAsWaiting();
+        ItShouldShowWhenEachWasLastCurated();
+
+        void ItShouldShowTheFailure() => result.Value[0].State.ShouldBe(TopicState.CurationFailed);
+
+        void ItShouldShowANewerRequestAsWaiting() => result.Value[1].State.ShouldBe(TopicState.AwaitingCuration);
+
+        void ItShouldShowWhenEachWasLastCurated() => result.Value.Select(topic => topic.LastCuratedAt).ShouldBe([curated, null]);
+    }
 }

@@ -79,6 +79,17 @@ public sealed class AgentInstructionsTests
             .Message.ShouldBe($"Agent {AgentName} requires the '{AgentInstructions.WikiRulesKey}' configuration value.");
     }
 
+    [Test]
+    public void AnAgentIsInstructedWithItsRoleOnly()
+    {
+        string instructions = AgentInstructions.ComposeRoleOnly(AgentName, $"  {RoleInstructions}  ");
+
+        ItShouldContainOnlyTheRole();
+
+        void ItShouldContainOnlyTheRole() => instructions.ShouldBe(
+            $"# Your Role: {AgentName}{Environment.NewLine}{Environment.NewLine}{RoleInstructions}{Environment.NewLine}");
+    }
+
     private static IConfiguration Configuration(string? sharedInstructions, string? wikiRules) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

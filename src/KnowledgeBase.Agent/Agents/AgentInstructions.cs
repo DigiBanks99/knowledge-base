@@ -40,6 +40,19 @@ internal static class AgentInstructions
         return instructions.ToString();
     }
 
+    /// <summary>
+    /// Only the agent's own role, for a small local model whose context is precious and which must not see anything
+    /// personal about the author (the research agents write what leaves the machine).
+    /// </summary>
+    public static string ComposeRoleOnly(string agentName, string roleInstructions)
+    {
+        StringBuilder instructions = new();
+        instructions.AppendLine($"# Your Role: {agentName}");
+        instructions.AppendLine();
+        instructions.AppendLine(roleInstructions.Trim());
+        return instructions.ToString();
+    }
+
     private static void AppendSection(StringBuilder instructions, string heading, string? content)
     {
         if (string.IsNullOrWhiteSpace(content))

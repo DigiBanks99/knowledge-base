@@ -12,22 +12,33 @@ internal sealed class ListTopicsQueryHandler(IResearchStore store)
         .ListTopicsAsync(cancellationToken)
         .Bind(async topics => await store
             .ListCurationRequestsAsync(cancellationToken)
-            .Map(IReadOnlyList<TopicSummary> (requests) =>
-            {
-                HashSet<string> awaitingCuration = [.. requests.Select(request => request.Topic)];
-                return
-                [
-                    .. topics
-                        .OrderBy(topic => topic.Path, StringComparer.OrdinalIgnoreCase)
-                        .Select(topic => Summarise(topic, awaitingCuration.Contains(topic.Path)))
-                ];
-            }));
+            .Bind(async requests => await store
+                .ListFailedCurationsAsync(cancellationToken)
+                .Map(IReadOnlyList<TopicSummary> (failed) =>
+                {
+                    HashSet<string> awaitingCuration = [.. requests.Select(request => request.Topic)];
+                    HashSet<string> curationFailed = [.. failed.Select(failure => failure.Request.Topic)];
+                    return
+                    [
+                        .. topics
+                            .OrderBy(topic => topic.Path, StringComparer.OrdinalIgnoreCase)
+                            .Select(topic => Summarise(topic, State(topic, awaitingCuration, curationFailed)))
+                    ];
+                })));
 
-    private static TopicSummary Summarise(ResearchTopic topic, bool awaitingCuration) => new(
+    /// <summary>A failed curation is superseded by a newer request waiting for the same topic.</summary>
+    private static TopicState State(ResearchTopic topic, HashSet<string> awaitingCuration, HashSet<string> curationFailed) =>
+        topic.Muted ? TopicState.Muted
+        : awaitingCuration.Contains(topic.Path) ? TopicState.AwaitingCuration
+        : curationFailed.Contains(topic.Path) ? TopicState.CurationFailed
+        : TopicState.Idle;
+
+    private static TopicSummary Summarise(ResearchTopic topic, TopicState state) => new(
         topic.Path,
         TopicPaths.Slug(topic.Path),
-        topic.Muted ? TopicState.Muted : awaitingCuration ? TopicState.AwaitingCuration : TopicState.Idle,
+        state,
         topic.Brief,
         topic.Queries,
-        topic.Muted);
+        topic.Muted,
+        topic.LastCuratedAt);
 }

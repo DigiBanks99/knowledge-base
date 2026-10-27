@@ -113,6 +113,57 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         }
     }
 
+    public async Task<UnitResult<Error>> CompleteCurationAsync(CurationRequest curated, CancellationToken cancellationToken)
+    {
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            return await RemoveRequestUnlessChangedAsync(curated, cancellationToken)
+                .Bind(() => Delete(TopicFilePath(_curationFailedDirectory, curated.Topic)));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    public async Task<UnitResult<Error>> FailCurationAsync(FailedCuration failure, CancellationToken cancellationToken)
+    {
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Result<FailedCuration, Error> written = await WriteDocumentAsync(
+                TopicFilePath(_curationFailedDirectory, failure.Request.Topic),
+                failure,
+                cancellationToken);
+            return written.IsFailure
+                ? written.Error
+                : await RemoveRequestUnlessChangedAsync(failure.Request, cancellationToken);
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    public Task<Result<IReadOnlyList<FailedCuration>, Error>> ListFailedCurationsAsync(CancellationToken cancellationToken) =>
+        ReadAllAsync<FailedCuration>(_curationFailedDirectory, cancellationToken);
+
+    /// <summary>Called under the topics lock, so no request can be merged between the read and the delete.</summary>
+    private async Task<UnitResult<Error>> RemoveRequestUnlessChangedAsync(CurationRequest handled, CancellationToken cancellationToken)
+    {
+        string requestPath = TopicFilePath(_curationRequestsDirectory, handled.Topic);
+        Result<Maybe<CurationRequest>, Error> waiting = await ReadDocumentAsync<CurationRequest>(requestPath, cancellationToken);
+        if (waiting.IsFailure)
+        {
+            return waiting.Error;
+        }
+
+        return waiting.Value.HasValue && waiting.Value.Value.IsSameAs(handled)
+            ? Delete(requestPath)
+            : UnitResult.Success<Error>();
+    }
+
     private static string TopicFilePath(string directory, string topic) =>
         Path.Combine(directory, $"{TopicPaths.Slug(topic)}.json");
 

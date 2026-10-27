@@ -14,6 +14,13 @@ internal interface IWikiTopics
 
     /// <summary>Every topic in the wiki: the top-level folders and pages of the researched sections.</summary>
     IReadOnlyList<string> All();
+
+    /// <summary>
+    /// The content of a wiki page, or none when it is not in the wiki or cannot be read (such as a page deleted since
+    /// it was changed).
+    /// </summary>
+    /// <param name="wikiPath">The page's wiki path, such as <c>projects/foo/index.md</c>.</param>
+    Maybe<string> ReadPage(string wikiPath);
 }
 
 internal sealed class WikiTopics(WikiPaths wikiPaths) : IWikiTopics
@@ -45,4 +52,21 @@ internal sealed class WikiTopics(WikiPaths wikiPaths) : IWikiTopics
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
     ];
+
+    public Maybe<string> ReadPage(string wikiPath)
+    {
+        if (!wikiPaths.TryResolve(wikiPath, out string fullPath) || !File.Exists(fullPath))
+        {
+            return Maybe.None;
+        }
+
+        try
+        {
+            return File.ReadAllText(fullPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Maybe.None;
+        }
+    }
 }

@@ -61,8 +61,9 @@ internal sealed class TestWiki : IAsyncDisposable
     public FakeAgent Reviewer { get; } = new(KnownAgents.Reviewer);
     public FakeAgent Editor { get; } = new(KnownAgents.Editor);
     public FakeAgent Librarian { get; } = new(KnownAgents.Librarian);
+    public FakeAgent Pleb { get; } = new(KnownAgents.Pleb);
 
-    private IEnumerable<FakeAgent> Agents => [FactFinder, ThreadWeaver, Reviewer, Editor, Librarian];
+    private IEnumerable<FakeAgent> Agents => [FactFinder, ThreadWeaver, Reviewer, Editor, Librarian, Pleb];
 
     public T Get<T>() where T : notnull => _app.Services.GetRequiredService<T>();
 

@@ -22,4 +22,42 @@ public sealed class CurationRequestTests
 
         void ItShouldTakeTheLaterTime() => merged.RequestedAt.ShouldBe(Later);
     }
+
+    [Test]
+    public void ATopicKeepsChangingWhileItsRequestWaits()
+    {
+        CurationRequest waiting = new("projects/foo", ["projects/foo/a.md"], Earlier);
+
+        CurationRequest merged = waiting
+            .Merge(new CurationRequest("projects/foo", ["projects/foo/b.md"], Later))
+            .Merge(new CurationRequest("projects/foo", ["projects/foo/c.md"], Later.AddHours(1)));
+
+        ItShouldKeepItsPlaceInTheQueue();
+
+        void ItShouldKeepItsPlaceInTheQueue() => merged.QueuedSince.ShouldBe(Earlier);
+    }
+
+    [Test]
+    public void ARequestIsReadBackUnchanged()
+    {
+        CurationRequest curated = new("projects/foo", ["projects/foo/a.md"], Earlier);
+
+        bool same = curated.IsSameAs(new CurationRequest("projects/foo", ["projects/foo/a.md"], Earlier));
+
+        ItShouldBeTheSameRequest();
+
+        void ItShouldBeTheSameRequest() => same.ShouldBeTrue();
+    }
+
+    [Test]
+    public void AChangeWasMergedIntoARequest()
+    {
+        CurationRequest curated = new("projects/foo", ["projects/foo/a.md"], Earlier);
+
+        bool same = curated.IsSameAs(curated.Merge(new CurationRequest("projects/foo", ["projects/foo/b.md"], Later)));
+
+        ItShouldBeANewerRequest();
+
+        void ItShouldBeANewerRequest() => same.ShouldBeFalse();
+    }
 }

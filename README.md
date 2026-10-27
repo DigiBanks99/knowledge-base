@@ -21,6 +21,7 @@ note ──► FactFinder ──► facts ──► ThreadWeaver ──► wiki 
 | Reviewer     | the whole wiki  | findings                  | Checks the wiki against the wiki rules on a schedule.           |
 | Editor       | open findings   | wiki pages                | Resolves findings. Restructures; never adds new knowledge.      |
 | Librarian    | the wiki        | conversations             | Answers questions in a chat. Read-only.                         |
+| Pleb         | a topic's pages | a topic's brief, queries  | Keeps each research topic's search queries current. Local model. |
 
 The pipeline is driven by the file system. Every stage watches a folder under the wiki root directory and moves files
 along as it finishes (`notes/new` → `notes/processing` → `notes/processed`, facts into `facts/processed`, and so on).
@@ -73,14 +74,16 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `EntraClientId`           |        | Application (client) id of the app registration.                                       |
 | `EntraClientSecret`       |   ✓    | A client secret of the app registration.                                               |
 | `{Agent}Provider`         |        | `Anthropic` (default) or `OpenAICompatible`. See [Local models](#local-models-llamacpp). |
-| `{Agent}Model`            |        | Model per agent, e.g. `claude-sonnet-5-5`. One each for the five agents.               |
+| `{Agent}Model`            |        | Model per agent, e.g. `claude-sonnet-5-5`. One each for the six agents.                |
 | `{Agent}EnableThinking`   |        | `true` (default) or `false` to stop a local model reasoning before it answers. Ignored by `Anthropic`. |
 | `OpenAICompatibleEndpoint`|        | Base address of the OpenAI-compatible server (default `http://localhost:8080/v1`).     |
 | `OpenAICompatibleApiKey`  |   ✓    | The server's API key, if it was started with one (default empty).                      |
 | `WikiBackupRemote`        |        | SSH URL of a private repository the wiki is pushed to (default empty: backup off). See [Wiki backup](#wiki-backup). |
 | `WikiBackupKeyDirectory`  |        | Folder holding the backup deploy key and pinned host keys (default empty: your own SSH setup). |
 
-`{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor` and `Librarian`. The provider and
+`{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian` and `Pleb`. The Pleb defaults to
+the local model (`OpenAICompatible`, thinking off) and is instructed with its role only; its curation cycle is tuned
+with the API's `Research:*` settings (`ResearchSettings`). The provider and
 OpenAI-compatible defaults live in the AppHost's `appsettings.json`; override them with user secrets or
 `Parameters__*` environment variables. `AnthropicApiKey` is still required by the AppHost, so set a placeholder
 when no agent uses Anthropic.

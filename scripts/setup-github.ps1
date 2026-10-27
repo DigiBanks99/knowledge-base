@@ -208,7 +208,9 @@ try {
     Write-Host 'Keys are stored as secrets because the logs of a public repository are public. The instructions and wiki'
     Write-Host 'rules are not set here: they live in the private config repository.'
 
-    $agents = 'FactFinder', 'ThreadWeaver', 'Reviewer', 'Editor', 'Librarian'
+    $agents = 'FactFinder', 'ThreadWeaver', 'Reviewer', 'Editor', 'Librarian', 'Pleb'
+    # The research agents run on the local model without thinking unless chosen otherwise.
+    $localAgents = 'Pleb'
     $parameters = @(
         [pscustomobject]@{ Name = 'WikiRootDirectory'; GitHub = 'WIKI_ROOT_DIRECTORY'; Secret = $false; Required = $true; OnVm = $true; Default = '/srv/knowledge-base'; Help = 'Folder on the VM for the wiki and pipeline state.' }
         [pscustomobject]@{ Name = 'AnthropicApiKey'; GitHub = 'ANTHROPIC_API_KEY'; Secret = $true; Required = $true; OnVm = $false; Default = $null; Help = 'Anthropic API key. Required by the AppHost even when no agent uses Anthropic (any placeholder then).' }
@@ -222,9 +224,10 @@ try {
     )
     foreach ($agent in $agents) {
         $upper = $agent.ToUpperInvariant()
-        $parameters += [pscustomobject]@{ Name = "${agent}Provider"; GitHub = "${upper}_PROVIDER"; Secret = $false; Required = $true; OnVm = $true; Default = 'Anthropic'; Help = "Anthropic or OpenAICompatible (the local model) for the $agent." }
-        $parameters += [pscustomobject]@{ Name = "${agent}Model"; GitHub = "${upper}_MODEL"; Secret = $false; Required = $true; OnVm = $false; Default = $null; Help = "Model for the $agent, e.g. claude-sonnet-5-5, or any label (such as qwen) for the local model." }
-        $parameters += [pscustomobject]@{ Name = "${agent}EnableThinking"; GitHub = "${upper}_ENABLE_THINKING"; Secret = $false; Required = $true; OnVm = $true; Default = 'true'; Help = "true, or false to stop the local model reasoning before it answers for the $agent (Anthropic ignores it)." }
+        $isLocal = $localAgents -contains $agent
+        $parameters += [pscustomobject]@{ Name = "${agent}Provider"; GitHub = "${upper}_PROVIDER"; Secret = $false; Required = $true; OnVm = $true; Default = $(if ($isLocal) { 'OpenAICompatible' } else { 'Anthropic' }); Help = "Anthropic or OpenAICompatible (the local model) for the $agent." }
+        $parameters += [pscustomobject]@{ Name = "${agent}Model"; GitHub = "${upper}_MODEL"; Secret = $false; Required = $true; OnVm = $false; Default = $(if ($isLocal) { 'qwen' } else { $null }); Help = "Model for the $agent, e.g. claude-sonnet-5-5, or any label (such as qwen) for the local model." }
+        $parameters += [pscustomobject]@{ Name = "${agent}EnableThinking"; GitHub = "${upper}_ENABLE_THINKING"; Secret = $false; Required = $true; OnVm = $true; Default = $(if ($isLocal) { 'false' } else { 'true' }); Help = "true, or false to stop the local model reasoning before it answers for the $agent (Anthropic ignores it)." }
     }
 
     $localSecrets = Get-LocalUserSecrets

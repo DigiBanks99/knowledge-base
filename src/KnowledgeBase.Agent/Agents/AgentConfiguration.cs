@@ -42,7 +42,11 @@ internal static class AgentConfiguration
 {
     extension(IHostApplicationBuilder builder)
     {
-        internal AIAgentToolsBuilder ConfigureAgent(string agentName, bool includeWikiRules = false)
+        /// <param name="roleOnly">
+        /// Instructs the agent with its role alone, without the pipeline, the shared instructions or the date tool, for
+        /// small local models that are given everything they need in the prompt.
+        /// </param>
+        internal AIAgentToolsBuilder ConfigureAgent(string agentName, bool includeWikiRules = false, bool roleOnly = false)
         {
             AgentModelOptions options = builder.Configuration.GetSection(agentName).Get<AgentModelOptions>()
                 ?? throw new InvalidOperationException($"Failed to bind model options for agent {agentName}. Please ensure the configuration is correct.");
@@ -52,11 +56,9 @@ internal static class AgentConfiguration
                     $"Agent {agentName} has no instructions. Add config/{agentName}.Instructions.md, or run the AppHost's scaffold-config command (see the README).");
             }
 
-            string instructions = AgentInstructions.Compose(
-                builder.Configuration,
-                agentName,
-                options.Instructions,
-                includeWikiRules);
+            string instructions = roleOnly
+                ? AgentInstructions.ComposeRoleOnly(agentName, options.Instructions)
+                : AgentInstructions.Compose(builder.Configuration, agentName, options.Instructions, includeWikiRules);
 
             Func<AITool[], AIAgent> createAgent = options.Provider switch
             {
@@ -71,7 +73,10 @@ internal static class AgentConfiguration
                 AgentToolCollection tools = sp.GetRequiredKeyedService<AgentToolCollection>(agentName);
                 DateTools dateTools = sp.GetRequiredService<DateTools>();
                 AgentRunTracker runTracker = sp.GetRequiredService<AgentRunTracker>();
-                return createAgent([.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)])
+                AITool[] agentTools = roleOnly
+                    ? tools.Tools
+                    : [.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)];
+                return createAgent(agentTools)
                     .AsBuilder()
                     .Use((_, context, next, cancellationToken) => RecordToolCall(runTracker, context, next, cancellationToken))
                     .Build();
