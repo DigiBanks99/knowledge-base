@@ -7,6 +7,7 @@ using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Files.Tools;
 using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Research.Tools;
 using KnowledgeBase.Agent.Review.Tools;
 using KnowledgeBase.Agent.Telemetry;
 using KnowledgeBase.Agent.Wiki;
@@ -26,7 +27,9 @@ builder
     .ConfigureAgent(KnownAgents.Editor, includeWikiRules: true)
         .WithTools(toolsBuilder => toolsBuilder.WithEditorTools())
     .ConfigureAgent(KnownAgents.Librarian, includeWikiRules: true)
-        .WithTools(toolsBuilder => toolsBuilder.WithReadFileTools());
+        .WithTools(toolsBuilder => toolsBuilder.WithReadFileTools())
+    .ConfigureAgent(KnownAgents.Pleb, roleOnly: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithPlebTools());
 
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

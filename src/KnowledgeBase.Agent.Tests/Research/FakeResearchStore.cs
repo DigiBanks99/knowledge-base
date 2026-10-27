@@ -51,6 +51,7 @@ internal static class FakeResearchStore
                 {
                     topics.Topics.Remove(topic);
                     topics.CurationRequests.Remove(topic);
+                    topics.FailedCurations.Remove(topic);
                 }
 
                 return updated;
@@ -67,14 +68,44 @@ internal static class FakeResearchStore
                 topics.CurationRequests[request.Topic] = merged;
                 return Result.Success<CurationRequest, Error>(merged);
             });
+        store.CompleteCurationAsync(Arg.Any<CurationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                CurationRequest curated = call.Arg<CurationRequest>();
+                RemoveUnlessChanged(curated);
+                topics.FailedCurations.Remove(curated.Topic);
+                return UnitResult.Success<Error>();
+            });
+        store.FailCurationAsync(Arg.Any<FailedCuration>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                FailedCuration failure = call.Arg<FailedCuration>();
+                topics.FailedCurations[failure.Request.Topic] = failure;
+                RemoveUnlessChanged(failure.Request);
+                return UnitResult.Success<Error>();
+            });
+        store.ListFailedCurationsAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<IReadOnlyList<FailedCuration>, Error>([.. topics.FailedCurations.Values]));
+        store.ReadDenyListAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<DenyList, Error>(topics.DenyList));
 
         return store;
+
+        void RemoveUnlessChanged(CurationRequest handled)
+        {
+            if (topics.CurationRequests.TryGetValue(handled.Topic, out CurationRequest? waiting) && waiting.IsSameAs(handled))
+            {
+                topics.CurationRequests.Remove(handled.Topic);
+            }
+        }
     }
 }
 
-/// <summary>The topics and curation requests a <see cref="FakeResearchStore"/> holds, keyed by topic.</summary>
+/// <summary>The topics, curation requests and deny-list a <see cref="FakeResearchStore"/> holds, keyed by topic.</summary>
 internal sealed class ResearchTopics
 {
     public Dictionary<string, ResearchTopic> Topics { get; } = [];
     public Dictionary<string, CurationRequest> CurationRequests { get; } = [];
+    public Dictionary<string, FailedCuration> FailedCurations { get; } = [];
+    public DenyList DenyList { get; set; } = DenyList.Empty;
 }

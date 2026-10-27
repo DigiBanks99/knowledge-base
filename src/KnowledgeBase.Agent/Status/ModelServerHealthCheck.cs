@@ -15,6 +15,7 @@ internal sealed class ModelServerHealthCheck(
     IConfiguration configuration)
     : IHealthCheck
 {
+    public const string Name = "Model server";
     public const string HttpClientName = "ModelServerHealth";
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -68,7 +69,13 @@ internal sealed class ModelServerHealthCheck(
         StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The server's health route: the endpoint with its <c>v1</c> version segment replaced by <c>health</c>.</summary>
-    public static Uri HealthUri(Uri endpoint)
+    public static Uri HealthUri(Uri endpoint) => ServerUri(endpoint, "health");
+
+    /// <summary>
+    /// One of llama-server's own routes, which it serves beside the versioned API: the endpoint with its <c>v1</c>
+    /// version segment replaced by <paramref name="route"/>.
+    /// </summary>
+    public static Uri ServerUri(Uri endpoint, string route)
     {
         string path = endpoint.AbsolutePath.TrimEnd('/');
         if (path.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
@@ -76,6 +83,6 @@ internal sealed class ModelServerHealthCheck(
             path = path[..^"/v1".Length];
         }
 
-        return new Uri(endpoint, $"{path}/health");
+        return new Uri(endpoint, $"{path}/{route}");
     }
 }

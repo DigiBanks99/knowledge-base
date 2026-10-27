@@ -8,6 +8,7 @@ public enum TopicState
 {
     Idle,
     AwaitingCuration,
+    CurationFailed,
     Muted
 }
 
@@ -19,4 +20,5 @@ public sealed record TopicSummary(
     TopicState State,
     string? Brief,
     IReadOnlyList<string> Queries,
-    bool Muted);
+    bool Muted,
+    DateTimeOffset? LastCuratedAt);

@@ -13,6 +13,7 @@ public enum AgentRunTriggerKind
 {
     Note,
     Facts,
+    Curation,
     ReviewRequest,
     Findings
 }

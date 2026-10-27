@@ -38,4 +38,19 @@ internal interface IResearchStore
     /// changes becomes one curation. Returns the request as it now waits.
     /// </summary>
     Task<Result<CurationRequest, Error>> RequestCurationAsync(CurationRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes a curated request and any earlier failure of its topic. A request that changed while it was being
+    /// curated (the topic changed again) stays waiting, so the newer changes are curated too.
+    /// </summary>
+    Task<UnitResult<Error>> CompleteCurationAsync(CurationRequest curated, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Records a curation that failed in the failed folder and removes its request, unless the request changed while
+    /// it was being curated, in which case the newer request stays waiting.
+    /// </summary>
+    Task<UnitResult<Error>> FailCurationAsync(FailedCuration failure, CancellationToken cancellationToken);
+
+    /// <summary>The curations that failed, at most one per topic.</summary>
+    Task<Result<IReadOnlyList<FailedCuration>, Error>> ListFailedCurationsAsync(CancellationToken cancellationToken);
 }

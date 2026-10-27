@@ -20,7 +20,7 @@ UI, commits and conversation. When a term changes meaning, change it here first.
 |--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
 | **Pipeline**             | The four agents (FactFinder, ThreadWeaver, Reviewer, Editor) that turn notes into a maintained wiki. File-system driven: each stage watches a folder and moves files along when it finishes.            | `pipeline.md`, `*/Watchers`                |
 | **Stage**                | One agent's step in the pipeline, with a contract for what it consumes and what it produces.                                                                                                              |                                            |
-| **Agent**                | A model-backed worker with a role, instructions and only the tools its role needs. There are five: the four pipeline agents and the Librarian.                                                           | `KnownAgents`, `AIAgent`                   |
+| **Agent**                | A model-backed worker with a role, instructions and only the tools its role needs. There are six: the four pipeline agents, the Librarian and the Pleb.                                                  | `KnownAgents`, `AIAgent`                   |
 | **Provider**             | Where an agent's model runs: `Anthropic` or `OpenAICompatible` (for example a local llama.cpp server). Chosen per agent.                                                                                  | `AgentConfiguration`                       |
 | **Tool**                 | A function an agent may call. Agents reach the disk only through their tools.                                                                                                                            | `*/Tools`                                  |
 | **Watcher**              | Reacts to files appearing in a pipeline folder and starts the next stage.                                                                                                                               | `NoteWatcher`, `FactWatcher`, ...          |
@@ -35,6 +35,7 @@ UI, commits and conversation. When a term changes meaning, change it here first.
 | **Reviewer**     | the whole wiki      | a report and findings | Never edits the wiki.                                           |
 | **Editor**       | open findings       | changed wiki pages    | Restructures and corrects; never adds new knowledge.            |
 | **Librarian**    | the wiki            | answers               | Outside the pipeline. Read-only.                                |
+| **Pleb**         | a curation request  | a topic's brief and queries | Research. No read tools: code gives it the topic's page. Never names people or organisations. |
 
 "Weaving" is what the ThreadWeaver does: filing facts into the pages they belong to, creating pages where needed and
 linking them.
@@ -72,6 +73,9 @@ ThreadWeaver fails on its facts.
 | **Topic** | A subject the wiki is kept informed about: every top-level folder or page under `projects/`, `learning/` and `plans/` (`projects/foo`, `learning/bar.md`). Discovered as agent runs change the wiki, pruned when its page is deleted or moved. Its state is in `research/topics/<slug>.json`, where the slug is the path with `/` replaced by `--`. | `ResearchTopic`, `TopicPaths` |
 | **Muted** | A topic the author has stopped researching from the UI, without moving it in the wiki. Only the author changes it. | `ResearchTopic.Muted` |
 | **Curation request** | A file in `research/curation/requests` asking the Pleb to revisit a topic's brief and queries. One per topic: a new request merges into a waiting one. | `CurationRequest` |
+| **Brief** | A topic's short, de-identified description of what is worth finding, written by the Pleb for the web-facing agents. | `ResearchTopic.Brief` |
+| **Curation** | One Pleb run over a curation request: it either sets the topic's brief and up to three queries, or keeps them. Requests are drained a few per **research cycle**, oldest first, and skipped while the model server is unhealthy. A curation without a verdict moves to `research/curation/failed`. | `CurateTopicsCommandHandler`, `CurationJob` |
+| **Model gate** | Limits how many research agent runs use the model at once (one by default). | `ModelGate` |
 
 ## Review
 

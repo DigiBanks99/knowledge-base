@@ -17,6 +17,7 @@ internal static class StatusDependencyInjection
         {
             builder.Services
                 .AddSingleton<StatusMonitor>()
+                .AddSingleton<IModelServerHealth, ModelServerHealth>()
                 .AddSingleton<IHealthCheckPublisher>(services => services.GetRequiredService<StatusMonitor>())
                 .Configure<HealthCheckPublisherOptions>(options =>
                 {
@@ -28,7 +29,7 @@ internal static class StatusDependencyInjection
 
             builder.Services
                 .AddHealthChecks()
-                .AddStatusSignal<ModelServerHealthCheck>("Model server");
+                .AddStatusSignal<ModelServerHealthCheck>(ModelServerHealthCheck.Name);
 
             return builder;
         }

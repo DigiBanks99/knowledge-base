@@ -35,7 +35,7 @@ internal sealed class TestApi : WebApplicationFactory<Program>
     public const string OwnerObjectId = "6f1c8f0e-7f4a-4a52-9a43-0b0d2c1a9e11";
 
     private static readonly string[] KnownAgentNames =
-        [KnownAgents.FactFinder, KnownAgents.ThreadWeaver, KnownAgents.Reviewer, KnownAgents.Editor, KnownAgents.Librarian];
+        [KnownAgents.FactFinder, KnownAgents.ThreadWeaver, KnownAgents.Reviewer, KnownAgents.Editor, KnownAgents.Librarian, KnownAgents.Pleb];
 
     private readonly TemporaryDirectory _root = new();
     private readonly Dictionary<string, FakeAgent> _agents = KnownAgentNames.ToDictionary(name => name, name => new FakeAgent(name));

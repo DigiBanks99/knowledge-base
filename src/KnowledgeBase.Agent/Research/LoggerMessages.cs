@@ -33,4 +33,25 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Information, "The author set research topic '{Topic}' muted: {Muted}.")]
     public static partial void TopicMuteSet(this ILogger logger, string topic, bool muted);
+
+    [LoggerMessage(LogLevel.Information, "The Pleb set {Count} queries for research topic '{Topic}'.")]
+    public static partial void TopicQueriesSet(this ILogger logger, string topic, int count);
+
+    [LoggerMessage(LogLevel.Information, "The Pleb kept the queries of research topic '{Topic}'.")]
+    public static partial void TopicQueriesKept(this ILogger logger, string topic);
+
+    [LoggerMessage(LogLevel.Information, "Skipping the curation cycle: the model server is not healthy.")]
+    public static partial void CurationSkippedModelServerUnhealthy(this ILogger logger);
+
+    [LoggerMessage(LogLevel.Information, "Curating {Count} of {Waiting} waiting research topics.")]
+    public static partial void CuratingTopics(this ILogger logger, int count, int waiting);
+
+    [LoggerMessage(LogLevel.Warning, "Curation of research topic '{Topic}' failed: {Reason}")]
+    public static partial void CurationFailed(this ILogger logger, string topic, string reason);
+
+    [LoggerMessage(LogLevel.Warning, "Curation of research topic '{Topic}' was left waiting: {Error}")]
+    public static partial void CurationLeftWaiting(this ILogger logger, string topic, Error error);
+
+    [LoggerMessage(LogLevel.Error, "The curation cycle failed: {Error}")]
+    public static partial void CurationCycleFailed(this ILogger logger, Error error);
 }

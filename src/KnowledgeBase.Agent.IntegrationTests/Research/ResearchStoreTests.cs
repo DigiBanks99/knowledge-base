@@ -143,6 +143,88 @@ public sealed class ResearchStoreTests : IDisposable
     }
 
     [Test]
+    public async Task ACurationIsCompleted()
+    {
+        CurationRequest request = await RequestCurationAsync("projects/garden", "projects/garden/index.md");
+        await _store.FailCurationAsync(new FailedCuration(request, "No verdict.", Discovered), CancellationToken.None);
+        CurationRequest again = await RequestCurationAsync("projects/garden", "projects/garden/beds.md");
+
+        UnitResult<Error> result = await _store.CompleteCurationAsync(again, CancellationToken.None);
+
+        ItShouldSucceed();
+        ItShouldRemoveTheRequest();
+        ItShouldClearTheEarlierFailure();
+
+        void ItShouldSucceed() => result.IsSuccess.ShouldBeTrue();
+
+        void ItShouldRemoveTheRequest() => TestWiki.FileNames(_settings.CurationRequestsDirectory).ShouldBeEmpty();
+
+        void ItShouldClearTheEarlierFailure() => TestWiki.FileNames(_settings.CurationFailedDirectory).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ACurationFails()
+    {
+        CurationRequest request = await RequestCurationAsync("projects/garden", "projects/garden/index.md");
+
+        UnitResult<Error> result = await _store.FailCurationAsync(new FailedCuration(request, "No verdict.", Discovered), CancellationToken.None);
+        Result<IReadOnlyList<FailedCuration>, Error> failed = await _store.ListFailedCurationsAsync(CancellationToken.None);
+
+        ItShouldSucceed();
+        ItShouldMoveTheRequestToTheFailedFolder();
+        ItShouldListTheFailureWithItsReason();
+
+        void ItShouldSucceed() => result.IsSuccess.ShouldBeTrue();
+
+        void ItShouldMoveTheRequestToTheFailedFolder()
+        {
+            TestWiki.FileNames(_settings.CurationRequestsDirectory).ShouldBeEmpty();
+            TestWiki.FileNames(_settings.CurationFailedDirectory).ShouldBe(["projects--garden.json"]);
+        }
+
+        void ItShouldListTheFailureWithItsReason() => failed.Value.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            failure => failure.Reason.ShouldBe("No verdict."),
+            failure => failure.Request.ChangedPaths.ShouldBe(["projects/garden/index.md"]));
+    }
+
+    [Test]
+    public async Task ATopicChangesWhileItIsCurated()
+    {
+        CurationRequest curated = await RequestCurationAsync("projects/garden", "projects/garden/index.md");
+        await RequestCurationAsync("projects/garden", "projects/garden/beds.md", minutesLater: 5);
+
+        await _store.CompleteCurationAsync(curated, CancellationToken.None);
+        Result<IReadOnlyList<CurationRequest>, Error> waiting = await _store.ListCurationRequestsAsync(CancellationToken.None);
+
+        ItShouldKeepTheNewerRequestWaiting();
+
+        void ItShouldKeepTheNewerRequestWaiting() => waiting.Value.ShouldHaveSingleItem().ChangedPaths
+            .ShouldBe(["projects/garden/index.md", "projects/garden/beds.md"]);
+    }
+
+    [Test]
+    public async Task ATopicWithAFailedCurationIsPruned()
+    {
+        CurationRequest request = await RequestCurationAsync("projects/garden", "projects/garden/index.md");
+        await _store.FailCurationAsync(new FailedCuration(request, "No verdict.", Discovered), CancellationToken.None);
+
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe<ResearchTopic>.None, CancellationToken.None);
+
+        ItShouldRemoveTheFailure();
+
+        void ItShouldRemoveTheFailure() => TestWiki.FileNames(_settings.CurationFailedDirectory).ShouldBeEmpty();
+    }
+
+    private async Task<CurationRequest> RequestCurationAsync(string topic, string changedPath, int minutesLater = 0)
+    {
+        await _store.UpdateTopicAsync(topic, current => current.HasValue ? current : Maybe.From(ResearchTopic.New(topic, Discovered)), CancellationToken.None);
+        Result<CurationRequest, Error> requested = await _store.RequestCurationAsync(
+            new CurationRequest(topic, [changedPath], Discovered.AddMinutes(minutesLater)),
+            CancellationToken.None);
+        return requested.Value;
+    }
+
+    [Test]
     public async Task ATopicsStateIsCorrupt()
     {
         Directory.CreateDirectory(_settings.ResearchTopicsDirectory);
