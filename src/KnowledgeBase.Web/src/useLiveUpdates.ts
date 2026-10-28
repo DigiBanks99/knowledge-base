@@ -10,7 +10,7 @@ const queriesByArea: Record<string, string[][]> = {
   wiki: [['wiki-tree'], ['wiki-page']],
   conversations: [['conversations']],
   status: [['status']],
-  research: [['deny-list'], ['topics']],
+  research: [['deny-list'], ['topics'], ['topic-results']],
 }
 
 /**

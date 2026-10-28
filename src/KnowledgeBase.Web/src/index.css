@@ -300,7 +300,8 @@ details.card summary {
 .badge-running,
 .badge-processing,
 .badge-medium,
-.badge-degraded {
+.badge-degraded,
+.badge-triaging {
   background: var(--warning-soft);
   color: var(--warning);
 }
@@ -357,14 +358,41 @@ details.card summary {
 }
 
 .deny-list .item-title button,
-.topics .item-title button {
+.topics .item-title .actions {
   margin-left: auto;
+}
+
+.topics .item-title .actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .topics .queries {
   margin: 0.4rem 0 0;
   padding-left: 1.2rem;
   font-size: 0.85rem;
+}
+
+.topics .pending-results {
+  margin-top: 0.6rem;
+}
+
+.topics .pending-results summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.topics .pending-results ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.topics .pending-results li + li {
+  margin-top: 0.5rem;
+}
+
+.topics .pending-results a {
+  overflow-wrap: anywhere;
 }
 
 .tabs {

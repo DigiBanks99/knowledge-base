@@ -104,7 +104,7 @@ export interface DenyListEntry {
   state: DenyListState
 }
 
-export type TopicState = 'Idle' | 'AwaitingCuration' | 'CurationFailed' | 'Muted'
+export type TopicState = 'Idle' | 'AwaitingCuration' | 'CurationFailed' | 'Muted' | 'Triaging'
 export interface TopicSummary {
   path: string
   slug: string
@@ -113,6 +113,31 @@ export interface TopicSummary {
   queries: string[]
   muted: boolean
   lastCuratedAt: string | null
+  lastSearchedAt: string | null
+  nextSearchAt: string | null
+  pendingResults: number
+}
+export interface SearchResult {
+  url: string
+  title: string
+  snippet: string | null
+  source: string
+  publishedAt: string | null
+}
+export interface BatchResult {
+  query: string
+  url: string
+  result: SearchResult
+}
+export interface ResearchBatch {
+  topic: string
+  searchedAt: string
+  results: BatchResult[]
+}
+export interface TopicSearchOutcome {
+  topic: string
+  found: number
+  kept: number
 }
 
 export class ApiError extends Error {
@@ -197,6 +222,10 @@ export const api = {
   topics: () => request<TopicSummary[]>('/api/research/topics'),
   setTopicMuted: (slug: string, muted: boolean) =>
     put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/muted`, { muted }),
+  researchNow: (slug: string) =>
+    post<TopicSearchOutcome>(`/api/research/topics/${encodeURIComponent(slug)}/research`),
+  topicResults: (slug: string) =>
+    request<ResearchBatch>(`/api/research/topics/${encodeURIComponent(slug)}/results`),
 
   conversations: () => request<ConversationSummary[]>('/api/conversations'),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${id}`),
