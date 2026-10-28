@@ -15,6 +15,8 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
     private readonly string _topicsDirectory = settings.Value.ResearchTopicsDirectory;
     private readonly string _curationRequestsDirectory = settings.Value.CurationRequestsDirectory;
     private readonly string _curationFailedDirectory = settings.Value.CurationFailedDirectory;
+    private readonly string _pendingBatchesDirectory = settings.Value.PendingBatchesDirectory;
+    private readonly string _blockedDomainsPath = settings.Value.BlockedDomainsPath;
     private readonly SemaphoreSlim _denyListLock = new(1, 1);
 
     // One lock for topics and their curation requests, so pruning a topic never races a request being merged for it.
@@ -84,6 +86,7 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
                 : Delete(topicPath)
                     .Bind(() => Delete(TopicFilePath(_curationRequestsDirectory, topic)))
                     .Bind(() => Delete(TopicFilePath(_curationFailedDirectory, topic)))
+                    .Bind(() => Delete(TopicFilePath(_pendingBatchesDirectory, topic)))
                     .Map(() => Maybe<ResearchTopic>.None);
         }
         finally
@@ -148,6 +151,63 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
 
     public Task<Result<IReadOnlyList<FailedCuration>, Error>> ListFailedCurationsAsync(CancellationToken cancellationToken) =>
         ReadAllAsync<FailedCuration>(_curationFailedDirectory, cancellationToken);
+
+    public Task<Result<Maybe<ResearchTopic>, Error>> ReadTopicAsync(string topic, CancellationToken cancellationToken) =>
+        ReadDocumentAsync<ResearchTopic>(TopicFilePath(_topicsDirectory, topic), cancellationToken);
+
+    public Task<Result<IReadOnlySet<string>, Error>> ListTopicsInFlightAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            IReadOnlySet<string> topics = Directory.Exists(_pendingBatchesDirectory)
+                ? Directory
+                    .EnumerateFiles(_pendingBatchesDirectory, "*.json")
+                    .Select(filePath => TopicPaths.FromSlug(Path.GetFileNameWithoutExtension(filePath)))
+                    .Choose()
+                    .ToHashSet(StringComparer.Ordinal)
+                : new HashSet<string>();
+            return Task.FromResult(Result.Success<IReadOnlySet<string>, Error>(topics));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Task.FromResult(Result.Failure<IReadOnlySet<string>, Error>(new ResearchStoreError(_pendingBatchesDirectory, ex.Message)));
+        }
+    }
+
+    public Task<Result<IReadOnlyList<ResearchBatch>, Error>> ListPendingBatchesAsync(CancellationToken cancellationToken) =>
+        ReadAllAsync<ResearchBatch>(_pendingBatchesDirectory, cancellationToken);
+
+    public Task<Result<Maybe<ResearchBatch>, Error>> ReadPendingBatchAsync(string topic, CancellationToken cancellationToken) =>
+        ReadDocumentAsync<ResearchBatch>(TopicFilePath(_pendingBatchesDirectory, topic), cancellationToken);
+
+    public async Task<Result<Maybe<ResearchBatch>, Error>> WritePendingBatchAsync(
+        ResearchBatch batch,
+        CancellationToken cancellationToken)
+    {
+        // Under the topics lock, so a topic pruned while it was being searched never gets an orphaned batch.
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!File.Exists(TopicFilePath(_topicsDirectory, batch.Topic)))
+            {
+                return Maybe<ResearchBatch>.None;
+            }
+
+            return await WriteDocumentAsync(TopicFilePath(_pendingBatchesDirectory, batch.Topic), batch, cancellationToken)
+                .Map(written => Maybe.From(written));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    /// <summary>A corrupt list is an error rather than none, so blocked domains are never fetched by mistake.</summary>
+    public async Task<Result<BlockedDomains, Error>> ReadBlockedDomainsAsync(CancellationToken cancellationToken) =>
+        await ReadDocumentAsync<BlockedDomains>(_blockedDomainsPath, cancellationToken)
+            .Bind(read => read.HasValue && read.Value.Blocked is null
+                ? Result.Failure<BlockedDomains, Error>(new ResearchStoreError(_blockedDomainsPath, "the domain list has no blocked array."))
+                : Result.Success<BlockedDomains, Error>(read.GetValueOrDefault(BlockedDomains.None)));
 
     /// <summary>Called under the topics lock, so no request can be merged between the read and the delete.</summary>
     private async Task<UnitResult<Error>> RemoveRequestUnlessChangedAsync(CurationRequest handled, CancellationToken cancellationToken)

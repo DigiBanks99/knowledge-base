@@ -9,11 +9,16 @@ public enum TopicState
     Idle,
     AwaitingCuration,
     CurationFailed,
-    Muted
+    Muted,
+
+    /// <summary>The topic's last search kept results that wait for the Scout.</summary>
+    Triaging
 }
 
 /// <summary>A topic as the Topics page shows it.</summary>
 /// <param name="Slug">The topic's path in the form the API's topic routes take.</param>
+/// <param name="NextSearchAt">When the topic is next due to be searched, once it has queries to search.</param>
+/// <param name="PendingResults">How many results of its last search wait to be triaged.</param>
 public sealed record TopicSummary(
     string Path,
     string Slug,
@@ -21,4 +26,7 @@ public sealed record TopicSummary(
     string? Brief,
     IReadOnlyList<string> Queries,
     bool Muted,
-    DateTimeOffset? LastCuratedAt);
+    DateTimeOffset? LastCuratedAt,
+    DateTimeOffset? LastSearchedAt = null,
+    DateTimeOffset? NextSearchAt = null,
+    int PendingResults = 0);

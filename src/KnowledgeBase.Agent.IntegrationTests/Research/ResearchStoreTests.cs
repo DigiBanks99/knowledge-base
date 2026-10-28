@@ -274,4 +274,139 @@ public sealed class ResearchStoreTests : IDisposable
             File.ReadAllText(_settings.DenyListPath).ShouldBe(content);
         }
     }
+
+    [Test]
+    public async Task ASearchKeepsResults()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        ResearchBatch batch = Batch("projects/garden");
+
+        Result<Maybe<ResearchBatch>, Error> written = await _store.WritePendingBatchAsync(batch, CancellationToken.None);
+        ResearchStore restarted = new(Options.Create(_settings));
+        Result<IReadOnlyList<ResearchBatch>, Error> listed = await restarted.ListPendingBatchesAsync(CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> read = await restarted.ReadPendingBatchAsync("projects/garden", CancellationToken.None);
+
+        ItShouldPersistItUnderThePendingBatches();
+        ItShouldReadItBack();
+
+        void ItShouldPersistItUnderThePendingBatches()
+        {
+            written.Value.HasValue.ShouldBeTrue();
+            TestWiki.FileNames(_settings.PendingBatchesDirectory).ShouldBe(["projects--garden.json"]);
+        }
+
+        void ItShouldReadItBack()
+        {
+            listed.Value.ShouldHaveSingleItem().Results.ShouldBe(batch.Results);
+            read.Value.Value.Results.ShouldBe(batch.Results);
+        }
+    }
+
+    [Test]
+    public async Task APendingBatchIsCorrupt()
+    {
+        Directory.CreateDirectory(_settings.PendingBatchesDirectory);
+        await File.WriteAllTextAsync(Path.Combine(_settings.PendingBatchesDirectory, "projects--garden.json"), "{ not json");
+
+        Result<IReadOnlySet<string>, Error> inFlight = await _store.ListTopicsInFlightAsync(CancellationToken.None);
+        Result<IReadOnlyList<ResearchBatch>, Error> listed = await _store.ListPendingBatchesAsync(CancellationToken.None);
+
+        ItShouldStillCountItsTopicAsInFlight();
+        ItShouldSkipItInTheListing();
+
+        // Otherwise the topic would look due, and every cycle would pick it first and fail to search it.
+        void ItShouldStillCountItsTopicAsInFlight() => inFlight.Value.ShouldBe(["projects/garden"]);
+
+        void ItShouldSkipItInTheListing() => listed.Value.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ATopicIsPrunedWhileItIsSearched()
+    {
+        Result<Maybe<ResearchBatch>, Error> written = await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+
+        ItShouldWriteNoBatch();
+
+        void ItShouldWriteNoBatch()
+        {
+            written.Value.HasNoValue.ShouldBeTrue();
+            Directory.Exists(_settings.PendingBatchesDirectory).ShouldBeFalse();
+        }
+    }
+
+    [Test]
+    public async Task ATopicWithPendingResultsIsPruned()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe<ResearchTopic>.None, CancellationToken.None);
+
+        ItShouldRemoveTheBatch();
+
+        void ItShouldRemoveTheBatch() => TestWiki.FileNames(_settings.PendingBatchesDirectory).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ATopicIsSearched()
+    {
+        ResearchTopic searched = ResearchTopic.New("projects/garden", Discovered).Searched(Discovered.AddDays(1), ["https://example.com/one"]);
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(searched), CancellationToken.None);
+
+        ResearchTopic read = (await new ResearchStore(Options.Create(_settings)).ListTopicsAsync(CancellationToken.None)).Value.Single();
+
+        ItShouldKeepWhenAndWhatItSaw();
+
+        void ItShouldKeepWhenAndWhatItSaw() => read.ShouldSatisfyAllConditions(
+            topic => topic.LastSearchedAt.ShouldBe(Discovered.AddDays(1)),
+            topic => topic.SeenUrls.ShouldBe(new Dictionary<string, DateTimeOffset> { ["https://example.com/one"] = Discovered.AddDays(1) }));
+    }
+
+    [Test]
+    public async Task NoDomainsHaveBeenBlocked()
+    {
+        Result<BlockedDomains, Error> blocked = await _store.ReadBlockedDomainsAsync(CancellationToken.None);
+
+        ItShouldBlockNothing();
+
+        void ItShouldBlockNothing() => blocked.Value.Blocked.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task TheAuthorBlockedDomains()
+    {
+        Directory.CreateDirectory(_settings.ResearchDirectory);
+        await File.WriteAllTextAsync(_settings.BlockedDomainsPath, """{ "blocked": ["contentfarm.example"] }""");
+
+        Result<BlockedDomains, Error> blocked = await _store.ReadBlockedDomainsAsync(CancellationToken.None);
+
+        ItShouldReadThem();
+
+        void ItShouldReadThem() => blocked.Value.Blocked.ShouldBe(["contentfarm.example"]);
+    }
+
+    [Test]
+    [Arguments("""{ "blocked": null }""")]
+    [Arguments("{ not json")]
+    public async Task TheBlockedDomainsAreCorrupt(string content)
+    {
+        Directory.CreateDirectory(_settings.ResearchDirectory);
+        await File.WriteAllTextAsync(_settings.BlockedDomainsPath, content);
+
+        Result<BlockedDomains, Error> blocked = await _store.ReadBlockedDomainsAsync(CancellationToken.None);
+
+        ItShouldRefuseToReadThem();
+
+        void ItShouldRefuseToReadThem() => blocked.Error.ShouldBeOfType<ResearchStoreError>();
+    }
+
+    private static ResearchBatch Batch(string topic) => new(
+        topic,
+        Discovered,
+        [
+            new BatchResult(
+                "raised beds",
+                "https://example.com/beds",
+                new SearchResult("https://www.example.com/beds/", "Raised beds", "How to build them.", "SearXNG", Discovered.AddDays(-1)))
+        ]);
 }

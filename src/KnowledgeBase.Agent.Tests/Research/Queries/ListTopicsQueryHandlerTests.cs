@@ -60,4 +60,55 @@ public sealed class ListTopicsQueryHandlerTests
 
         void ItShouldShowWhenEachWasLastCurated() => result.Value.Select(topic => topic.LastCuratedAt).ShouldBe([curated, null]);
     }
+
+    [Test]
+    public async Task APendingBatchIsMissingItsTopic()
+    {
+        _state.Topics["projects/atlas"] = ResearchTopic.New("projects/atlas", Discovered);
+        _state.PendingBatches["edited-by-hand"] = new ResearchBatch(null!, Discovered, []);
+
+        Result<IReadOnlyList<TopicSummary>, Error> result = await _handler.Handle(new ListTopicsQuery(), CancellationToken.None);
+
+        ItShouldStillListTheTopics();
+
+        void ItShouldStillListTheTopics() => result.Value.ShouldHaveSingleItem().State.ShouldBe(TopicState.Idle);
+    }
+
+    [Test]
+    public async Task TopicsHaveBeenSearched()
+    {
+        DateTimeOffset searched = Discovered.AddDays(2);
+        _state.Topics["projects/atlas"] = ResearchTopic.New("projects/atlas", Discovered) with { Queries = ["atlas"], LastSearchedAt = searched };
+        _state.Topics["projects/beta"] = ResearchTopic.New("projects/beta", Discovered) with
+        {
+            Queries = ["beta"],
+            LastSearchedAt = searched,
+            Interval = TimeSpan.FromDays(4)
+        };
+        _state.Topics["projects/gamma"] = ResearchTopic.New("projects/gamma", Discovered);
+        _state.CurationRequests["projects/beta"] = new CurationRequest("projects/beta", [], searched);
+        _state.PendingBatches["projects/beta"] = new ResearchBatch(
+            "projects/beta",
+            searched,
+            [
+                new BatchResult("beta", "https://example.com/one", new SearchResult("https://example.com/one", "One", null, "SearXNG", null)),
+                new BatchResult("beta", "https://example.com/two", new SearchResult("https://example.com/two", "Two", null, "SearXNG", null))
+            ]);
+
+        Result<IReadOnlyList<TopicSummary>, Error> result = await _handler.Handle(new ListTopicsQuery(), CancellationToken.None);
+
+        ItShouldShowResultsWaitingForTriageFirst();
+        ItShouldCountThePendingResults();
+        ItShouldShowWhenEachWasSearchedAndIsNextDue();
+
+        void ItShouldShowResultsWaitingForTriageFirst() =>
+            result.Value.Select(topic => topic.State).ShouldBe([TopicState.Idle, TopicState.Triaging, TopicState.Idle]);
+
+        void ItShouldCountThePendingResults() => result.Value.Select(topic => topic.PendingResults).ShouldBe([0, 2, 0]);
+
+        // A topic with no queries has nothing to search, so it is never due.
+        void ItShouldShowWhenEachWasSearchedAndIsNextDue() => result.Value.ShouldSatisfyAllConditions(
+            topics => topics.Select(topic => topic.LastSearchedAt).ShouldBe([searched, searched, null]),
+            topics => topics.Select(topic => topic.NextSearchAt).ShouldBe([searched.AddDays(1), searched.AddDays(4), null]));
+    }
 }

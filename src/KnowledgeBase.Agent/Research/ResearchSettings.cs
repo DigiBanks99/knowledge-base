@@ -30,4 +30,25 @@ public sealed class ResearchSettings
 
     /// <summary>How many of a request's changed pages the curation prompt lists.</summary>
     public int ChangedPathsLimit { get; init; } = 20;
+
+    /// <summary>
+    /// How long after one search cycle finishes the next starts. Counting from the end rather than on a fixed tick
+    /// means a long cycle pushes the next back instead of overlapping it.
+    /// </summary>
+    public TimeSpan SearchCycleInterval { get; init; } = TimeSpan.FromHours(6);
+
+    /// <summary>
+    /// The most topics one search cycle searches. Each one's results later cost a Scout run apiece, so this bounds how
+    /// much model time a cycle can queue.
+    /// </summary>
+    public int TopicsPerCycle { get; init; } = 4;
+
+    /// <summary>The most results taken from each source for each query.</summary>
+    public int ResultsPerQuery { get; init; } = 10;
+
+    /// <summary>The self-hosted SearXNG instance; SearXNG is not searched when none is configured.</summary>
+    public Uri? SearxngEndpoint { get; init; }
+
+    /// <summary>The Hacker News Algolia search API.</summary>
+    public Uri HackerNewsEndpoint { get; init; } = new("https://hn.algolia.com/api/v1/");
 }

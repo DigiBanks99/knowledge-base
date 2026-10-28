@@ -52,6 +52,7 @@ internal static class FakeResearchStore
                     topics.Topics.Remove(topic);
                     topics.CurationRequests.Remove(topic);
                     topics.FailedCurations.Remove(topic);
+                    topics.PendingBatches.Remove(topic);
                 }
 
                 return updated;
@@ -88,6 +89,28 @@ internal static class FakeResearchStore
             .Returns(_ => Result.Success<IReadOnlyList<FailedCuration>, Error>([.. topics.FailedCurations.Values]));
         store.ReadDenyListAsync(Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success<DenyList, Error>(topics.DenyList));
+        store.ReadTopicAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => Result.Success<Maybe<ResearchTopic>, Error>(Maybe.From(topics.Topics.GetValueOrDefault(call.Arg<string>()))));
+        store.ListTopicsInFlightAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<IReadOnlySet<string>, Error>(topics.PendingBatches.Keys.ToHashSet(StringComparer.Ordinal)));
+        store.ListPendingBatchesAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<IReadOnlyList<ResearchBatch>, Error>([.. topics.PendingBatches.Values]));
+        store.ReadPendingBatchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(topics.PendingBatches.GetValueOrDefault(call.Arg<string>()))));
+        store.WritePendingBatchAsync(Arg.Any<ResearchBatch>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                ResearchBatch batch = call.Arg<ResearchBatch>();
+                if (!topics.Topics.ContainsKey(batch.Topic))
+                {
+                    return Result.Success<Maybe<ResearchBatch>, Error>(Maybe<ResearchBatch>.None);
+                }
+
+                topics.PendingBatches[batch.Topic] = batch;
+                return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(batch));
+            });
+        store.ReadBlockedDomainsAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<BlockedDomains, Error>(topics.BlockedDomains));
 
         return store;
 
@@ -101,11 +124,16 @@ internal static class FakeResearchStore
     }
 }
 
-/// <summary>The topics, curation requests and deny-list a <see cref="FakeResearchStore"/> holds, keyed by topic.</summary>
+/// <summary>
+/// The topics, curation requests, pending batches, deny-list and blocked domains a <see cref="FakeResearchStore"/>
+/// holds, keyed by topic.
+/// </summary>
 internal sealed class ResearchTopics
 {
     public Dictionary<string, ResearchTopic> Topics { get; } = [];
     public Dictionary<string, CurationRequest> CurationRequests { get; } = [];
     public Dictionary<string, FailedCuration> FailedCurations { get; } = [];
     public DenyList DenyList { get; set; } = DenyList.Empty;
+    public Dictionary<string, ResearchBatch> PendingBatches { get; } = [];
+    public BlockedDomains BlockedDomains { get; set; } = BlockedDomains.None;
 }
