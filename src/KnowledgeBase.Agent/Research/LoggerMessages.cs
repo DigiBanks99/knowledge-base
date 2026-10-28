@@ -108,4 +108,13 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Error, "The triage cycle failed: {Error}")]
     public static partial void TriageCycleFailed(this ILogger logger, Error error);
+
+    [LoggerMessage(LogLevel.Information, "Research on topic '{Topic}' resolved as {Outcome}; the topic is failing: {Failing}.")]
+    public static partial void BatchResolved(this ILogger logger, string topic, string outcome, bool failing);
+
+    [LoggerMessage(LogLevel.Information, "Pruned {Count} completed research batches past their retention.")]
+    public static partial void CompletedBatchesPruned(this ILogger logger, int count);
+
+    [LoggerMessage(LogLevel.Error, "Resolving the awaiting research batches failed: {Error}")]
+    public static partial void ResolveCycleFailed(this ILogger logger, Error error);
 }

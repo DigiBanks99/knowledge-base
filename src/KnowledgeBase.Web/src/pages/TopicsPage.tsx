@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type FetchedPage, type TopicState, type TopicSummary } from '../api'
 import { Badge, Empty, ErrorMessage, Loading, Markdown } from '../components'
-import { formatDate } from '../format'
+import { formatDate, formatInterval } from '../format'
 
 const stateLabels: Record<TopicState, string> = {
   Idle: 'Idle',
@@ -10,6 +10,7 @@ const stateLabels: Record<TopicState, string> = {
   CurationFailed: 'Curation failed',
   Muted: 'Muted',
   Triaging: 'Results pending',
+  Failing: 'Failing',
 }
 
 export function TopicsPage() {
@@ -95,6 +96,8 @@ function TopicItem({
         {topic.nextSearchAt && !topic.muted && topic.pendingResults === 0
           ? ` · Due ${formatDate(topic.nextSearchAt)}`
           : ''}
+        {` · Checked every ${formatInterval(topic.interval)}`}
+        {topic.lastPositiveAt ? ` · Last positive ${formatDate(topic.lastPositiveAt)}` : ' · Nothing filed yet'}
       </p>
       {topic.queries.length > 0 && (
         <ul className="queries">

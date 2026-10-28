@@ -148,6 +148,21 @@ internal static class FakeResearchStore
                 topics.CompletedBatches.Add(batch);
                 return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(batch));
             });
+        store.ListAwaitingBatchesAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<IReadOnlyList<AwaitingBatch>, Error>([.. topics.AwaitingBatches.Values]));
+        store.CompleteAwaitingBatchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                if (!topics.AwaitingBatches.Remove(call.Arg<string>(), out AwaitingBatch? awaiting))
+                {
+                    return Result.Success<Maybe<ResearchBatch>, Error>(Maybe<ResearchBatch>.None);
+                }
+
+                topics.CompletedBatches.Add(awaiting.Batch);
+                return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(awaiting.Batch));
+            });
+        store.PruneCompletedBatchesAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Result.Success<int, Error>(0));
         store.ReadBlockedDomainsAsync(Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success<BlockedDomains, Error>(topics.BlockedDomains));
 

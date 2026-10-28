@@ -104,7 +104,7 @@ export interface DenyListEntry {
   state: DenyListState
 }
 
-export type TopicState = 'Idle' | 'AwaitingCuration' | 'CurationFailed' | 'Muted' | 'Triaging'
+export type TopicState = 'Idle' | 'AwaitingCuration' | 'CurationFailed' | 'Muted' | 'Triaging' | 'Failing'
 export interface TopicSummary {
   path: string
   slug: string
@@ -116,6 +116,9 @@ export interface TopicSummary {
   lastSearchedAt: string | null
   nextSearchAt: string | null
   pendingResults: number
+  /** How long after a search the topic is due again, as a .NET TimeSpan (`d.hh:mm:ss`). */
+  interval: string | null
+  lastPositiveAt: string | null
 }
 export interface SearchResult {
   url: string
