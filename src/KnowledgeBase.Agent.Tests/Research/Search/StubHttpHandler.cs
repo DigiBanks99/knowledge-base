@@ -8,6 +8,9 @@ internal sealed class StubHttpHandler : HttpMessageHandler
 {
     public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } = _ => new HttpResponseMessage(HttpStatusCode.OK);
 
+    /// <summary>Answers instead of <see cref="Respond"/> when set, for an answer that takes time or never comes.</summary>
+    public Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? RespondAsync { get; set; }
+
     public List<HttpRequestMessage> Requests { get; } = [];
 
     public static HttpResponseMessage Json(string json) =>
@@ -24,6 +27,6 @@ internal sealed class StubHttpHandler : HttpMessageHandler
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
-        return Task.FromResult(Respond(request));
+        return RespondAsync is null ? Task.FromResult(Respond(request)) : RespondAsync(request, cancellationToken);
     }
 }

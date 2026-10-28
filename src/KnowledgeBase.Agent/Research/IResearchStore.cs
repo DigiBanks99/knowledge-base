@@ -75,6 +75,15 @@ internal interface IResearchStore
     /// </summary>
     Task<Result<Maybe<ResearchBatch>, Error>> WritePendingBatchAsync(ResearchBatch batch, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Reads, changes and writes the topic's pending batch as one step, so each fetched page is kept as soon as it is
+    /// fetched. None, with nothing written, when the topic has no pending batch (it was pruned meanwhile).
+    /// </summary>
+    Task<Result<Maybe<ResearchBatch>, Error>> UpdatePendingBatchAsync(
+        string topic,
+        Func<ResearchBatch, ResearchBatch> update,
+        CancellationToken cancellationToken);
+
     /// <summary>The domains the author blocked, or none when none have been written yet.</summary>
     Task<Result<BlockedDomains, Error>> ReadBlockedDomainsAsync(CancellationToken cancellationToken);
 }

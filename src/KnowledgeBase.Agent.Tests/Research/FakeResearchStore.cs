@@ -109,6 +109,19 @@ internal static class FakeResearchStore
                 topics.PendingBatches[batch.Topic] = batch;
                 return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(batch));
             });
+        store.UpdatePendingBatchAsync(Arg.Any<string>(), Arg.Any<Func<ResearchBatch, ResearchBatch>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                string topic = call.Arg<string>();
+                if (!topics.PendingBatches.TryGetValue(topic, out ResearchBatch? batch))
+                {
+                    return Result.Success<Maybe<ResearchBatch>, Error>(Maybe<ResearchBatch>.None);
+                }
+
+                ResearchBatch updated = call.Arg<Func<ResearchBatch, ResearchBatch>>()(batch);
+                topics.PendingBatches[topic] = updated;
+                return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(updated));
+            });
         store.ReadBlockedDomainsAsync(Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success<BlockedDomains, Error>(topics.BlockedDomains));
 

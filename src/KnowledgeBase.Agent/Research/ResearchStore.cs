@@ -202,6 +202,31 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         }
     }
 
+    public async Task<Result<Maybe<ResearchBatch>, Error>> UpdatePendingBatchAsync(
+        string topic,
+        Func<ResearchBatch, ResearchBatch> update,
+        CancellationToken cancellationToken)
+    {
+        // Under the topics lock, so a batch pruned with its topic is never written back.
+        string batchPath = TopicFilePath(_pendingBatchesDirectory, topic);
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Result<Maybe<ResearchBatch>, Error> current = await ReadDocumentAsync<ResearchBatch>(batchPath, cancellationToken);
+            if (current.IsFailure || current.Value.HasNoValue)
+            {
+                return current;
+            }
+
+            return await WriteDocumentAsync(batchPath, update(current.Value.Value), cancellationToken)
+                .Map(written => Maybe.From(written));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
     /// <summary>A corrupt list is an error rather than none, so blocked domains are never fetched by mistake.</summary>
     public async Task<Result<BlockedDomains, Error>> ReadBlockedDomainsAsync(CancellationToken cancellationToken) =>
         await ReadDocumentAsync<BlockedDomains>(_blockedDomainsPath, cancellationToken)
