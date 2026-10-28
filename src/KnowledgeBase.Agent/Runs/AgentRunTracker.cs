@@ -53,7 +53,8 @@ internal sealed class AgentRunTracker(
         FactOrigin origin,
         string? topic,
         Func<CancellationToken, Task<AgentResponse>> run,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? sourceNote = null)
     {
         RunRecorder recorder = new(new AgentRun(
             $"{timeProvider.GetUtcNow():yyyyMMdd-HHmmss}-{agent.ToLowerInvariant()}-{Guid.NewGuid():N}"[..40],
@@ -66,7 +67,8 @@ internal sealed class AgentRunTracker(
             null,
             [],
             origin,
-            topic));
+            topic,
+            sourceNote));
         CurrentRecorder.Value = recorder;
         await SaveAsync(recorder);
 

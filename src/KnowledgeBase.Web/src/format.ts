@@ -5,6 +5,14 @@ export function formatDate(value: string | null | undefined): string {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/** Formats a .NET TimeSpan (`d.hh:mm:ss` or `hh:mm:ss`) as whole days, or hours when under a day. */
+export function formatInterval(value: string | null | undefined): string {
+  const match = value?.match(/^(?:(\d+)\.)?(\d+):/)
+  if (!match) return '—'
+  const days = Number(match[1] ?? 0)
+  return days > 0 ? `${days}d` : `${Number(match[2])}h`
+}
+
 export function formatDuration(run: AgentRun): string {
   const end = run.completedAt ? new Date(run.completedAt).getTime() : Date.now()
   const seconds = Math.max(0, Math.round((end - new Date(run.startedAt).getTime()) / 1000))

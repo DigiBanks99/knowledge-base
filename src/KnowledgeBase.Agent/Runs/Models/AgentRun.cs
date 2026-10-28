@@ -28,7 +28,8 @@ public sealed record AgentToolCall(string Tool, string? Target, DateTimeOffset A
 /// <summary>
 /// A recorded agent run. <see cref="Origin"/> is where the content the run works on came from, and <see cref="Topic"/>
 /// the wiki topic research was gathered for. Runs over research are restricted in what their tools may change, and runs
-/// stored before origins were recorded read as <see cref="FactOrigin.Author"/>.
+/// stored before origins were recorded read as <see cref="FactOrigin.Author"/>. <see cref="SourceNote"/> is the note
+/// whose facts a weaving run files, by which research finds the run that ingested its note.
 /// </summary>
 public sealed record AgentRun(
     string Id,
@@ -41,4 +42,5 @@ public sealed record AgentRun(
     string? Error,
     IReadOnlyList<AgentToolCall> ToolCalls,
     FactOrigin Origin = FactOrigin.Author,
-    string? Topic = null);
+    string? Topic = null,
+    string? SourceNote = null);

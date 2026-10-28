@@ -14,6 +14,8 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// Every normalised result URL the topic's searches returned, with when it was first seen, so a result is only ever
 /// considered once; none until the first search.
 /// </param>
+/// <param name="LastPositiveAt">When the ThreadWeaver last filed something from the topic's research; none until it has.</param>
+/// <param name="ConsecutiveFailures">How many research notes in a row ended in the failed notes folder.</param>
 public sealed record ResearchTopic(
     string Path,
     string? Brief,
@@ -23,15 +25,29 @@ public sealed record ResearchTopic(
     DateTimeOffset? LastCuratedAt = null,
     DateTimeOffset? LastSearchedAt = null,
     TimeSpan? Interval = null,
-    IReadOnlyDictionary<string, DateTimeOffset>? SeenUrls = null)
+    IReadOnlyDictionary<string, DateTimeOffset>? SeenUrls = null,
+    DateTimeOffset? LastPositiveAt = null,
+    int ConsecutiveFailures = 0)
 {
     /// <summary>How long a topic waits between searches until its outcomes say otherwise.</summary>
     public static TimeSpan DefaultInterval { get; } = TimeSpan.FromHours(24);
+
+    /// <summary>The longest a topic backs off to when its research keeps coming to nothing.</summary>
+    public static TimeSpan MaxInterval { get; } = TimeSpan.FromDays(30);
+
+    /// <summary>How long a seen URL is remembered; after that a result may be considered again.</summary>
+    public static TimeSpan SeenUrlRetention { get; } = TimeSpan.FromDays(180);
+
+    /// <summary>How many failed notes in a row flag a topic as failing.</summary>
+    public const int FailureLimit = 3;
 
     public static ResearchTopic New(string path, DateTimeOffset createdAt) => new(path, null, [], false, createdAt);
 
     /// <summary>When the topic is next due to be searched; a topic never searched is due from its creation.</summary>
     public DateTimeOffset DueAt => LastSearchedAt.HasValue ? LastSearchedAt.Value + (Interval ?? DefaultInterval) : CreatedAt;
+
+    /// <summary>Whether the pipeline keeps failing on the topic's research, which is not the same as the topic being quiet.</summary>
+    public bool IsFailing => ConsecutiveFailures >= FailureLimit;
 
     /// <summary>Whether the topic has been searched for <paramref name="normalisedUrl"/> before.</summary>
     public bool HasSeen(string normalisedUrl) => SeenUrls?.ContainsKey(normalisedUrl) == true;
@@ -46,7 +62,8 @@ public sealed record ResearchTopic(
     /// </summary>
     public ResearchTopic Saw(DateTimeOffset seenAt, IEnumerable<string> urls)
     {
-        Dictionary<string, DateTimeOffset> seen = new(SeenUrls ?? new Dictionary<string, DateTimeOffset>(), StringComparer.Ordinal);
+        // Expired URLs are dropped as new ones are added, so the record never grows without bound.
+        Dictionary<string, DateTimeOffset> seen = new(WithoutExpiredUrls(seenAt).SeenUrls ?? new Dictionary<string, DateTimeOffset>(), StringComparer.Ordinal);
         foreach (string url in urls)
         {
             seen.TryAdd(url, seenAt);
@@ -54,4 +71,36 @@ public sealed record ResearchTopic(
 
         return this with { SeenUrls = seen };
     }
+
+    /// <summary>The ThreadWeaver filed something from the topic's research: check it again after the default interval.</summary>
+    public ResearchTopic Positive(DateTimeOffset at) =>
+        this with { Interval = DefaultInterval, LastPositiveAt = at, ConsecutiveFailures = 0 };
+
+    /// <summary>
+    /// Nothing came of the topic's research (all discarded, or nothing filed): wait twice as long, up to
+    /// <see cref="MaxInterval"/>. A quiet topic is not a failing one, so failures reset.
+    /// </summary>
+    public ResearchTopic Empty() =>
+        this with { Interval = Min(2 * (Interval ?? DefaultInterval), MaxInterval), ConsecutiveFailures = 0 };
+
+    /// <summary>The research note failed: the interval says nothing about the topic, so it stays.</summary>
+    public ResearchTopic Failed() => this with { ConsecutiveFailures = ConsecutiveFailures + 1 };
+
+    /// <summary>This topic having forgotten the URLs first seen more than <see cref="SeenUrlRetention"/> before <paramref name="now"/>.</summary>
+    public ResearchTopic WithoutExpiredUrls(DateTimeOffset now)
+    {
+        if (SeenUrls is null || !SeenUrls.Values.Any(seenAt => now - seenAt > SeenUrlRetention))
+        {
+            return this;
+        }
+
+        return this with
+        {
+            SeenUrls = SeenUrls
+                .Where(seen => now - seen.Value <= SeenUrlRetention)
+                .ToDictionary(seen => seen.Key, seen => seen.Value, StringComparer.Ordinal)
+        };
+    }
+
+    private static TimeSpan Min(TimeSpan first, TimeSpan second) => first < second ? first : second;
 }

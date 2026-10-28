@@ -258,24 +258,50 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         }
     }
 
-    public async Task<Result<Maybe<ResearchBatch>, Error>> CompleteBatchAsync(string topic, CancellationToken cancellationToken)
+    public Task<Result<Maybe<ResearchBatch>, Error>> CompleteBatchAsync(string topic, CancellationToken cancellationToken) =>
+        MoveToCompletedAsync<ResearchBatch>(TopicFilePath(_pendingBatchesDirectory, topic), topic, batch => batch, cancellationToken);
+
+    public async Task<Result<IReadOnlyList<AwaitingBatch>, Error>> ListAwaitingBatchesAsync(CancellationToken cancellationToken) =>
+        await ReadAllAsync<AwaitingBatch>(_awaitingBatchesDirectory, cancellationToken)
+            .Map(IReadOnlyList<AwaitingBatch> (awaiting) => [.. awaiting.Where(batch => batch.Batch is not null && batch.NoteFile is not null)]);
+
+    public Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(string topic, CancellationToken cancellationToken) =>
+        MoveToCompletedAsync(TopicFilePath(_awaitingBatchesDirectory, topic), topic, (AwaitingBatch awaiting) => awaiting.Batch, cancellationToken);
+
+    public async Task<Result<int, Error>> PruneCompletedBatchesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken)
     {
-        string pendingPath = TopicFilePath(_pendingBatchesDirectory, topic);
+        // Under the topics lock, so a batch being completed is never pruned half-written.
         await _topicsLock.WaitAsync(cancellationToken);
         try
         {
-            Result<Maybe<ResearchBatch>, Error> pending = await ReadDocumentAsync<ResearchBatch>(pendingPath, cancellationToken);
-            if (pending.IsFailure || pending.Value.HasNoValue)
+            if (!Directory.Exists(_completedBatchesDirectory))
             {
-                return pending;
+                return 0;
             }
 
-            ResearchBatch batch = pending.Value.Value;
-            string completedPath = Path.Combine(
-                _completedBatchesDirectory,
-                $"{TopicPaths.Slug(topic)}-{batch.SearchedAt.UtcDateTime:yyyyMMdd-HHmmss}.json");
-            return await WriteDocumentAsync(completedPath, batch, cancellationToken)
-                .Bind(written => Delete(pendingPath).Map(() => Maybe.From(written)));
+            int pruned = 0;
+            foreach (string filePath in Directory.EnumerateFiles(_completedBatchesDirectory, "*.json"))
+            {
+                // The file's own age, not the batch's search time: a batch may wait days for its outcome.
+                if (File.GetLastWriteTimeUtc(filePath) >= olderThan.UtcDateTime)
+                {
+                    continue;
+                }
+
+                UnitResult<Error> deleted = Delete(filePath);
+                if (deleted.IsFailure)
+                {
+                    return deleted.Error;
+                }
+
+                pruned++;
+            }
+
+            return pruned;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(_completedBatchesDirectory, ex.Message);
         }
         finally
         {
@@ -289,6 +315,39 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
             .Bind(read => read.HasValue && read.Value.Blocked is null
                 ? Result.Failure<BlockedDomains, Error>(new ResearchStoreError(_blockedDomainsPath, "the domain list has no blocked array."))
                 : Result.Success<BlockedDomains, Error>(read.GetValueOrDefault(BlockedDomains.None)));
+
+    /// <summary>
+    /// Writes a pending or awaiting batch to the completed folder and removes it from where it was. The completed file is
+    /// written before the source is removed, so a crash between them leaves the batch in both places rather than neither.
+    /// </summary>
+    private async Task<Result<Maybe<ResearchBatch>, Error>> MoveToCompletedAsync<TSource>(
+        string sourcePath,
+        string topic,
+        Func<TSource, ResearchBatch> batchOf,
+        CancellationToken cancellationToken)
+        where TSource : class
+    {
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Result<Maybe<TSource>, Error> source = await ReadDocumentAsync<TSource>(sourcePath, cancellationToken);
+            if (source.IsFailure || source.Value.HasNoValue)
+            {
+                return source.IsFailure ? source.Error : Maybe<ResearchBatch>.None;
+            }
+
+            ResearchBatch batch = batchOf(source.Value.Value);
+            string completedPath = Path.Combine(
+                _completedBatchesDirectory,
+                $"{TopicPaths.Slug(topic)}-{batch.SearchedAt.UtcDateTime:yyyyMMdd-HHmmss}.json");
+            return await WriteDocumentAsync(completedPath, batch, cancellationToken)
+                .Bind(written => Delete(sourcePath).Map(() => Maybe.From(written)));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
 
     /// <summary>Called under the topics lock, so no request can be merged between the read and the delete.</summary>
     private async Task<UnitResult<Error>> RemoveRequestUnlessChangedAsync(CurationRequest handled, CancellationToken cancellationToken)

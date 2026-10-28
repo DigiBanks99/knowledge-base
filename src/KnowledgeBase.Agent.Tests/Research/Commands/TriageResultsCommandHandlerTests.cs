@@ -130,6 +130,7 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
 
         ItShouldCompleteTheBatchAsEmpty();
         ItShouldWriteNoNote();
+        ItShouldBackTheTopicOff();
 
         void ItShouldCompleteTheBatchAsEmpty()
         {
@@ -140,6 +141,8 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
         }
 
         void ItShouldWriteNoNote() => _notes.ShouldBeEmpty();
+
+        void ItShouldBackTheTopicOff() => _state.Topics[Atlas].Interval.ShouldBe(TimeSpan.FromHours(48));
     }
 
     [Test]

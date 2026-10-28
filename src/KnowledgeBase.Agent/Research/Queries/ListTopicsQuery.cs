@@ -49,6 +49,7 @@ internal sealed class ListTopicsQueryHandler(IResearchStore store)
         : pendingResults.ContainsKey(topic.Path) ? TopicState.Triaging
         : awaitingCuration.Contains(topic.Path) ? TopicState.AwaitingCuration
         : curationFailed.Contains(topic.Path) ? TopicState.CurationFailed
+        : topic.IsFailing ? TopicState.Failing
         : TopicState.Idle;
 
     private static TopicSummary Summarise(ResearchTopic topic, TopicState state, int pendingResults) => new(
@@ -61,5 +62,7 @@ internal sealed class ListTopicsQueryHandler(IResearchStore store)
         topic.LastCuratedAt,
         topic.LastSearchedAt,
         topic.Queries.Count > 0 ? topic.DueAt : null,
-        pendingResults);
+        pendingResults,
+        topic.Interval ?? ResearchTopic.DefaultInterval,
+        topic.LastPositiveAt);
 }

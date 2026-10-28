@@ -392,6 +392,56 @@ public sealed class ResearchStoreTests : IDisposable
     }
 
     [Test]
+    public async Task AnAwaitingBatchHasItsOutcome()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+        await _store.AwaitBatchAsync("projects/garden", "research-projects--garden.md", Discovered, CancellationToken.None);
+
+        Result<IReadOnlyList<AwaitingBatch>, Error> listed = await _store.ListAwaitingBatchesAsync(CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> completed = await _store.CompleteAwaitingBatchAsync("projects/garden", CancellationToken.None);
+        Result<IReadOnlySet<string>, Error> inFlight = await _store.ListTopicsInFlightAsync(CancellationToken.None);
+
+        ItShouldListTheBatchWithItsNote();
+        ItShouldMoveTheBatchToTheCompletedBatches();
+        ItShouldFreeTheTopic();
+
+        void ItShouldListTheBatchWithItsNote() => listed.Value.Select(batch => batch.NoteFile).ShouldBe(["research-projects--garden.md"]);
+
+        void ItShouldMoveTheBatchToTheCompletedBatches()
+        {
+            completed.Value.HasValue.ShouldBeTrue();
+            TestWiki.FileNames(_settings.CompletedBatchesDirectory).ShouldBe(["projects--garden-20261025-093000.json"]);
+            TestWiki.FileNames(_settings.AwaitingBatchesDirectory).ShouldBeEmpty();
+        }
+
+        void ItShouldFreeTheTopic() => inFlight.Value.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task SomeCompletedBatchesAreOlderThanTheRetention()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+        await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden") with { SearchedAt = Discovered.AddDays(1) }, CancellationToken.None);
+        await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        string[] files = [.. Directory.EnumerateFiles(_settings.CompletedBatchesDirectory).Order()];
+        File.SetLastWriteTimeUtc(files[0], Discovered.UtcDateTime.AddDays(1));
+        File.SetLastWriteTimeUtc(files[1], Discovered.UtcDateTime.AddDays(40));
+
+        Result<int, Error> pruned = await _store.PruneCompletedBatchesAsync(Discovered.AddDays(30), CancellationToken.None);
+
+        ItShouldDeleteOnlyTheOldOne();
+
+        void ItShouldDeleteOnlyTheOldOne()
+        {
+            pruned.Value.ShouldBe(1);
+            Directory.EnumerateFiles(_settings.CompletedBatchesDirectory).ShouldBe([files[1]]);
+        }
+    }
+
+    [Test]
     public async Task ABatchIsMovedThatIsGone()
     {
         Result<Maybe<AwaitingBatch>, Error> awaiting = await _store.AwaitBatchAsync("projects/garden", "note.md", Discovered, CancellationToken.None);

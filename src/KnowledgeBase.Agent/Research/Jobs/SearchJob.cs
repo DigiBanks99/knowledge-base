@@ -6,20 +6,24 @@ namespace KnowledgeBase.Agent.Research.Jobs;
 
 /// <summary>
 /// Runs a search cycle shortly after start, then again <see cref="ResearchSettings.SearchCycleInterval"/> after each
-/// one finishes, so cycles never overlap however long one takes. A cycle searches the due topics, then fetches the
-/// pages of every pending batch, including any a restart interrupted, and has the Scout judge the fetched results.
+/// one finishes, so cycles never overlap however long one takes. A cycle first settles the batches awaiting the
+/// ThreadWeaver, so their topics' intervals are current, then searches the due topics, fetches the pages of every
+/// pending batch, including any a restart interrupted, and has the Scout judge the fetched results.
 /// </summary>
 internal sealed class SearchJob(
     ILogger<SearchJob> logger,
     IOptions<ResearchSettings> settings,
     TimeProvider timeProvider,
+    ResolveAwaitingBatchesCommandHandler resolveHandler,
     SearchTopicsCommandHandler handler,
     FetchPendingResultsCommandHandler fetchHandler,
-    TriageResultsCommandHandler triageHandler)
+    TriageResultsCommandHandler triageHandler,
+    ResearchCycleClock cycleClock)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        cycleClock.NextCycle(timeProvider.GetUtcNow() + settings.Value.FirstCycleDelay);
         await Task.Delay(settings.Value.FirstCycleDelay, timeProvider, stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -27,6 +31,9 @@ internal sealed class SearchJob(
             // does) stop the whole API.
             try
             {
+                await resolveHandler
+                    .Handle(new ResolveAwaitingBatchesCommand(), stoppingToken)
+                    .TapError(logger.ResolveCycleFailed);
                 await handler
                     .Handle(new SearchTopicsCommand(), stoppingToken)
                     .TapError(logger.SearchCycleFailed);
@@ -42,6 +49,7 @@ internal sealed class SearchJob(
                 logger.SearchCycleCrashed(ex);
             }
 
+            cycleClock.NextCycle(timeProvider.GetUtcNow() + settings.Value.SearchCycleInterval);
             await Task.Delay(settings.Value.SearchCycleInterval, timeProvider, stoppingToken);
         }
     }

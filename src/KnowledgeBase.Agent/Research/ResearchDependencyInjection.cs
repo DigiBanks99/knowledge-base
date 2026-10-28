@@ -42,6 +42,7 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<ScoutTools>()
                 .AddSingleton<IResearchNoteWriter, ResearchNoteWriter>()
                 .AddSingleton<TriageResultsCommandHandler>()
+                .AddSingleton<ResolveAwaitingBatchesCommandHandler>()
                 .AddSingleton<ModelGate>()
                 .AddHostedService<CurationJob>()
                 .AddSingleton<SearxngSearchSource>()
@@ -63,7 +64,8 @@ internal static class ResearchDependencyInjection
                 .AddHostedService<SearchJob>()
                 // Singletons, so each keeps its last probe between the status publisher's runs.
                 .AddSingleton<SearchSourceHealthCheck<SearxngSearchSource>>()
-                .AddSingleton<SearchSourceHealthCheck<HackerNewsSearchSource>>();
+                .AddSingleton<SearchSourceHealthCheck<HackerNewsSearchSource>>()
+                .AddSingleton<ResearchCycleClock>();
 
             builder.Services.AddHttpClient(SearxngSearchSource.HttpClientName, client => client.Timeout = SearchTimeout);
             // Algolia asks API users to identify themselves; the default HttpClient sends no user agent at all.
@@ -80,7 +82,8 @@ internal static class ResearchDependencyInjection
             builder.Services
                 .AddHealthChecks()
                 .AddStatusSignal<SearchSourceHealthCheck<SearxngSearchSource>>($"Search: {SearxngSearchSource.SourceName}")
-                .AddStatusSignal<SearchSourceHealthCheck<HackerNewsSearchSource>>($"Search: {HackerNewsSearchSource.SourceName}");
+                .AddStatusSignal<SearchSourceHealthCheck<HackerNewsSearchSource>>($"Search: {HackerNewsSearchSource.SourceName}")
+                .AddStatusSignal<ResearchLoopHealthCheck>(ResearchLoopHealthCheck.Name);
 
             // Only llama-server can count tokens for the model it has loaded; another provider's context is far larger
             // than a curation prompt, so an estimate is enough there.

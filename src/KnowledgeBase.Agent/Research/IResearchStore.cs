@@ -100,6 +100,18 @@ internal interface IResearchStore
     /// </summary>
     Task<Result<Maybe<ResearchBatch>, Error>> CompleteBatchAsync(string topic, CancellationToken cancellationToken);
 
+    /// <summary>The batches awaiting the ThreadWeaver's outcome, at most one per topic, skipping any that cannot be read.</summary>
+    Task<Result<IReadOnlyList<AwaitingBatch>, Error>> ListAwaitingBatchesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves the topic's awaiting batch to completed, once its outcome is known. None, with nothing moved, when the topic
+    /// has no awaiting batch.
+    /// </summary>
+    Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(string topic, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the completed batches written before <paramref name="olderThan"/>, and says how many.</summary>
+    Task<Result<int, Error>> PruneCompletedBatchesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
+
     /// <summary>The domains the author blocked, or none when none have been written yet.</summary>
     Task<Result<BlockedDomains, Error>> ReadBlockedDomainsAsync(CancellationToken cancellationToken);
 }

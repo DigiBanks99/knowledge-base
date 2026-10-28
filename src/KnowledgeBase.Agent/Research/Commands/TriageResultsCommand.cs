@@ -266,7 +266,11 @@ internal sealed class TriageResultsCommandHandler(
         if (kept.Length == 0)
         {
             logger.TopicTriagedEmpty(topic, batch.Results.Count);
-            return await store.CompleteBatchAsync(topic, cancellationToken).Map(_ => Finish.Completed);
+            // Nothing to ingest, so there is no outcome to wait for: the topic backs off now, as for a note that filed nothing.
+            return await store
+                .UpdateTopicAsync(topic, current => Result.Success<Maybe<ResearchTopic>, Error>(current.Select(existing => existing.Empty())), cancellationToken)
+                .Bind(_ => store.CompleteBatchAsync(topic, cancellationToken))
+                .Map(_ => Finish.Completed);
         }
 
         ResearchNote note = ResearchNote.Build(batch, kept);

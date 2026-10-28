@@ -64,7 +64,8 @@ internal sealed class IngestFactsCommandHandler(
                 origin,
                 document?.Topic,
                 token => threadWeaver.RunAsync(prompt, cancellationToken: token),
-                cancellationToken);
+                cancellationToken,
+                document?.SourceNote);
         }
 
         if (run.IsFailure)
