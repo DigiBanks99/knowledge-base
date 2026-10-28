@@ -58,6 +58,20 @@ public sealed class ResearchSettings
     /// </summary>
     public int TriageContentTokenBudget { get; init; } = 2500;
 
+    /// <summary>
+    /// Whether the Scout triages fetched results. Off, the search cycle is a dry run: results are searched and fetched
+    /// and left pending, to be inspected before the loop closes.
+    /// </summary>
+    public bool ScoutEnabled { get; init; } = true;
+
+    /// <summary>The most Scout runs (one per result) in one research cycle, so triage never queues unbounded model time.</summary>
+    public int ScoutRunsPerCycle { get; init; } = 10;
+
+    /// <summary>
+    /// The most tokens a Scout prompt may hold. A prompt over it is not run rather than letting the server truncate it.
+    /// </summary>
+    public int ScoutPromptTokenBudget { get; init; } = 6000;
+
     /// <summary>The largest page the fetcher reads; anything larger is recorded as a failed fetch.</summary>
     public long FetchMaxBytes { get; init; } = 2 * 1024 * 1024;
 

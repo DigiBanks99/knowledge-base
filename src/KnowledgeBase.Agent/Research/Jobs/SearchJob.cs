@@ -7,14 +7,15 @@ namespace KnowledgeBase.Agent.Research.Jobs;
 /// <summary>
 /// Runs a search cycle shortly after start, then again <see cref="ResearchSettings.SearchCycleInterval"/> after each
 /// one finishes, so cycles never overlap however long one takes. A cycle searches the due topics, then fetches the
-/// pages of every pending batch, including any a restart interrupted.
+/// pages of every pending batch, including any a restart interrupted, and has the Scout judge the fetched results.
 /// </summary>
 internal sealed class SearchJob(
     ILogger<SearchJob> logger,
     IOptions<ResearchSettings> settings,
     TimeProvider timeProvider,
     SearchTopicsCommandHandler handler,
-    FetchPendingResultsCommandHandler fetchHandler)
+    FetchPendingResultsCommandHandler fetchHandler,
+    TriageResultsCommandHandler triageHandler)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,6 +33,9 @@ internal sealed class SearchJob(
                 await fetchHandler
                     .Handle(new FetchPendingResultsCommand(), stoppingToken)
                     .TapError(logger.FetchCycleFailed);
+                await triageHandler
+                    .Handle(new TriageResultsCommand(), stoppingToken)
+                    .TapError(logger.TriageCycleFailed);
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {

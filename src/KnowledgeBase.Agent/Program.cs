@@ -29,7 +29,9 @@ builder
     .ConfigureAgent(KnownAgents.Librarian, includeWikiRules: true)
         .WithTools(toolsBuilder => toolsBuilder.WithReadFileTools())
     .ConfigureAgent(KnownAgents.Pleb, roleOnly: true)
-        .WithTools(toolsBuilder => toolsBuilder.WithPlebTools());
+        .WithTools(toolsBuilder => toolsBuilder.WithPlebTools())
+    .ConfigureAgent(KnownAgents.Scout, roleOnly: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithScoutTools());
 
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

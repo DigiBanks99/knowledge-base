@@ -6,6 +6,7 @@ using KnowledgeBase.Agent.Research.Jobs;
 using KnowledgeBase.Agent.Research.Queries;
 using KnowledgeBase.Agent.Research.Search;
 using KnowledgeBase.Agent.Research.Tools;
+using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Status;
 
@@ -38,6 +39,9 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<KeepTopicQueriesCommandHandler>()
                 .AddSingleton<CurateTopicsCommandHandler>()
                 .AddSingleton<PlebTools>()
+                .AddSingleton<ScoutTools>()
+                .AddSingleton<IResearchNoteWriter, ResearchNoteWriter>()
+                .AddSingleton<TriageResultsCommandHandler>()
                 .AddSingleton<ModelGate>()
                 .AddHostedService<CurationJob>()
                 .AddSingleton<SearxngSearchSource>()
@@ -80,11 +84,11 @@ internal static class ResearchDependencyInjection
 
             // Only llama-server can count tokens for the model it has loaded; another provider's context is far larger
             // than a curation prompt, so an estimate is enough there.
-            bool plebIsLocal = string.Equals(
-                builder.Configuration[$"{KnownAgents.Pleb}:{nameof(AgentModelOptions.Provider)}"],
+            bool researchIsLocal = new[] { KnownAgents.Pleb, KnownAgents.Scout }.Any(agent => string.Equals(
+                builder.Configuration[$"{agent}:{nameof(AgentModelOptions.Provider)}"],
                 nameof(ModelProvider.OpenAICompatible),
-                StringComparison.OrdinalIgnoreCase);
-            if (plebIsLocal)
+                StringComparison.OrdinalIgnoreCase));
+            if (researchIsLocal)
             {
                 builder.Services
                     .AddSingleton<IPromptTokenCounter, LlamaServerTokenCounter>()

@@ -90,4 +90,22 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Error, "The fetch step of the search cycle failed: {Error}")]
     public static partial void FetchCycleFailed(this ILogger logger, Error error);
+
+    [LoggerMessage(LogLevel.Information, "Skipping the triage cycle: the model server is not healthy.")]
+    public static partial void TriageSkippedModelServerUnhealthy(this ILogger logger);
+
+    [LoggerMessage(LogLevel.Warning, "A result of research topic '{Topic}' ({Url}) was left unjudged: {Error}")]
+    public static partial void ResultLeftWaiting(this ILogger logger, string topic, string url, Error error);
+
+    [LoggerMessage(LogLevel.Warning, "A result of research topic '{Topic}' ({Url}) got no verdict and counts as discarded: {Reason}")]
+    public static partial void ResultNotJudged(this ILogger logger, string topic, string url, string reason);
+
+    [LoggerMessage(LogLevel.Information, "Triaged research topic '{Topic}': {Kept} of {Count} results kept in note '{Note}'.")]
+    public static partial void TopicTriaged(this ILogger logger, string topic, int kept, int count, string note);
+
+    [LoggerMessage(LogLevel.Information, "Triaged research topic '{Topic}': all {Count} results were discarded.")]
+    public static partial void TopicTriagedEmpty(this ILogger logger, string topic, int count);
+
+    [LoggerMessage(LogLevel.Error, "The triage cycle failed: {Error}")]
+    public static partial void TriageCycleFailed(this ILogger logger, Error error);
 }

@@ -34,5 +34,7 @@ public class WikiConfigurationSettings
     public string CurationFailedDirectory => Path.Combine(CurationDirectory, "failed");
     public string BatchesDirectory => Path.Combine(ResearchDirectory, "batches");
     public string PendingBatchesDirectory => Path.Combine(BatchesDirectory, "pending");
+    public string AwaitingBatchesDirectory => Path.Combine(BatchesDirectory, "awaiting");
+    public string CompletedBatchesDirectory => Path.Combine(BatchesDirectory, "completed");
     public string BlockedDomainsPath => Path.Combine(ResearchDirectory, "domains.json");
 }

@@ -343,6 +343,71 @@ public sealed class ResearchStoreTests : IDisposable
     }
 
     [Test]
+    public async Task APendingBatchIsAwaitingIngestion()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+
+        Result<Maybe<AwaitingBatch>, Error> awaiting = await _store.AwaitBatchAsync("projects/garden", "research-projects--garden.md", Discovered, CancellationToken.None);
+        ResearchStore restarted = new(Options.Create(_settings));
+        Result<IReadOnlySet<string>, Error> inFlight = await restarted.ListTopicsInFlightAsync(CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> pending = await restarted.ReadPendingBatchAsync("projects/garden", CancellationToken.None);
+
+        ItShouldMoveTheBatchToTheAwaitingBatches();
+        ItShouldKeepTheTopicInFlight();
+        ItShouldNoLongerBePending();
+
+        void ItShouldMoveTheBatchToTheAwaitingBatches()
+        {
+            awaiting.Value.Value.NoteFile.ShouldBe("research-projects--garden.md");
+            TestWiki.FileNames(_settings.AwaitingBatchesDirectory).ShouldBe(["projects--garden.json"]);
+            TestWiki.FileNames(_settings.PendingBatchesDirectory).ShouldBeEmpty();
+        }
+
+        void ItShouldKeepTheTopicInFlight() => inFlight.Value.ShouldBe(["projects/garden"]);
+
+        void ItShouldNoLongerBePending() => pending.Value.HasNoValue.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task APendingBatchHasNothingKept()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+
+        Result<Maybe<ResearchBatch>, Error> completed = await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        Result<IReadOnlySet<string>, Error> inFlight = await _store.ListTopicsInFlightAsync(CancellationToken.None);
+
+        ItShouldMoveTheBatchToTheCompletedBatches();
+        ItShouldFreeTheTopic();
+
+        void ItShouldMoveTheBatchToTheCompletedBatches()
+        {
+            completed.Value.HasValue.ShouldBeTrue();
+            TestWiki.FileNames(_settings.CompletedBatchesDirectory).ShouldBe(["projects--garden-20261025-093000.json"]);
+            TestWiki.FileNames(_settings.PendingBatchesDirectory).ShouldBeEmpty();
+        }
+
+        void ItShouldFreeTheTopic() => inFlight.Value.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ABatchIsMovedThatIsGone()
+    {
+        Result<Maybe<AwaitingBatch>, Error> awaiting = await _store.AwaitBatchAsync("projects/garden", "note.md", Discovered, CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> completed = await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+
+        ItShouldMoveNothing();
+
+        void ItShouldMoveNothing()
+        {
+            awaiting.Value.HasNoValue.ShouldBeTrue();
+            completed.Value.HasNoValue.ShouldBeTrue();
+            Directory.Exists(_settings.AwaitingBatchesDirectory).ShouldBeFalse();
+        }
+    }
+
+    [Test]
     public async Task APendingBatchIsCorrupt()
     {
         Directory.CreateDirectory(_settings.PendingBatchesDirectory);

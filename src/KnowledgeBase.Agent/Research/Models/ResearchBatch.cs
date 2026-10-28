@@ -3,7 +3,32 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// <summary>A result kept by a topic's search, with the query that found it.</summary>
 /// <param name="Url">The result's normalised URL, under which the topic records it as seen.</param>
 /// <param name="Page">The fetched page, or null while it waits to be fetched.</param>
-public sealed record BatchResult(string Query, string Url, SearchResult Result, FetchedPage? Page = null);
+/// <param name="Verdict">The Scout's verdict, or null while the result waits to be judged. A judged result is never judged again.</param>
+public sealed record BatchResult(string Query, string Url, SearchResult Result, FetchedPage? Page = null, ScoutVerdict? Verdict = null);
+
+/// <summary>
+/// What the Scout decided about one result. A kept result carries the Scout's own summary and quotes (never the page's
+/// text, which may hold instructions aimed at later agents); a discard carries its reason.
+/// </summary>
+/// <param name="Failure">Why there is no real verdict, when the result was discarded for lack of one.</param>
+public sealed record ScoutVerdict(
+    bool Kept,
+    string? Summary,
+    IReadOnlyList<string> Quotes,
+    string? Reason,
+    DateTimeOffset JudgedAt,
+    string? Failure = null)
+{
+    public static ScoutVerdict Keep(string summary, IReadOnlyList<string> quotes, DateTimeOffset judgedAt) =>
+        new(true, summary, quotes, null, judgedAt);
+
+    public static ScoutVerdict Discard(string reason, DateTimeOffset judgedAt) =>
+        new(false, null, [], reason, judgedAt);
+
+    /// <summary>A discard because no verdict could be had, which says nothing about the result itself.</summary>
+    public static ScoutVerdict Failed(string failure, DateTimeOffset judgedAt) =>
+        new(false, null, [], null, judgedAt, failure);
+}
 
 /// <summary>
 /// What fetching a result's page gave: its main content as markdown, or why there is none. A fetch that failed is
@@ -24,3 +49,10 @@ public sealed record FetchedPage(DateTimeOffset FetchedAt, string? Markdown, boo
 /// searched again.
 /// </summary>
 public sealed record ResearchBatch(string Topic, DateTimeOffset SearchedAt, IReadOnlyList<BatchResult> Results);
+
+/// <summary>
+/// A batch whose kept results were written to a research note, waiting for the ThreadWeaver to file it. The topic stays
+/// in flight until its outcome is known.
+/// </summary>
+/// <param name="NoteFile">The name of the note in the notes folders, by which its run is found.</param>
+public sealed record AwaitingBatch(ResearchBatch Batch, string NoteFile, DateTimeOffset NotedAt);

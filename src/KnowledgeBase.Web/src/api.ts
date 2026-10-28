@@ -13,9 +13,9 @@ export interface NoteDetail {
   content: string
 }
 
-export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb'
+export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb' | 'Scout'
 export type AgentRunStatus = 'Running' | 'Succeeded' | 'Failed'
-export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'ReviewRequest' | 'Findings'
+export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'Triage' | 'ReviewRequest' | 'Findings'
 export interface AgentToolCall {
   tool: string
   target: string | null

@@ -48,6 +48,74 @@ public sealed class ModelGateTests : IDisposable
     }
 
     [Test]
+    public async Task ThePlebAndTheScoutWaitForTheModel()
+    {
+        TaskCompletionSource releaseFirst = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource firstStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        List<string> order = [];
+
+        Task first = _gate.RunAsync(async _ =>
+        {
+            firstStarted.SetResult();
+            await releaseFirst.Task;
+            return 0;
+        }, CancellationToken.None);
+        await firstStarted.Task;
+        Task pleb = _gate.RunAsync(_ => Record("Pleb"), CancellationToken.None);
+        Task scout = _gate.RunAsync(_ => Record("Scout"), CancellationToken.None, ModelPriority.High);
+        releaseFirst.SetResult();
+        await Task.WhenAll(first, pleb, scout);
+
+        ItShouldRunTheScoutFirst();
+
+        void ItShouldRunTheScoutFirst() => order.ShouldBe(["Scout", "Pleb"]);
+
+        Task<int> Record(string who)
+        {
+            order.Add(who);
+            return Task.FromResult(0);
+        }
+    }
+
+    [Test]
+    public async Task AWaitingRunIsCancelled()
+    {
+        TaskCompletionSource releaseFirst = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource firstStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenSource cancellation = new();
+        bool cancelledRunStarted = false;
+
+        Task first = _gate.RunAsync(async _ =>
+        {
+            firstStarted.SetResult();
+            await releaseFirst.Task;
+            return 0;
+        }, CancellationToken.None);
+        await firstStarted.Task;
+        Task cancelled = _gate.RunAsync(_ =>
+        {
+            cancelledRunStarted = true;
+            return Task.FromResult(0);
+        }, cancellation.Token);
+        await cancellation.CancelAsync();
+        Exception? error = await Catch.ExceptionAsync(() => cancelled);
+        releaseFirst.SetResult();
+        await first;
+        int next = await _gate.RunAsync(_ => Task.FromResult(2), CancellationToken.None);
+
+        ItShouldNeverRunIt();
+        ItShouldNotKeepTheModelFromTheNextRun();
+
+        void ItShouldNeverRunIt()
+        {
+            error.ShouldBeAssignableTo<OperationCanceledException>();
+            cancelledRunStarted.ShouldBeFalse();
+        }
+
+        void ItShouldNotKeepTheModelFromTheNextRun() => next.ShouldBe(2);
+    }
+
+    [Test]
     public async Task ARunFails()
     {
         Exception? exception = await Catch.ExceptionAsync(() => _gate.RunAsync<int>(_ => throw new InvalidOperationException("Boom."), CancellationToken.None));
