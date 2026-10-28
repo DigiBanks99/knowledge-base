@@ -303,6 +303,46 @@ public sealed class ResearchStoreTests : IDisposable
     }
 
     [Test]
+    public async Task APendingResultIsFetched()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+        FetchedPage page = FetchedPage.Content(Discovered, "# Raised beds", truncated: false);
+
+        Result<Maybe<ResearchBatch>, Error> updated = await _store.UpdatePendingBatchAsync(
+            "projects/garden",
+            batch => batch with { Results = [.. batch.Results.Select(result => result with { Page = page })] },
+            CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> read = await new ResearchStore(Options.Create(_settings))
+            .ReadPendingBatchAsync("projects/garden", CancellationToken.None);
+
+        ItShouldKeepThePageWithItsResult();
+
+        void ItShouldKeepThePageWithItsResult()
+        {
+            updated.Value.Value.Results.ShouldAllBe(result => result.Page == page);
+            read.Value.Value.Results.ShouldAllBe(result => result.Page == page);
+        }
+    }
+
+    [Test]
+    public async Task AResultIsFetchedForABatchThatIsGone()
+    {
+        Result<Maybe<ResearchBatch>, Error> updated = await _store.UpdatePendingBatchAsync(
+            "projects/garden",
+            batch => batch,
+            CancellationToken.None);
+
+        ItShouldWriteNoBatch();
+
+        void ItShouldWriteNoBatch()
+        {
+            updated.Value.HasNoValue.ShouldBeTrue();
+            Directory.Exists(_settings.PendingBatchesDirectory).ShouldBeFalse();
+        }
+    }
+
+    [Test]
     public async Task APendingBatchIsCorrupt()
     {
         Directory.CreateDirectory(_settings.PendingBatchesDirectory);

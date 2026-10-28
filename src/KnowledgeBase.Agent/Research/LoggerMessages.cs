@@ -72,4 +72,22 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Error, "The search cycle failed unexpectedly; the next cycle runs as usual.")]
     public static partial void SearchCycleCrashed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(LogLevel.Information, "Fetched the pending results of research topic '{Topic}': {Fetched} fetched, {Failed} could not be.")]
+    public static partial void TopicFetched(this ILogger logger, string topic, int fetched, int failed);
+
+    [LoggerMessage(LogLevel.Information, "A result of research topic '{Topic}' could not be fetched from {Url}: {Error}")]
+    public static partial void PageNotFetched(this ILogger logger, string topic, string url, Error error);
+
+    [LoggerMessage(LogLevel.Warning, "A result of research topic '{Topic}' could not be fetched from {Url}: the fetcher failed unexpectedly.")]
+    public static partial void PageFetchCrashed(this ILogger logger, string topic, string url, Exception exception);
+
+    [LoggerMessage(LogLevel.Warning, "Fetching the pending results of research topic '{Topic}' failed; the next cycle retries: {Error}")]
+    public static partial void FetchFailed(this ILogger logger, string topic, Error error);
+
+    [LoggerMessage(LogLevel.Error, "Fetching the pending results of research topic '{Topic}' failed unexpectedly; the next cycle retries.")]
+    public static partial void FetchCrashed(this ILogger logger, string topic, Exception exception);
+
+    [LoggerMessage(LogLevel.Error, "The fetch step of the search cycle failed: {Error}")]
+    public static partial void FetchCycleFailed(this ILogger logger, Error error);
 }

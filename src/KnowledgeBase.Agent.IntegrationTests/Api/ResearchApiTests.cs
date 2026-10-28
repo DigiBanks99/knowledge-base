@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 
 using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Research;
@@ -156,20 +157,30 @@ public sealed class ResearchApiTests : IDisposable
     public async Task TheAuthorResearchesATopicNow()
     {
         await CurateAsync("projects/garden", "raised beds");
-        _api.Web.Respond = _ => FakeWeb.Json("""
-            { "hits": [ { "objectID": "1", "title": "Building raised beds", "url": "https://example.com/beds", "created_at_i": 4102444800 } ] }
-            """);
+        _api.Web.Respond = request => request.RequestUri!.AbsolutePath switch
+        {
+            "/beds" => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("Raised beds drain well.", Encoding.UTF8, "text/plain") },
+            "/robots.txt" => new HttpResponseMessage(HttpStatusCode.NotFound),
+            _ => FakeWeb.Json("""
+                { "hits": [ { "objectID": "1", "title": "Building raised beds", "url": "https://example.com/beds", "created_at_i": 4102444800 } ] }
+                """)
+        };
 
         HttpResponseMessage response = await _api.Client().PostAsync("/api/research/topics/projects--garden/research", null);
         TopicSearchOutcome outcome = await TestApi.ReadAsync<TopicSearchOutcome>(response);
-        HttpResponseMessage results = await _api.Client().GetAsync("/api/research/topics/projects--garden/results");
-        ResearchBatch batch = await TestApi.ReadAsync<ResearchBatch>(results);
+        ResearchBatch batch = null!;
+        bool fetched = await Eventually.Until(async () =>
+        {
+            batch = await TestApi.ReadAsync<ResearchBatch>(await _api.Client().GetAsync("/api/research/topics/projects--garden/results"));
+            return batch.Results.All(result => result.Page is not null);
+        });
         IReadOnlyList<TopicSummary> topics = await TestApi.ReadAsync<IReadOnlyList<TopicSummary>>(
             await _api.Client().GetAsync("/api/research/topics"));
 
         ItShouldSearchHackerNewsForItsQuery();
         ItShouldReportWhatItKept();
         ItShouldShowThePendingResults();
+        ItShouldFetchTheirPagesInTheBackground();
         ItShouldShowTheTopicAsTriaging();
 
         void ItShouldSearchHackerNewsForItsQuery() =>
@@ -179,6 +190,12 @@ public sealed class ResearchApiTests : IDisposable
 
         void ItShouldShowThePendingResults() =>
             batch.Results.ShouldHaveSingleItem().Result.Title.ShouldBe("Building raised beds");
+
+        void ItShouldFetchTheirPagesInTheBackground()
+        {
+            fetched.ShouldBeTrue();
+            batch.Results.ShouldHaveSingleItem().Page!.Markdown.ShouldBe("Raised beds drain well.");
+        }
 
         void ItShouldShowTheTopicAsTriaging() => topics.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
             topic => topic.State.ShouldBe(TopicState.Triaging),

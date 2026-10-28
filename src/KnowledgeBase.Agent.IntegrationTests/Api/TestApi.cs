@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 
 using KnowledgeBase.Agent.Agents;
 using KnowledgeBase.Agent.Common;
+using KnowledgeBase.Agent.Research;
+using KnowledgeBase.Agent.Research.Fetch;
 using KnowledgeBase.Agent.Research.Search;
 using KnowledgeBase.Agent.Wiki;
 
@@ -85,6 +87,8 @@ internal sealed class TestApi : WebApplicationFactory<Program>
         builder.UseSetting("Authentication:ClientId", "00000000-0000-0000-0000-000000000002");
         builder.UseSetting("Authentication:ClientSecret", "not-a-secret");
         builder.UseSetting("Authentication:AllowedObjectIds:0", OwnerObjectId);
+        // Requests to the fake web need no spacing.
+        builder.UseSetting($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.FetchPolitenessDelay)}", "00:00:00");
         builder.UseSetting(AgentInstructions.SharedInstructionsKey, "Shared instructions.");
         builder.UseSetting(AgentInstructions.WikiRulesKey, "Wiki rules.");
         foreach (string agent in KnownAgentNames)
@@ -123,11 +127,16 @@ internal sealed class TestApi : WebApplicationFactory<Program>
                 services.AddKeyedSingleton<AIAgent>(agent.Name, agent);
             }
 
-            // The search sources (and their status signals) answer from the fake web instead of the internet.
-            foreach (string client in new[] { SearxngSearchSource.HttpClientName, HackerNewsSearchSource.HttpClientName })
+            // The search sources (and their status signals) and the page fetcher answer from the fake web instead of
+            // the internet, and every host it names resolves to a public address without asking DNS. The fetcher's
+            // own SSRF guard still checks each request.
+            foreach (string client in new[] { SearxngSearchSource.HttpClientName, HackerNewsSearchSource.HttpClientName, PageFetcher.HttpClientName })
             {
                 services.AddHttpClient(client).ConfigurePrimaryHttpMessageHandler(() => new FakeWeb.Handler(Web));
             }
+
+            services.RemoveAll<IHostResolver>();
+            services.AddSingleton<IHostResolver, FakeWeb.Resolver>();
         });
     }
 

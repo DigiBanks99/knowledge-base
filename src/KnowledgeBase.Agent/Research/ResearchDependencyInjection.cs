@@ -1,6 +1,7 @@
 using KnowledgeBase.Agent.Agents;
 using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Curation;
+using KnowledgeBase.Agent.Research.Fetch;
 using KnowledgeBase.Agent.Research.Jobs;
 using KnowledgeBase.Agent.Research.Queries;
 using KnowledgeBase.Agent.Research.Search;
@@ -47,6 +48,14 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<SearchTopicsCommandHandler>()
                 .AddSingleton<ResearchTopicNowCommandHandler>()
                 .AddSingleton<GetTopicResultsQueryHandler>()
+                .AddSingleton<IHostResolver, DnsHostResolver>()
+                .AddSingleton<FetchTarget>()
+                .AddSingleton<PolitenessGate>()
+                .AddSingleton<IContentExtractor, ReadabilityExtractor>()
+                .AddSingleton<ContentBudget>()
+                .AddSingleton<IPageFetcher, PageFetcher>()
+                .AddSingleton<PendingResultFetch>()
+                .AddSingleton<FetchPendingResultsCommandHandler>()
                 .AddHostedService<SearchJob>()
                 // Singletons, so each keeps its last probe between the status publisher's runs.
                 .AddSingleton<SearchSourceHealthCheck<SearxngSearchSource>>()
@@ -57,8 +66,13 @@ internal static class ResearchDependencyInjection
             builder.Services.AddHttpClient(HackerNewsSearchSource.HttpClientName, client =>
             {
                 client.Timeout = SearchTimeout;
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("KnowledgeBase-Research/1.0 (+https://github.com/DigiBanks99/knowledge-base)");
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(PageFetcher.UserAgent);
             });
+            // The fetcher bounds each request itself (and re-arms the bound per redirect), so the client's own timeout
+            // is off; its handler is the SSRF guard's, which connects only to vetted public addresses.
+            builder.Services
+                .AddHttpClient(PageFetcher.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+                .ConfigurePrimaryHttpMessageHandler(services => services.GetRequiredService<FetchTarget>().CreateHandler());
             builder.Services
                 .AddHealthChecks()
                 .AddStatusSignal<SearchSourceHealthCheck<SearxngSearchSource>>($"Search: {SearxngSearchSource.SourceName}")

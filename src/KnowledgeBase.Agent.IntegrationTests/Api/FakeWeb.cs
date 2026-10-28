@@ -2,10 +2,12 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 
+using KnowledgeBase.Agent.Research.Fetch;
+
 namespace KnowledgeBase.Agent.IntegrationTests.Api;
 
 /// <summary>
-/// Stands in for the internet the search sources reach: every request is recorded and answered with
+/// Stands in for the internet the search sources and the page fetcher reach: every request is recorded and answered with
 /// <see cref="Respond"/>, by default an empty Hacker News search.
 /// </summary>
 internal sealed class FakeWeb
@@ -28,5 +30,12 @@ internal sealed class FakeWeb
             web.Requests.Enqueue(request.RequestUri!);
             return Task.FromResult(web.Respond(request));
         }
+    }
+
+    /// <summary>Resolves every host to one public address, so the page fetcher's guard never asks real DNS.</summary>
+    internal sealed class Resolver : IHostResolver
+    {
+        public Task<IPAddress[]> ResolveAsync(string host, CancellationToken cancellationToken) =>
+            Task.FromResult<IPAddress[]>([IPAddress.Parse("93.184.215.14")]);
     }
 }

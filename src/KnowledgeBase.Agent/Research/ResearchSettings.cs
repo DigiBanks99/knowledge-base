@@ -51,4 +51,22 @@ public sealed class ResearchSettings
 
     /// <summary>The Hacker News Algolia search API.</summary>
     public Uri HackerNewsEndpoint { get; init; } = new("https://hn.algolia.com/api/v1/");
+
+    /// <summary>
+    /// The most tokens of a fetched page kept for triage; longer content is cut at a paragraph. It leaves room in the
+    /// Scout's context for its instructions and the topic brief.
+    /// </summary>
+    public int TriageContentTokenBudget { get; init; } = 2500;
+
+    /// <summary>The largest page the fetcher reads; anything larger is recorded as a failed fetch.</summary>
+    public long FetchMaxBytes { get; init; } = 2 * 1024 * 1024;
+
+    /// <summary>How long one request of the fetcher may take, from sending it to reading the last byte.</summary>
+    public TimeSpan FetchTimeout { get; init; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>The least time between two requests to the same host.</summary>
+    public TimeSpan FetchPolitenessDelay { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>How many redirects the fetcher follows for one page.</summary>
+    public int FetchMaxRedirects { get; init; } = 5;
 }

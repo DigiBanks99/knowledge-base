@@ -15,7 +15,9 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="ReverseMarkdown" />
     <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="SmartReader" />
   </ItemGroup>
 
   <!-- The deployed image needs git for the wiki's version history. The CD workflow builds a base image that adds it
