@@ -54,4 +54,22 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Error, "The curation cycle failed: {Error}")]
     public static partial void CurationCycleFailed(this ILogger logger, Error error);
+
+    [LoggerMessage(LogLevel.Information, "Searching {Count} due research topics.")]
+    public static partial void SearchingTopics(this ILogger logger, int count);
+
+    [LoggerMessage(LogLevel.Information, "Searched research topic '{Topic}': {Found} results found, {Kept} kept for triage.")]
+    public static partial void TopicSearched(this ILogger logger, string topic, int found, int kept);
+
+    [LoggerMessage(LogLevel.Warning, "A search source failed while searching research topic '{Topic}': {Error}")]
+    public static partial void SearchSourceFailed(this ILogger logger, string topic, Error error);
+
+    [LoggerMessage(LogLevel.Warning, "The search of research topic '{Topic}' failed; it stays due: {Error}")]
+    public static partial void TopicSearchFailed(this ILogger logger, string topic, Error error);
+
+    [LoggerMessage(LogLevel.Error, "The search cycle failed: {Error}")]
+    public static partial void SearchCycleFailed(this ILogger logger, Error error);
+
+    [LoggerMessage(LogLevel.Error, "The search cycle failed unexpectedly; the next cycle runs as usual.")]
+    public static partial void SearchCycleCrashed(this ILogger logger, Exception exception);
 }

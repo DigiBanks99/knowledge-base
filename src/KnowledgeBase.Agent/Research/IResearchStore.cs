@@ -53,4 +53,28 @@ internal interface IResearchStore
 
     /// <summary>The curations that failed, at most one per topic.</summary>
     Task<Result<IReadOnlyList<FailedCuration>, Error>> ListFailedCurationsAsync(CancellationToken cancellationToken);
+
+    /// <summary>A topic's state, or none for an unknown topic.</summary>
+    Task<Result<Maybe<ResearchTopic>, Error>> ReadTopicAsync(string topic, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The topics with a batch waiting for the Scout, from the batch files' names, so a batch that cannot be read still
+    /// counts as waiting.
+    /// </summary>
+    Task<Result<IReadOnlySet<string>, Error>> ListTopicsInFlightAsync(CancellationToken cancellationToken);
+
+    /// <summary>The batches waiting for the Scout, at most one per topic, skipping any that cannot be read.</summary>
+    Task<Result<IReadOnlyList<ResearchBatch>, Error>> ListPendingBatchesAsync(CancellationToken cancellationToken);
+
+    /// <summary>The topic's batch waiting for the Scout, or none.</summary>
+    Task<Result<Maybe<ResearchBatch>, Error>> ReadPendingBatchAsync(string topic, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Writes a search's batch for the Scout, unless the topic has been pruned meanwhile, in which case nothing is
+    /// written and none is returned.
+    /// </summary>
+    Task<Result<Maybe<ResearchBatch>, Error>> WritePendingBatchAsync(ResearchBatch batch, CancellationToken cancellationToken);
+
+    /// <summary>The domains the author blocked, or none when none have been written yet.</summary>
+    Task<Result<BlockedDomains, Error>> ReadBlockedDomainsAsync(CancellationToken cancellationToken);
 }

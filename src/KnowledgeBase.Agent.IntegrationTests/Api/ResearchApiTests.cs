@@ -5,6 +5,7 @@ using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Search;
 
 namespace KnowledgeBase.Agent.IntegrationTests.Api;
 
@@ -150,6 +151,84 @@ public sealed class ResearchApiTests : IDisposable
 
         void ItShouldBeRefused() => response.StatusCode.ShouldBe(status);
     }
+
+    [Test]
+    public async Task TheAuthorResearchesATopicNow()
+    {
+        await CurateAsync("projects/garden", "raised beds");
+        _api.Web.Respond = _ => FakeWeb.Json("""
+            { "hits": [ { "objectID": "1", "title": "Building raised beds", "url": "https://example.com/beds", "created_at_i": 4102444800 } ] }
+            """);
+
+        HttpResponseMessage response = await _api.Client().PostAsync("/api/research/topics/projects--garden/research", null);
+        TopicSearchOutcome outcome = await TestApi.ReadAsync<TopicSearchOutcome>(response);
+        HttpResponseMessage results = await _api.Client().GetAsync("/api/research/topics/projects--garden/results");
+        ResearchBatch batch = await TestApi.ReadAsync<ResearchBatch>(results);
+        IReadOnlyList<TopicSummary> topics = await TestApi.ReadAsync<IReadOnlyList<TopicSummary>>(
+            await _api.Client().GetAsync("/api/research/topics"));
+
+        ItShouldSearchHackerNewsForItsQuery();
+        ItShouldReportWhatItKept();
+        ItShouldShowThePendingResults();
+        ItShouldShowTheTopicAsTriaging();
+
+        void ItShouldSearchHackerNewsForItsQuery() =>
+            _api.Web.Requests.ShouldContain(uri => uri.AbsoluteUri.Contains("search_by_date?query=raised%20beds", StringComparison.Ordinal));
+
+        void ItShouldReportWhatItKept() => outcome.ShouldBe(new TopicSearchOutcome("projects/garden", 1, 1));
+
+        void ItShouldShowThePendingResults() =>
+            batch.Results.ShouldHaveSingleItem().Result.Title.ShouldBe("Building raised beds");
+
+        void ItShouldShowTheTopicAsTriaging() => topics.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            topic => topic.State.ShouldBe(TopicState.Triaging),
+            topic => topic.PendingResults.ShouldBe(1));
+    }
+
+    [Test]
+    public async Task TheAuthorResearchesATopicThePlebHasNotCurated()
+    {
+        await DiscoverAsync("projects/garden");
+
+        HttpResponseMessage response = await _api.Client().PostAsync("/api/research/topics/projects--garden/research", null);
+
+        ItShouldBeAConflict();
+
+        void ItShouldBeAConflict() => response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    [Test]
+    public async Task TheAuthorResearchesATopicWithoutTheCsrfHeader()
+    {
+        await CurateAsync("projects/garden", "raised beds");
+
+        HttpResponseMessage response = await _api.Client(sendsCsrfHeader: false).PostAsync("/api/research/topics/projects--garden/research", null);
+
+        ItShouldBeRefused();
+        ItShouldSearchNothing();
+
+        void ItShouldBeRefused() => response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        void ItShouldSearchNothing() => _api.Web.Requests.ShouldNotContain(uri => uri.AbsolutePath.EndsWith("search_by_date", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task TheResultsOfATopicWithNoneWaitingAreRequested()
+    {
+        await DiscoverAsync("projects/garden");
+
+        HttpResponseMessage response = await _api.Client().GetAsync("/api/research/topics/projects--garden/results");
+
+        ItShouldBeNotFound();
+
+        void ItShouldBeNotFound() => response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    private async Task CurateAsync(string topic, string query) =>
+        await _api.Get<IResearchStore>().UpdateTopicAsync(
+            topic,
+            _ => Maybe.From(ResearchTopic.New(topic, DateTimeOffset.UnixEpoch) with { Brief = "A topic.", Queries = [query] }),
+            CancellationToken.None);
 
     private async Task DiscoverAsync(params string[] topics)
     {

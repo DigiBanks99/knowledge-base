@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 
 using KnowledgeBase.Agent.Agents;
 using KnowledgeBase.Agent.Common;
+using KnowledgeBase.Agent.Research.Search;
 using KnowledgeBase.Agent.Wiki;
 
 using Microsoft.Agents.AI;
@@ -26,8 +27,8 @@ namespace KnowledgeBase.Agent.IntegrationTests.Api;
 
 /// <summary>
 /// The whole API, started from <c>Program</c> over a temporary wiki root. Only what needs the outside world is
-/// replaced: Entra sign-in by <see cref="TestSignIn"/>, Redis by an in-memory output cache and every agent by a
-/// <see cref="FakeAgent"/>. The rest (authorization, the CSRF check, routing, the watchers) runs as in production.
+/// replaced: Entra sign-in by <see cref="TestSignIn"/>, Redis by an in-memory output cache, every agent by a
+/// <see cref="FakeAgent"/> and the web the search sources reach by <see cref="FakeWeb"/>. The rest (authorization, the CSRF check, routing, the watchers) runs as in production.
 /// </summary>
 internal sealed class TestApi : WebApplicationFactory<Program>
 {
@@ -121,8 +122,17 @@ internal sealed class TestApi : WebApplicationFactory<Program>
             {
                 services.AddKeyedSingleton<AIAgent>(agent.Name, agent);
             }
+
+            // The search sources (and their status signals) answer from the fake web instead of the internet.
+            foreach (string client in new[] { SearxngSearchSource.HttpClientName, HackerNewsSearchSource.HttpClientName })
+            {
+                services.AddHttpClient(client).ConfigurePrimaryHttpMessageHandler(() => new FakeWeb.Handler(Web));
+            }
         });
     }
+
+    /// <summary>What the search sources' requests are answered with; by default an empty Hacker News search.</summary>
+    public FakeWeb Web { get; } = new();
 
     protected override void Dispose(bool disposing)
     {

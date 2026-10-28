@@ -83,7 +83,10 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 
 `{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian` and `Pleb`. The Pleb defaults to
 the local model (`OpenAICompatible`, thinking off) and is instructed with its role only; its curation cycle is tuned
-with the API's `Research:*` settings (`ResearchSettings`). The provider and
+with the API's `Research:*` settings (`ResearchSettings`). Those also tune the search cycle: every
+`Research:SearchCycleInterval` (6 hours after the last one finished) up to `Research:TopicsPerCycle` due topics are
+searched on a self-hosted SearXNG, which the AppHost runs from a pinned image (upgrade it by changing the tag in
+`src/KnowledgeBase.AppHost/searxng/Dockerfile`), and on Hacker News. The provider and
 OpenAI-compatible defaults live in the AppHost's `appsettings.json`; override them with user secrets or
 `Parameters__*` environment variables. `AnthropicApiKey` is still required by the AppHost, so set a placeholder
 when no agent uses Anthropic.
@@ -208,6 +211,7 @@ Docker Compose:
 | API and UI     | `127.0.0.1:7321`               | Host network; a Cloudflare tunnel forwards the public host. |
 | Redis          | `127.0.0.1:7322`               | Output cache.                                               |
 | Aspire dashboard | `127.0.0.1:7323` (OTLP `7324`) | Reach it with `ssh -L 7323:127.0.0.1:7323 <vm>`; the login token is in `docker logs`. |
+| SearXNG        | `127.0.0.1:7325`               | Research search; image and settings in [`src/KnowledgeBase.AppHost/searxng`](src/KnowledgeBase.AppHost/searxng). |
 
 The API container shares the host's network so it reaches llama-server on the VM's loopback
 (`http://127.0.0.1:9931/v1`) without opening it to containers. The wiki root directory on the VM is mounted at

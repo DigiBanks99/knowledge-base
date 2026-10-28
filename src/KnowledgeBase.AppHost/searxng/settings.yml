@@ -1,0 +1,30 @@
+# Only the API reaches this instance, over loopback, so the public-instance protections (the bot limiter and the
+# image proxy) are off. The secret key comes from SEARXNG_SECRET, which the AppHost generates.
+use_default_settings:
+  engines:
+    # Engines that tolerate being queried by a metasearch instance; Google and Startpage answer with captchas.
+    keep_only:
+      - duckduckgo
+      - bing
+      - mojeek
+      - wikipedia
+      - github
+
+general:
+  instance_name: knowledge-base
+
+search:
+  safe_search: 0
+  # The research cycle reads JSON; HTML stays for checking queries by hand.
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "replaced-by-SEARXNG_SECRET"
+  limiter: false
+  image_proxy: false
+  public_instance: false
+
+outgoing:
+  request_timeout: 5.0

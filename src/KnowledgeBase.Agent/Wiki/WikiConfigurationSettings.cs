@@ -32,4 +32,7 @@ public class WikiConfigurationSettings
     public string CurationDirectory => Path.Combine(ResearchDirectory, "curation");
     public string CurationRequestsDirectory => Path.Combine(CurationDirectory, "requests");
     public string CurationFailedDirectory => Path.Combine(CurationDirectory, "failed");
+    public string BatchesDirectory => Path.Combine(ResearchDirectory, "batches");
+    public string PendingBatchesDirectory => Path.Combine(BatchesDirectory, "pending");
+    public string BlockedDomainsPath => Path.Combine(ResearchDirectory, "domains.json");
 }

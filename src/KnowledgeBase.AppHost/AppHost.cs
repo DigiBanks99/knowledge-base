@@ -8,6 +8,7 @@ const int ApiPort = 7321;
 const int RedisPort = 7322;
 const int DashboardPort = 7323;
 const int DashboardOtlpPort = 7324;
+const int SearxngPort = 7325;
 const string ContainerWikiRoot = "/data";
 const string ContainerWikiBackupKeyDirectory = "/run/wiki-backup";
 
@@ -59,10 +60,25 @@ IResourceBuilder<RedisResource> cache = builder
         service.Restart = "unless-stopped";
     });
 
+// The metasearch instance the research cycle queries, built from the pinned image and settings in ./searxng. Its secret
+// is generated like Redis's password, so there is nothing to configure.
+ParameterResource searxngSecret = ParameterResourceBuilderExtensions
+    .CreateDefaultPasswordParameter(builder, "searxng-secret", special: false);
+IResourceBuilder<ContainerResource> searxng = builder
+    .AddDockerfile("searxng", "searxng")
+    .WithHttpEndpoint(targetPort: 8080)
+    .WithEnvironment(context => context.EnvironmentVariables["SEARXNG_SECRET"] = searxngSecret)
+    .PublishAsDockerComposeService((_, service) =>
+    {
+        service.Ports = [$"127.0.0.1:{SearxngPort}:8080"];
+        service.Restart = "unless-stopped";
+    });
+
 IResourceBuilder<ProjectResource> api = builder
     .AddProject<Projects.KnowledgeBase_Agent>("knowledgebase-agent")
     .WithReference(cache)
     .WaitFor(cache)
+    .WithEnvironment("Research__SearxngEndpoint", searxng.GetEndpoint("http"))
     .WithEnvironment("Wiki__RootDirectory", rootDirectory)
     .WithEnvironment("Authentication__TenantId", entraTenantId)
     .WithEnvironment("Authentication__ClientId", entraClientId)
@@ -95,7 +111,8 @@ if (builder.ExecutionContext.IsRunMode)
 
 // The API shares the host's network so it reaches a model server listening on the host's loopback (such as
 // llama-server) without opening that server or the firewall to containers. Redis and the dashboard are therefore
-// addressed through their loopback ports, and the wiki root directory on the host is mounted into the container.
+// addressed through their loopback ports (SearXNG too), and the wiki root directory on the host is mounted into the
+// container.
 api.PublishAsDockerComposeService((resource, service) =>
 {
     service.NetworkMode = "host";
@@ -116,6 +133,7 @@ api.PublishAsDockerComposeService((resource, service) =>
     service.Environment["ConnectionStrings__cache"] =
         $"127.0.0.1:{RedisPort},password={cache.Resource.PasswordParameter!.AsEnvironmentPlaceholder(resource)}";
     service.Environment["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://127.0.0.1:{DashboardOtlpPort}";
+    service.Environment["Research__SearxngEndpoint"] = $"http://127.0.0.1:{SearxngPort}";
 
     // The deploy key folder is mounted read-only, so nothing in the container can change the key or the pinned host
     // keys. Compose refuses a bind mount whose folder does not exist, and backup is optional, so the mount is only
@@ -153,6 +171,7 @@ ContainerTargetPlatform hostPlatform = RuntimeInformation.OSArchitecture == Arch
     : ContainerTargetPlatform.LinuxAmd64;
 api.WithContainerBuildOptions(context => context.TargetPlatform = hostPlatform);
 web.WithContainerBuildOptions(context => context.TargetPlatform = hostPlatform);
+searxng.WithContainerBuildOptions(context => context.TargetPlatform = hostPlatform);
 #pragma warning restore ASPIREPIPELINES003
 
 builder.Build().Run();

@@ -13,7 +13,9 @@ internal static class ResearchEndpoints
                 .MapListDenyList()
                 .MapSetDenyListEntryState()
                 .MapListTopics()
-                .MapSetTopicMuted();
+                .MapSetTopicMuted()
+                .MapResearchTopicNow()
+                .MapGetTopicResults();
 
             return endpoints;
         }
