@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type TopicState, type TopicSummary } from '../api'
-import { Badge, Empty, ErrorMessage, Loading } from '../components'
+import { api, type FetchedPage, type TopicState, type TopicSummary } from '../api'
+import { Badge, Empty, ErrorMessage, Loading, Markdown } from '../components'
 import { formatDate } from '../format'
 
 const stateLabels: Record<TopicState, string> = {
@@ -134,7 +134,7 @@ function PendingResults({ slug, count }: { slug: string; count: number }) {
       {results.isError && <ErrorMessage error={results.error} />}
       {results.data && (
         <ul>
-          {results.data.results.map(({ url, query, result }) => (
+          {results.data.results.map(({ url, query, result, page }) => (
             <li key={url}>
               <a href={result.url} target="_blank" rel="noreferrer noopener">
                 {result.title}
@@ -144,10 +144,27 @@ function PendingResults({ slug, count }: { slug: string; count: number }) {
                 {result.publishedAt ? ` · ${formatDate(result.publishedAt)}` : ''} · for <code>{query}</code>
               </div>
               {result.snippet && <p className="small">{result.snippet}</p>}
+              <FetchedContent page={page} />
             </li>
           ))}
         </ul>
       )}
+    </details>
+  )
+}
+
+/** The page the fetcher reduced a result to, as the Scout will see it, or why there is none. */
+function FetchedContent({ page }: { page: FetchedPage | null }) {
+  if (!page) return <p className="muted small">Page not fetched yet.</p>
+  if (page.error !== null || page.markdown === null)
+    return <p className="muted small fetch-failed">Not fetched: {page.error}</p>
+
+  return (
+    <details className="fetched-content">
+      <summary>
+        Fetched content{page.truncated ? ' (cut to the triage budget)' : ''} · {formatDate(page.fetchedAt)}
+      </summary>
+      <Markdown content={page.markdown} withoutImages />
     </details>
   )
 }
