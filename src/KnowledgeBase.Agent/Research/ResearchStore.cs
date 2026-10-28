@@ -16,6 +16,8 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
     private readonly string _curationRequestsDirectory = settings.Value.CurationRequestsDirectory;
     private readonly string _curationFailedDirectory = settings.Value.CurationFailedDirectory;
     private readonly string _pendingBatchesDirectory = settings.Value.PendingBatchesDirectory;
+    private readonly string _awaitingBatchesDirectory = settings.Value.AwaitingBatchesDirectory;
+    private readonly string _completedBatchesDirectory = settings.Value.CompletedBatchesDirectory;
     private readonly string _blockedDomainsPath = settings.Value.BlockedDomainsPath;
     private readonly SemaphoreSlim _denyListLock = new(1, 1);
 
@@ -159,13 +161,12 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
     {
         try
         {
-            IReadOnlySet<string> topics = Directory.Exists(_pendingBatchesDirectory)
-                ? Directory
-                    .EnumerateFiles(_pendingBatchesDirectory, "*.json")
-                    .Select(filePath => TopicPaths.FromSlug(Path.GetFileNameWithoutExtension(filePath)))
-                    .Choose()
-                    .ToHashSet(StringComparer.Ordinal)
-                : new HashSet<string>();
+            IReadOnlySet<string> topics = new[] { _pendingBatchesDirectory, _awaitingBatchesDirectory }
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(directory, "*.json"))
+                .Select(filePath => TopicPaths.FromSlug(Path.GetFileNameWithoutExtension(filePath)))
+                .Choose()
+                .ToHashSet(StringComparer.Ordinal);
             return Task.FromResult(Result.Success<IReadOnlySet<string>, Error>(topics));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -220,6 +221,61 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
 
             return await WriteDocumentAsync(batchPath, update(current.Value.Value), cancellationToken)
                 .Map(written => Maybe.From(written));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    public async Task<Result<Maybe<AwaitingBatch>, Error>> AwaitBatchAsync(
+        string topic,
+        string noteFile,
+        DateTimeOffset notedAt,
+        CancellationToken cancellationToken)
+    {
+        // The awaiting file is written before the pending one is removed, so a crash between them leaves the batch in
+        // both places (resolved as pending again, which writes the same note) rather than in neither.
+        string pendingPath = TopicFilePath(_pendingBatchesDirectory, topic);
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Result<Maybe<ResearchBatch>, Error> pending = await ReadDocumentAsync<ResearchBatch>(pendingPath, cancellationToken);
+            if (pending.IsFailure || pending.Value.HasNoValue)
+            {
+                return pending.IsFailure ? pending.Error : Maybe<AwaitingBatch>.None;
+            }
+
+            return await WriteDocumentAsync(
+                    TopicFilePath(_awaitingBatchesDirectory, topic),
+                    new AwaitingBatch(pending.Value.Value, noteFile, notedAt),
+                    cancellationToken)
+                .Bind(written => Delete(pendingPath).Map(() => Maybe.From(written)));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
+    public async Task<Result<Maybe<ResearchBatch>, Error>> CompleteBatchAsync(string topic, CancellationToken cancellationToken)
+    {
+        string pendingPath = TopicFilePath(_pendingBatchesDirectory, topic);
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Result<Maybe<ResearchBatch>, Error> pending = await ReadDocumentAsync<ResearchBatch>(pendingPath, cancellationToken);
+            if (pending.IsFailure || pending.Value.HasNoValue)
+            {
+                return pending;
+            }
+
+            ResearchBatch batch = pending.Value.Value;
+            string completedPath = Path.Combine(
+                _completedBatchesDirectory,
+                $"{TopicPaths.Slug(topic)}-{batch.SearchedAt.UtcDateTime:yyyyMMdd-HHmmss}.json");
+            return await WriteDocumentAsync(completedPath, batch, cancellationToken)
+                .Bind(written => Delete(pendingPath).Map(() => Maybe.From(written)));
         }
         finally
         {

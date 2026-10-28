@@ -58,8 +58,8 @@ internal interface IResearchStore
     Task<Result<Maybe<ResearchTopic>, Error>> ReadTopicAsync(string topic, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The topics with a batch waiting for the Scout, from the batch files' names, so a batch that cannot be read still
-    /// counts as waiting.
+    /// The topics with a batch in flight, waiting for the Scout or awaiting ingestion, from the batch files' names, so a
+    /// batch that cannot be read still counts as in flight.
     /// </summary>
     Task<Result<IReadOnlySet<string>, Error>> ListTopicsInFlightAsync(CancellationToken cancellationToken);
 
@@ -83,6 +83,22 @@ internal interface IResearchStore
         string topic,
         Func<ResearchBatch, ResearchBatch> update,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves the topic's pending batch to awaiting, recording the note its kept results were written to. None, with
+    /// nothing moved, when the topic has no pending batch (it was pruned meanwhile).
+    /// </summary>
+    Task<Result<Maybe<AwaitingBatch>, Error>> AwaitBatchAsync(
+        string topic,
+        string noteFile,
+        DateTimeOffset notedAt,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves the topic's pending batch to completed, for a batch with nothing kept. None, with nothing moved, when the
+    /// topic has no pending batch.
+    /// </summary>
+    Task<Result<Maybe<ResearchBatch>, Error>> CompleteBatchAsync(string topic, CancellationToken cancellationToken);
 
     /// <summary>The domains the author blocked, or none when none have been written yet.</summary>
     Task<Result<BlockedDomains, Error>> ReadBlockedDomainsAsync(CancellationToken cancellationToken);

@@ -208,9 +208,9 @@ try {
     Write-Host 'Keys are stored as secrets because the logs of a public repository are public. The instructions and wiki'
     Write-Host 'rules are not set here: they live in the private config repository.'
 
-    $agents = 'FactFinder', 'ThreadWeaver', 'Reviewer', 'Editor', 'Librarian', 'Pleb'
+    $agents = 'FactFinder', 'ThreadWeaver', 'Reviewer', 'Editor', 'Librarian', 'Pleb', 'Scout'
     # The research agents run on the local model without thinking unless chosen otherwise.
-    $localAgents = 'Pleb'
+    $localAgents = 'Pleb', 'Scout'
     $parameters = @(
         [pscustomobject]@{ Name = 'WikiRootDirectory'; GitHub = 'WIKI_ROOT_DIRECTORY'; Secret = $false; Required = $true; OnVm = $true; Default = '/srv/knowledge-base'; Help = 'Folder on the VM for the wiki and pipeline state.' }
         [pscustomobject]@{ Name = 'AnthropicApiKey'; GitHub = 'ANTHROPIC_API_KEY'; Secret = $true; Required = $true; OnVm = $false; Default = $null; Help = 'Anthropic API key. Required by the AppHost even when no agent uses Anthropic (any placeholder then).' }

@@ -14,6 +14,7 @@ public enum AgentRunTriggerKind
     Note,
     Facts,
     Curation,
+    Triage,
     ReviewRequest,
     Findings
 }

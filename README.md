@@ -22,6 +22,7 @@ note ──► FactFinder ──► facts ──► ThreadWeaver ──► wiki 
 | Editor       | open findings   | wiki pages                | Resolves findings. Restructures; never adds new knowledge.      |
 | Librarian    | the wiki        | conversations             | Answers questions in a chat. Read-only.                         |
 | Pleb         | a topic's pages | a topic's brief, queries  | Keeps each research topic's search queries current. Local model. |
+| Scout        | one fetched web page | keep or discard      | Judges a result against the topic's brief; kept results become a research note. Local model. |
 
 The pipeline is driven by the file system. Every stage watches a folder under the wiki root directory and moves files
 along as it finishes (`notes/new` → `notes/processing` → `notes/processed`, facts into `facts/processed`, and so on).
@@ -81,8 +82,8 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `WikiBackupRemote`        |        | SSH URL of a private repository the wiki is pushed to (default empty: backup off). See [Wiki backup](#wiki-backup). |
 | `WikiBackupKeyDirectory`  |        | Folder holding the backup deploy key and pinned host keys (default empty: your own SSH setup). |
 
-`{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian` and `Pleb`. The Pleb defaults to
-the local model (`OpenAICompatible`, thinking off) and is instructed with its role only; its curation cycle is tuned
+`{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian`, `Pleb` and `Scout`. The Pleb and the Scout default to
+the local model (`OpenAICompatible`, thinking off) and are instructed with their role only; their cycles are tuned
 with the API's `Research:*` settings (`ResearchSettings`). Those also tune the search cycle: every
 `Research:SearchCycleInterval` (6 hours after the last one finished) up to `Research:TopicsPerCycle` due topics are
 searched on a self-hosted SearXNG, which the AppHost runs from a pinned image (upgrade it by changing the tag in
