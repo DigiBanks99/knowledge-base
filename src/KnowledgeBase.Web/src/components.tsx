@@ -77,11 +77,21 @@ function WikiTarget({ target, tool }: { target: string; tool: string }) {
  * Renders markdown. Relative .md links are treated as wiki links and open inside the wiki browser; `basePath` is the
  * page the content belongs to (links in Librarian answers are relative to the wiki root).
  */
-export function Markdown({ content, basePath = '' }: { content: string; basePath?: string }) {
+export function Markdown({
+  content,
+  basePath = '',
+  withoutImages = false,
+}: {
+  content: string
+  basePath?: string
+  /** Drops images, for content from the open web whose images would otherwise be loaded from third parties. */
+  withoutImages?: boolean
+}) {
   return (
     <div className="markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        disallowedElements={withoutImages ? ['img'] : undefined}
         components={{
           a: ({ href, children }) => {
             const isExternal = !href || /^[a-z]+:/i.test(href) || href.startsWith('#')

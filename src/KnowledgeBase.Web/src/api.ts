@@ -124,10 +124,19 @@ export interface SearchResult {
   source: string
   publishedAt: string | null
 }
+/** A result's fetched page: its main content as markdown, or why it could not be fetched. */
+export interface FetchedPage {
+  fetchedAt: string
+  markdown: string | null
+  truncated: boolean
+  error: string | null
+}
 export interface BatchResult {
   query: string
   url: string
   result: SearchResult
+  /** Null until the page has been fetched. */
+  page: FetchedPage | null
 }
 export interface ResearchBatch {
   topic: string

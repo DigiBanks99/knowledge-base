@@ -395,6 +395,24 @@ details.card summary {
   overflow-wrap: anywhere;
 }
 
+.topics .fetched-content {
+  margin-top: 0.3rem;
+}
+
+.topics .fetched-content .markdown {
+  max-height: 24rem;
+  overflow-y: auto;
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.topics .fetch-failed {
+  overflow-wrap: anywhere;
+}
+
 .tabs {
   display: flex;
   gap: 1rem;
