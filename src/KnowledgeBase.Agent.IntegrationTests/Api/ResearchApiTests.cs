@@ -57,6 +57,42 @@ public sealed class ResearchApiTests : IDisposable
     }
 
     [Test]
+    public async Task TheAuthorAllowsAPublicFigureAheadOfClassification()
+    {
+        HttpResponseMessage response = await _api.Client().PostAsJsonAsync(
+            "/api/research/deny-list",
+            new AddDenyListEntryCommand("Martin Fowler", SubjectKind.PublicFigure, DenyListState.Allowed),
+            TestApi.Json);
+        DenyListEntry entry = await TestApi.ReadAsync<DenyListEntry>(response);
+        DenyList stored = (await _api.Get<IResearchStore>().ReadDenyListAsync(CancellationToken.None)).Value;
+
+        ItShouldReturnTheAuthorsDecision();
+        ItShouldStoreIt();
+
+        void ItShouldReturnTheAuthorsDecision() =>
+            entry.ShouldBe(new DenyListEntry("Martin Fowler", SubjectKind.PublicFigure, DenyListSource.Manual, DenyListState.Allowed));
+
+        void ItShouldStoreIt() => stored.Entries.ShouldBe([entry]);
+    }
+
+    [Test]
+    public async Task TheAuthorAddsANameWithoutTheCsrfHeader()
+    {
+        HttpResponseMessage response = await _api.Client(sendsCsrfHeader: false).PostAsJsonAsync(
+            "/api/research/deny-list",
+            new AddDenyListEntryCommand("Martin Fowler", SubjectKind.PublicFigure, DenyListState.Allowed),
+            TestApi.Json);
+        DenyList stored = (await _api.Get<IResearchStore>().ReadDenyListAsync(CancellationToken.None)).Value;
+
+        ItShouldRefuseTheChange();
+        ItShouldListNothing();
+
+        void ItShouldRefuseTheChange() => response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        void ItShouldListNothing() => stored.Entries.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task TheAuthorTogglesAnUnknownName()
     {
         HttpResponseMessage response = await _api.Client().PutAsJsonAsync(

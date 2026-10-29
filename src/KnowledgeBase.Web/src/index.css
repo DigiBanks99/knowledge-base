@@ -302,7 +302,8 @@ details.card summary {
 .badge-processing,
 .badge-medium,
 .badge-degraded,
-.badge-triaging {
+.badge-triaging,
+.badge-pending {
   background: var(--warning-soft);
   color: var(--warning);
 }
@@ -358,14 +359,49 @@ details.card summary {
   flex-wrap: wrap;
 }
 
-.deny-list .item-title button,
+.deny-list .item-title .actions,
 .topics .item-title .actions {
   margin-left: auto;
 }
 
+.deny-list .item-title .actions,
 .topics .item-title .actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.deny-list .item-title .actions,
+.add-name .actions {
+  margin-top: 0;
+}
+
+.add-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.add-name input,
+.add-name select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.add-name input {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.add-name input:focus,
+.add-name select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .topics .queries {

@@ -64,4 +64,19 @@ public sealed class SetDenyListEntryStateCommandHandlerTests
 
         void ItShouldBeRefused() => result.Error.ShouldBeOfType<ValidationError>().Code.ShouldBe("DenyListNameRequired");
     }
+
+    [Test]
+    public async Task TheAuthorSetsANamePending()
+    {
+        Result<DenyListEntry, Error> result = await _handler.Handle(
+            new SetDenyListEntryStateCommand("Jane Doe", DenyListState.Pending),
+            CancellationToken.None);
+
+        ItShouldBeRefused();
+        ItShouldChangeNothing();
+
+        void ItShouldBeRefused() => result.Error.ShouldBeOfType<ValidationError>().Code.ShouldBe("DenyListStateInvalid");
+
+        void ItShouldChangeNothing() => _denyList().ShouldBeSameAs(_initial);
+    }
 }

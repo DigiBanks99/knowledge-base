@@ -24,6 +24,54 @@ public sealed class DenyListTests
     }
 
     [Test]
+    public void ANewPublicFigureIsClassified()
+    {
+        DenyList updated = _denyList.WithAutomatic("Martin Fowler", SubjectKind.PublicFigure, DenyListState.Allowed);
+
+        ItShouldAllowThemAutomatically();
+
+        void ItShouldAllowThemAutomatically() => updated.Find("Martin Fowler")
+            .ShouldBe(new DenyListEntry("Martin Fowler", SubjectKind.PublicFigure, DenyListSource.Auto, DenyListState.Allowed));
+    }
+
+    [Test]
+    public void APublicFigureIsLaterClassifiedAsAPerson()
+    {
+        DenyList updated = _denyList
+            .WithAutomatic("Martin Fowler", SubjectKind.PublicFigure, DenyListState.Allowed)
+            .WithAutomatic("Martin Fowler", SubjectKind.Person);
+
+        ItShouldDenyThem();
+
+        void ItShouldDenyThem() => updated.Find("Martin Fowler")
+            .ShouldBe(new DenyListEntry("Martin Fowler", SubjectKind.Person, DenyListSource.Auto, DenyListState.Denied));
+    }
+
+    [Test]
+    public void APossiblePublicFigureIsLaterClassifiedAsAPerson()
+    {
+        DenyList updated = _denyList
+            .WithAutomatic("Sam", SubjectKind.Person, DenyListState.Pending)
+            .WithAutomatic("Sam", SubjectKind.Person);
+
+        ItShouldDenyThem();
+
+        void ItShouldDenyThem() => updated.Find("Sam")!.State.ShouldBe(DenyListState.Denied);
+    }
+
+    [Test]
+    [Arguments(DenyListState.Allowed)]
+    [Arguments(DenyListState.Pending)]
+    public void ADeniedPersonIsLaterClassifiedAsAPublicFigure(DenyListState state)
+    {
+        DenyList updated = _denyList.WithAutomatic("Jane Doe", SubjectKind.PublicFigure, state);
+
+        ItShouldChangeNothing();
+
+        void ItShouldChangeNothing() => updated.ShouldBeSameAs(_denyList);
+    }
+
+    [Test]
     [Arguments("Contoso")]
     [Arguments("CONTOSO")]
     public void AnOrganisationTheAuthorAllowedIsClassifiedAgain(string name)
@@ -125,5 +173,30 @@ public sealed class DenyListTests
         void ItShouldFindDeniedNames() => matcher.FindDeniedName("ask jane doe").ShouldBe(Maybe.From("Jane Doe"));
 
         void ItShouldIgnoreAllowedNames() => matcher.FindDeniedName("contoso release notes").HasNoValue.ShouldBeTrue();
+    }
+
+    [Test]
+    public void AMatcherIsBuiltWithAPendingName()
+    {
+        DenyListMatcher matcher = _denyList.WithAutomatic("Sam Smith", SubjectKind.Person, DenyListState.Pending).Matcher();
+
+        ItShouldKeepThePendingNameOut();
+
+        void ItShouldKeepThePendingNameOut() => matcher.FindDeniedName("ask sam smith").ShouldBe(Maybe.From("Sam Smith"));
+    }
+
+    [Test]
+    [Arguments(DenyListState.Allowed)]
+    [Arguments(DenyListState.Denied)]
+    public void TheAuthorDecidesAPendingName(DenyListState decision)
+    {
+        Result<DenyList, Error> updated = _denyList
+            .WithAutomatic("Sam Smith", SubjectKind.Person, DenyListState.Pending)
+            .WithManual("Sam Smith", decision);
+
+        ItShouldRecordTheDecisionAsTheAuthors();
+
+        void ItShouldRecordTheDecisionAsTheAuthors() => updated.Value.Find("Sam Smith")
+            .ShouldBe(new DenyListEntry("Sam Smith", SubjectKind.Person, DenyListSource.Manual, decision));
     }
 }

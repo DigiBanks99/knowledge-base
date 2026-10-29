@@ -6,8 +6,9 @@ using KnowledgeBase.Agent.Research.Errors;
 namespace KnowledgeBase.Agent.Research.Models;
 
 /// <summary>
-/// The names kept out of search queries, and the rules for changing them: classification only ever adds names, and
-/// a decision the author made in the UI (<see cref="DenyListSource.Manual"/>) is never changed by classification.
+/// The names kept out of search queries, and the rules for changing them: classification only ever adds names or
+/// makes an automatic entry more private, and a decision the author made in the UI (<see cref="DenyListSource.Manual"/>)
+/// is never changed by classification.
 /// </summary>
 /// <param name="SeededFromPeople">Whether the one-off backfill from the wiki's <c>people/</c> folders has run.</param>
 public sealed partial record DenyList(IReadOnlyList<DenyListEntry> Entries, bool SeededFromPeople = false)
@@ -15,16 +16,51 @@ public sealed partial record DenyList(IReadOnlyList<DenyListEntry> Entries, bool
     public static DenyList Empty { get; } = new([]);
 
     /// <summary>
-    /// Adds a name classified from the author's own notes as denied, unless an entry for it already exists: an
-    /// existing entry is either already denied or was allowed by the author, and both must stay as they are.
+    /// Adds a name classified from the author's own notes. An existing automatic entry only ever becomes more private,
+    /// so a public figure a later note shows the author knows is denied, while one denied before is never allowed by a
+    /// later note. The author's own decisions stay as they are.
     /// </summary>
-    public DenyList WithAutomatic(string name, SubjectKind kind)
+    public DenyList WithAutomatic(string name, SubjectKind kind, DenyListState state = DenyListState.Denied)
     {
         string trimmed = WhitespaceRun().Replace(name.Trim(), " ");
         // A name of only separators has no words to match, so it would be listed but deny nothing.
-        return DenyListMatcher.Words(trimmed).Length == 0 || Find(trimmed) is not null
+        if (DenyListMatcher.Words(trimmed).Length == 0)
+        {
+            return this;
+        }
+
+        DenyListEntry? existing = Find(trimmed);
+        if (existing is null)
+        {
+            return this with { Entries = [.. Entries, new DenyListEntry(trimmed, kind, DenyListSource.Auto, state)] };
+        }
+
+        return existing.Source == DenyListSource.Manual || Privacy(state) <= Privacy(existing.State)
             ? this
-            : this with { Entries = [.. Entries, new DenyListEntry(trimmed, kind, DenyListSource.Auto, DenyListState.Denied)] };
+            : this with
+            {
+                Entries = [.. Entries.Select(entry => entry == existing ? entry with { Kind = kind, State = state } : entry)]
+            };
+    }
+
+    /// <summary>
+    /// Records the author's decision about a name, listed or not, which classification will never change again. An
+    /// existing entry keeps its spelling.
+    /// </summary>
+    public DenyList WithManualEntry(string name, SubjectKind kind, DenyListState state)
+    {
+        DenyListEntry? existing = Find(name);
+        return existing is null
+            ? this with
+            {
+                Entries = [.. Entries, new DenyListEntry(WhitespaceRun().Replace(name.Trim(), " "), kind, DenyListSource.Manual, state)]
+            }
+            : this with
+            {
+                Entries = [.. Entries.Select(entry => entry == existing
+                    ? entry with { Kind = kind, Source = DenyListSource.Manual, State = state }
+                    : entry)]
+            };
     }
 
     /// <summary>Records the author's decision for an existing entry, which classification will never change again.</summary>
@@ -47,7 +83,8 @@ public sealed partial record DenyList(IReadOnlyList<DenyListEntry> Entries, bool
         return Entries.FirstOrDefault(entry => Key(entry.Name) == key);
     }
 
-    public DenyListMatcher Matcher() => new([.. Entries.Where(entry => entry.State == DenyListState.Denied).Select(entry => entry.Name)]);
+    /// <summary>Matches every name not allowed: a pending name stays out of queries until the author allows it.</summary>
+    public DenyListMatcher Matcher() => new([.. Entries.Where(entry => entry.State != DenyListState.Allowed).Select(entry => entry.Name)]);
 
     /// <summary>
     /// Names are the same entry whatever their case or how their words are separated, so <c>jane-doe</c> from a folder
@@ -55,6 +92,13 @@ public sealed partial record DenyList(IReadOnlyList<DenyListEntry> Entries, bool
     /// </summary>
     internal static string Key(string name) =>
         string.Join(' ', DenyListMatcher.Words(name)).ToUpperInvariant();
+
+    private static int Privacy(DenyListState state) => state switch
+    {
+        DenyListState.Allowed => 0,
+        DenyListState.Pending => 1,
+        _ => 2
+    };
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRun();
