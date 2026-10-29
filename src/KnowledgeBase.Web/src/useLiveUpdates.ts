@@ -11,6 +11,7 @@ const queriesByArea: Record<string, string[][]> = {
   conversations: [['conversations']],
   status: [['status']],
   research: [['deny-list'], ['topics'], ['topic-results']],
+  settings: [['agent-providers'], ['status']],
 }
 
 /**

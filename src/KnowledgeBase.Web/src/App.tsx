@@ -13,6 +13,7 @@ import { DenyListPage } from './pages/DenyListPage'
 import { ResearchPage } from './pages/ResearchPage'
 import { TopicsPage } from './pages/TopicsPage'
 import { CurationPage } from './pages/CurationPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 const sections = [
   { to: '/capture', label: 'Capture' },
@@ -39,6 +40,7 @@ export function App() {
           </NavLink>
         ))}
         <span className="spacer" />
+        <NavLink to="/settings">Settings</NavLink>
         <NavLink to="/status" title={statusTitle(status.data?.isDegraded, status.isError)}>
           Status
           {status.data?.isDegraded && <span className="status-badge">!</span>}
@@ -71,6 +73,7 @@ export function App() {
             <Route path="curation" element={<CurationPage />} />
             <Route path="deny-list" element={<DenyListPage />} />
           </Route>
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/status" element={<StatusPage />} />
           <Route path="*" element={<Navigate to="/capture" replace />} />
         </Routes>

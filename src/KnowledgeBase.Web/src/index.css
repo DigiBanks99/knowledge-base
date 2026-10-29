@@ -331,6 +331,7 @@ details.card summary {
 .signals,
 .deny-list,
 .topics,
+.agent-providers,
 .tree-list {
   list-style: none;
   padding: 0;
@@ -360,17 +361,20 @@ details.card summary {
 }
 
 .deny-list .item-title .actions,
-.topics .item-title .actions {
+.topics .item-title .actions,
+.agent-providers .item-title .actions {
   margin-left: auto;
 }
 
 .deny-list .item-title .actions,
-.topics .item-title .actions {
+.topics .item-title .actions,
+.agent-providers .item-title .actions {
   display: flex;
   gap: 0.5rem;
 }
 
 .deny-list .item-title .actions,
+.agent-providers .item-title .actions,
 .add-name .actions {
   margin-top: 0;
 }
