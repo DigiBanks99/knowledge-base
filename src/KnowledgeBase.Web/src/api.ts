@@ -152,6 +152,20 @@ export interface TopicSearchOutcome {
   kept: number
 }
 
+export type ModelProvider = 'Anthropic' | 'OpenAICompatible'
+export interface ProviderChoice {
+  provider: ModelProvider
+  model: string
+  /** Why the agent cannot run on this provider, or null when it can. */
+  unavailable: string | null
+}
+export interface AgentProviderSetting {
+  agent: AgentName
+  provider: ModelProvider
+  defaultProvider: ModelProvider
+  choices: ProviderChoice[]
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -227,6 +241,10 @@ export const api = {
   wikiPage: (path: string) => request<WikiPage>(`/api/wiki/page?path=${encodeURIComponent(path)}`),
 
   status: () => request<StatusReport>('/api/status'),
+
+  agentProviders: () => request<AgentProviderSetting[]>('/api/agents/providers'),
+  setAgentProvider: (agent: AgentName, provider: ModelProvider) =>
+    put<AgentProviderSetting>('/api/agents/providers', { agent, provider }),
 
   denyList: () => request<DenyListEntry[]>('/api/research/deny-list'),
   setDenyListState: (name: string, state: DenyListState) =>
