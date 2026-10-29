@@ -80,7 +80,7 @@ ThreadWeaver fails on its facts.
 | **Model gate** | Limits how many research agent runs use the model at once (one by default). A waiting Scout run goes before a waiting Pleb run. | `ModelGate` |
 | **Verdict** | The Scout's judgement of one result, recorded on the result in the pending batch: kept (with a summary and short quotes) or discarded (with a reason). A judged result is skipped after a restart. A run that ends without one counts as a discard and is recorded as failed. | `ScoutVerdict` |
 | **Triage** | The Scout judging a topic's fetched results, one run each. When all are judged, the kept ones are combined into one **research note** in `notes/new` and the batch moves to `research/batches/awaiting`; a batch with nothing kept moves to `batches/completed`. | `TriageResultsCommandHandler` |
-| **Research note** | The note triage writes for a topic: a research header (origin, topic, source URLs), then the Scout's summaries and length-capped quotes, never raw page text. | `ResearchNote` |
+| **Research note** | The note triage writes for a topic: a research header (origin, topic, source URLs), then each result's length-capped search snippet and the Scout's summaries and length-capped quotes, never raw page text. | `ResearchNote` |
 
 ## Review
 

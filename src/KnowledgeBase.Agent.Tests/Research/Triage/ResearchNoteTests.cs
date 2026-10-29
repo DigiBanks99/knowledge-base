@@ -38,6 +38,40 @@ public sealed class ResearchNoteTests
             () => content.ShouldContain("## A talk\n\nSource: https://example.com/b\n\nA talk on Atlas."));
     }
 
+    [Test]
+    public void AKeptResultHasASnippet()
+    {
+        ResearchBatch batch = new("projects/atlas", Searched, []);
+        BatchResult kept = Result("https://example.com/a", "Atlas 2", ScoutVerdict.Keep("Atlas 2 ships.", [], Searched)) with
+        {
+            Result = new SearchResult("https://example.com/a", "Atlas 2", "# Atlas 2\n\nis   out today.", "SearXNG", null)
+        };
+
+        string content = ResearchNote.Build(batch, [kept]).Content.ReplaceLineEndings("\n");
+
+        ItShouldGiveTheSnippetOneLabelledLineBeforeTheSummary();
+
+        void ItShouldGiveTheSnippetOneLabelledLineBeforeTheSummary() =>
+            content.ShouldContain("Source: https://example.com/a\n\nSearch snippet: # Atlas 2 is out today.\n\nAtlas 2 ships.");
+    }
+
+    [Test]
+    public void AKeptResultHasALongSnippet()
+    {
+        ResearchBatch batch = new("projects/atlas", Searched, []);
+        BatchResult kept = Result("https://example.com/a", "Atlas 2", ScoutVerdict.Keep("Atlas 2 ships.", [], Searched)) with
+        {
+            Result = new SearchResult("https://example.com/a", "Atlas 2", new string('a', 1000), "SearXNG", null)
+        };
+
+        string content = ResearchNote.Build(batch, [kept]).Content.ReplaceLineEndings("\n");
+
+        ItShouldCutTheSnippetToItsLimit();
+
+        void ItShouldCutTheSnippetToItsLimit() =>
+            content.ShouldContain($"Search snippet: {new string('a', ResearchNote.MaxSnippetLength - 1)}…\n");
+    }
+
     private static BatchResult Result(string url, string title, ScoutVerdict verdict) =>
         new("a query", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, "Page text that must not appear.", false), verdict);
 }
