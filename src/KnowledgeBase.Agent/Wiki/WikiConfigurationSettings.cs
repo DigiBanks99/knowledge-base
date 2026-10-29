@@ -37,4 +37,6 @@ public class WikiConfigurationSettings
     public string AwaitingBatchesDirectory => Path.Combine(BatchesDirectory, "awaiting");
     public string CompletedBatchesDirectory => Path.Combine(BatchesDirectory, "completed");
     public string BlockedDomainsPath => Path.Combine(ResearchDirectory, "domains.json");
+    public string SettingsDirectory => Path.Combine(RootDirectory, "settings");
+    public string AgentProvidersPath => Path.Combine(SettingsDirectory, "agent-providers.json");
 }

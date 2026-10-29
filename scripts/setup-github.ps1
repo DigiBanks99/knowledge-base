@@ -219,6 +219,8 @@ try {
         [pscustomobject]@{ Name = 'EntraClientSecret'; GitHub = 'ENTRA_CLIENT_SECRET'; Secret = $true; Required = $true; OnVm = $false; Default = $null; Help = 'A client secret of the Entra app registration.' }
         [pscustomobject]@{ Name = 'OpenAICompatibleEndpoint'; GitHub = 'OPENAI_COMPATIBLE_ENDPOINT'; Secret = $false; Required = $true; OnVm = $true; Default = 'http://127.0.0.1:9931/v1'; Help = 'The llama-server API on the VM, as the API container sees it (it shares the host network).' }
         [pscustomobject]@{ Name = 'OpenAICompatibleApiKey'; GitHub = 'OPENAI_COMPATIBLE_API_KEY'; Secret = $true; Required = $false; OnVm = $true; Default = $null; Help = 'Only if llama-server was started with --api-key; skip otherwise.' }
+        [pscustomobject]@{ Name = 'AnthropicModel'; GitHub = 'ANTHROPIC_MODEL'; Secret = $false; Required = $true; OnVm = $false; Default = 'claude-haiku-5-5'; Help = 'The Claude model every agent on the Anthropic provider runs.' }
+        [pscustomobject]@{ Name = 'OpenAICompatibleModel'; GitHub = 'OPENAI_COMPATIBLE_MODEL'; Secret = $false; Required = $true; OnVm = $false; Default = 'Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL'; Help = 'The model llama-server runs. A single-model server ignores the name, so it mostly labels the runs.' }
         [pscustomobject]@{ Name = 'WikiBackupRemote'; GitHub = 'WIKI_BACKUP_REMOTE'; Secret = $false; Required = $false; OnVm = $true; Default = $null; Help = 'SSH URL of the private wiki backup repository (git@github.com:<owner>/<repo>.git); skip to leave backup off. See "Wiki backup" in the README.' }
         [pscustomobject]@{ Name = 'WikiBackupKeyDirectory'; GitHub = 'WIKI_BACKUP_KEY_DIRECTORY'; Secret = $false; Required = $false; OnVm = $true; Default = $null; Help = 'Folder on the VM holding the backup deploy key (id_ed25519) and known_hosts, e.g. /srv/knowledge-base-backup-key. It must exist; skip to leave backup off.' }
     )
@@ -226,7 +228,6 @@ try {
         $upper = $agent.ToUpperInvariant()
         $isLocal = $localAgents -contains $agent
         $parameters += [pscustomobject]@{ Name = "${agent}Provider"; GitHub = "${upper}_PROVIDER"; Secret = $false; Required = $true; OnVm = $true; Default = $(if ($isLocal) { 'OpenAICompatible' } else { 'Anthropic' }); Help = "Anthropic or OpenAICompatible (the local model) for the $agent." }
-        $parameters += [pscustomobject]@{ Name = "${agent}Model"; GitHub = "${upper}_MODEL"; Secret = $false; Required = $true; OnVm = $false; Default = $(if ($isLocal) { 'qwen' } else { $null }); Help = "Model for the $agent, e.g. claude-sonnet-5-5, or any label (such as qwen) for the local model." }
         $parameters += [pscustomobject]@{ Name = "${agent}EnableThinking"; GitHub = "${upper}_ENABLE_THINKING"; Secret = $false; Required = $true; OnVm = $true; Default = $(if ($isLocal) { 'false' } else { 'true' }); Help = "true, or false to stop the local model reasoning before it answers for the $agent (Anthropic ignores it)." }
     }
 

@@ -74,8 +74,9 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `EntraTenantId`           |        | Directory (tenant) id of the app registration.                                         |
 | `EntraClientId`           |        | Application (client) id of the app registration.                                       |
 | `EntraClientSecret`       |   ✓    | A client secret of the app registration.                                               |
-| `{Agent}Provider`         |        | `Anthropic` (default) or `OpenAICompatible`. See [Local models](#local-models-llamacpp). |
-| `{Agent}Model`            |        | Model per agent, e.g. `claude-sonnet-5-5`. One each for the six agents.                |
+| `{Agent}Provider`         |        | `Anthropic` (default) or `OpenAICompatible`: the agent's default, which the Settings page can switch while the app runs. See [Local models](#local-models-llamacpp). |
+| `AnthropicModel`          |        | The Claude model every agent on `Anthropic` runs (default `claude-haiku-5-5`).         |
+| `OpenAICompatibleModel`   |        | The model every agent on `OpenAICompatible` runs (default `Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL`). |
 | `{Agent}EnableThinking`   |        | `true` (default) or `false` to stop a local model reasoning before it answers. Ignored by `Anthropic`. |
 | `OpenAICompatibleEndpoint`|        | Base address of the OpenAI-compatible server (default `http://localhost:8080/v1`).     |
 | `OpenAICompatibleApiKey`  |   ✓    | The server's API key, if it was started with one (default empty).                      |
@@ -148,9 +149,13 @@ Claude. Providers are chosen per agent, so you can, say, run the Librarian local
 
 ```shell
 dotnet user-secrets set "Parameters:LibrarianProvider" "OpenAICompatible"
-dotnet user-secrets set "Parameters:LibrarianModel" "qwen"
 dotnet user-secrets set "Parameters:OpenAICompatibleEndpoint" "http://127.0.0.1:8080/v1"
 ```
+
+`{Agent}Provider` is only the default. The **Settings** page switches an agent between the providers while the app
+runs: the agent's next request goes to the new provider, and the choice is kept in `settings/agent-providers.json`
+under the root directory so it survives a restart. Choosing the default again clears it. A provider that is not
+configured for the agent (no API key, no endpoint) cannot be chosen.
 
 The agents depend on tool calling, so the server must support it. For `llama-server`:
 
@@ -158,7 +163,7 @@ The agents depend on tool calling, so the server must support it. For `llama-ser
   support tools.
 - Give it enough context (`-c`). The Reviewer reads the whole wiki in one run. The context is split between parallel
   slots (`-np`), so `-c 32768 -np 2` gives each request 16k tokens.
-- A single-model server ignores the model name, so `{Agent}Model` can be any label.
+- A single-model server ignores the model name, so `OpenAICompatibleModel` can be any label.
 - Reasoning models such as Qwen 3 think before every answer, which on a CPU can take minutes. Set
   `{Agent}EnableThinking` to `false` to send `chat_template_kwargs.enable_thinking = false` with each request, so the
   chat template skips it.

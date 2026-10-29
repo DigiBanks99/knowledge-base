@@ -18,6 +18,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder
     .AddConfigFiles()
+    .AddAgentProviders()
     .ConfigureAgent(KnownAgents.FactFinder)
         .WithTools(toolsBuilder => toolsBuilder.WithFactTools())
     .ConfigureAgent(KnownAgents.ThreadWeaver, includeWikiRules: true)
@@ -60,6 +61,7 @@ app.MapAuthEndpoints();
 RouteGroupBuilder api = app
     .UseWiki()
     .RequireSignedInUser();
+api.MapAgentsEndpoints();
 api.MapFallback(() => Results.NotFound());
 
 if (app.Environment.IsDevelopment())

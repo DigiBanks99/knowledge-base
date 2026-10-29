@@ -86,22 +86,11 @@ internal static class ResearchDependencyInjection
                 .AddStatusSignal<SearchSourceHealthCheck<HackerNewsSearchSource>>($"Search: {HackerNewsSearchSource.SourceName}")
                 .AddStatusSignal<ResearchLoopHealthCheck>(ResearchLoopHealthCheck.Name);
 
-            // Only llama-server can count tokens for the model it has loaded; another provider's context is far larger
-            // than a curation prompt, so an estimate is enough there.
-            bool researchIsLocal = new[] { KnownAgents.Pleb, KnownAgents.Scout }.Any(agent => string.Equals(
-                builder.Configuration[$"{agent}:{nameof(AgentModelOptions.Provider)}"],
-                nameof(ModelProvider.OpenAICompatible),
-                StringComparison.OrdinalIgnoreCase));
-            if (researchIsLocal)
-            {
-                builder.Services
-                    .AddSingleton<IPromptTokenCounter, LlamaServerTokenCounter>()
-                    .AddHttpClient(LlamaServerTokenCounter.HttpClientName, client => client.Timeout = TokenizeTimeout);
-            }
-            else
-            {
-                builder.Services.AddSingleton<IPromptTokenCounter, EstimatedTokenCounter>();
-            }
+            builder.Services
+                .AddSingleton<LlamaServerTokenCounter>()
+                .AddSingleton<EstimatedTokenCounter>()
+                .AddSingleton<IPromptTokenCounter, ResearchTokenCounter>()
+                .AddHttpClient(LlamaServerTokenCounter.HttpClientName, client => client.Timeout = TokenizeTimeout);
 
             return builder;
         }
