@@ -1,19 +1,26 @@
 using System.Text;
 
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Tools;
 
 namespace KnowledgeBase.Agent.Research.Triage;
 
 /// <summary>
 /// The note triage writes for a topic: the research header <c>ResearchNoteHeader</c> reads, then each kept result's
-/// source and the Scout's own summary and quotes. Page text never goes in, as it may hold instructions aimed at the
-/// agents that read the note.
+/// source, the search engine's snippet and the Scout's own summary and quotes. Page text never goes in, as it may hold
+/// instructions aimed at the agents that read the note.
 /// </summary>
 /// <param name="FileName">
 /// Derived from the topic and the search, so writing the note again after a restart names the same file.
 /// </param>
 internal sealed record ResearchNote(string FileName, string Content)
 {
+    /// <summary>
+    /// The snippet is third-party text too, so like the Scout's quotes it is made one bounded line after a label: it
+    /// cannot carry markdown structure or much of an instruction into the note.
+    /// </summary>
+    internal const int MaxSnippetLength = 300;
+
     public static ResearchNote Build(ResearchBatch batch, IReadOnlyList<BatchResult> kept)
     {
         StringBuilder content = new();
@@ -37,6 +44,13 @@ internal sealed record ResearchNote(string FileName, string Content)
             content.AppendLine();
             content.AppendLine($"Source: {result.Result.Url}");
             content.AppendLine();
+            string snippet = ScoutTools.Tidy(result.Result.Snippet, MaxSnippetLength);
+            if (snippet.Length > 0)
+            {
+                content.AppendLine($"Search snippet: {snippet}");
+                content.AppendLine();
+            }
+
             content.AppendLine(Plain(verdict.Summary!));
             foreach (string quote in verdict.Quotes)
             {
