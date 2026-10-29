@@ -21,6 +21,10 @@ internal sealed class SetDenyListEntryStateCommandHandler(
             !string.IsNullOrWhiteSpace(request.Name),
             request,
             new ValidationError("DenyListNameRequired", "The name of the deny-list entry is required."))
+        // Pending is classification's doubt, never a decision.
+        .Ensure(
+            command => command.State is DenyListState.Denied or DenyListState.Allowed,
+            new ValidationError("DenyListStateInvalid", "A name can only be denied or allowed."))
         .Bind(_ => store.UpdateDenyListAsync(denyList => denyList.WithManual(request.Name, request.State), cancellationToken))
         .Map(denyList => denyList.Find(request.Name)!)
         .Tap(entry => logger.DenyListEntrySet(entry.Name, entry.State));

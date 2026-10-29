@@ -28,6 +28,7 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<RecordFactSubjectsCommandHandler>()
                 .AddSingleton<SeedDenyListFromPeopleCommandHandler>()
                 .AddSingleton<SetDenyListEntryStateCommandHandler>()
+                .AddSingleton<AddDenyListEntryCommandHandler>()
                 .AddSingleton<ListDenyListQueryHandler>()
                 .AddSingleton<IWikiTopics, WikiTopics>()
                 .AddSingleton<RecordTopicChangesCommandHandler>()

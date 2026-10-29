@@ -262,6 +262,61 @@ public sealed class NotePipelineTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task AnAuthorNoteCitesTheAuthorOfAnArticle()
+    {
+        Fact[] facts =
+        [
+            new(
+                new FactSubject("Refactoring", "A practice the author is learning.", SubjectKind.Other),
+                [
+                    new Observation(
+                        "Read an article on refactoring",
+                        "Martin Fowler's article, recommended by Sam.",
+                        2,
+                        [
+                            new FactSubject("Martin Fowler", "Author of the article.", SubjectKind.PublicFigure),
+                            new FactSubject("Sam", "Recommended the article.", SubjectKind.Person, PossiblyPublicFigure: true)
+                        ])
+                ])
+        ];
+        _wiki.FactFinder.Behaviour = async (_, cancellationToken) => await _wiki.CallToolAsync(
+            nameof(FactTools.FactWriterTool),
+            Collection,
+            () => _wiki.Get<FactTools>().FactWriterTool(facts, Collection, cancellationToken));
+        await StartAsync();
+
+        await CaptureAsync(NoteName, NoteContent);
+        bool settled = await Eventually.Until(async () =>
+            TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+        FactDocument? document = settled ? await ReadProcessedFactsAsync() : null;
+        DenyList denyList = await ReadDenyListAsync();
+
+        ItShouldFinish();
+        ItShouldKeepWhoMightBeAPublicFigureForTheThreadWeaver();
+        ItShouldAllowThePublicFigureInSearchQueries();
+        ItShouldLeaveThePossiblePublicFigureToTheAuthor();
+
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
+
+        void ItShouldKeepWhoMightBeAPublicFigureForTheThreadWeaver() => document.ShouldNotBeNull()
+            .Facts.Single().Observations.Single().RelatedSubjects.ShouldBe(facts[0].Observations[0].RelatedSubjects);
+
+        void ItShouldAllowThePublicFigureInSearchQueries()
+        {
+            denyList.Find("Martin Fowler")
+                .ShouldBe(new DenyListEntry("Martin Fowler", SubjectKind.PublicFigure, DenyListSource.Auto, DenyListState.Allowed));
+            denyList.Matcher().FindDeniedName("refactoring by martin fowler").HasNoValue.ShouldBeTrue();
+        }
+
+        void ItShouldLeaveThePossiblePublicFigureToTheAuthor()
+        {
+            denyList.Find("Sam").ShouldBe(new DenyListEntry("Sam", SubjectKind.Person, DenyListSource.Auto, DenyListState.Pending));
+            denyList.Matcher().FindDeniedName("ask sam").ShouldBe(Maybe.From("Sam"));
+        }
+    }
+
+    [Test]
     public async Task AResearchNoteTriesToRewriteTheWiki()
     {
         _wiki.FactFinder.Behaviour = async (_, cancellationToken) => await _wiki.CallToolAsync(

@@ -4,6 +4,8 @@ The wiki has these top-level folders, each with an `index.md`:
 
 - `me/`: the author's own growth, feedback, goals and achievements.
 - `people/`: anyone with a relationship to the author, one folder per person: `people/{first-name-last-name}/index.md`.
+  Public figures (the authors and experts behind sources, whom the author does not know) never get a page here or
+  anywhere else; mention them, with how they relate, on the pages of the topics they are relevant to.
 - `projects/`: initiatives with a defined scope and goal.
 - `learning/`: knowledge gained or referenced.
 - `plans/`: time-boxed intentions.

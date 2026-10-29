@@ -78,6 +78,66 @@ public sealed class RecordFactSubjectsCommandHandlerTests
     }
 
     [Test]
+    public async Task TheAuthorsNoteCitesPublicFigures()
+    {
+        Fact[] facts =
+        [
+            new(
+                new FactSubject("Refactoring", null, SubjectKind.Other),
+                [
+                    new Observation(
+                        "Read an article on refactoring.",
+                        "Recommended by Sam.",
+                        1,
+                        [
+                            new FactSubject("Martin Fowler", "Author of the article.", SubjectKind.PublicFigure),
+                            new FactSubject("Kent Beck", "Quoted in the article.", SubjectKind.PublicFigure, PossiblyPublicFigure: true),
+                            new FactSubject("Sam", "Recommended the article.", SubjectKind.Person, PossiblyPublicFigure: true),
+                            new FactSubject("Fabrikam", "Hosts the article.", SubjectKind.Organisation, PossiblyPublicFigure: true)
+                        ])
+                ])
+        ];
+
+        Result<int, Error> result = await _handler.Handle(new RecordFactSubjectsCommand(facts, FactOrigin.Author), CancellationToken.None);
+
+        ItShouldCountThemAll();
+        ItShouldAllowThePublicFigure();
+        ItShouldLeaveThePossiblePublicFiguresToTheAuthor();
+        ItShouldDenyTheOrganisation();
+
+        void ItShouldCountThemAll() => result.Value.ShouldBe(4);
+
+        void ItShouldAllowThePublicFigure() => _denyList().Find("Martin Fowler")
+            .ShouldBe(new DenyListEntry("Martin Fowler", SubjectKind.PublicFigure, DenyListSource.Auto, DenyListState.Allowed));
+
+        void ItShouldLeaveThePossiblePublicFiguresToTheAuthor()
+        {
+            _denyList().Find("Kent Beck")!.State.ShouldBe(DenyListState.Pending);
+            _denyList().Find("Sam")
+                .ShouldBe(new DenyListEntry("Sam", SubjectKind.Person, DenyListSource.Auto, DenyListState.Pending));
+        }
+
+        void ItShouldDenyTheOrganisation() => _denyList().Find("Fabrikam")!.State.ShouldBe(DenyListState.Denied);
+    }
+
+    [Test]
+    public async Task OneNoteNamesSomeoneAsAPublicFigureAndAPerson()
+    {
+        Fact[] facts =
+        [
+            new(new FactSubject("Jane Smith", "A friend.", SubjectKind.Person), []),
+            new(new FactSubject("Refactoring", null, SubjectKind.Other),
+                [new Observation("Jane wrote about refactoring.", "Her blog post.", 1, [new FactSubject("Jane Smith", "Author of the post.", SubjectKind.PublicFigure)])])
+        ];
+
+        await _handler.Handle(new RecordFactSubjectsCommand(facts, FactOrigin.Author), CancellationToken.None);
+
+        ItShouldDenyThem();
+
+        void ItShouldDenyThem() => _denyList().Find("Jane Smith")!.State.ShouldBe(DenyListState.Denied);
+    }
+
+    [Test]
     public async Task FactsFromAResearchNoteAreRecorded()
     {
         Result<int, Error> result = await _handler.Handle(new RecordFactSubjectsCommand(Facts, FactOrigin.Research), CancellationToken.None);

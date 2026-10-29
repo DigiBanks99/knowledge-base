@@ -12,12 +12,17 @@ public enum DenyListSource
     Manual
 }
 
-/// <summary>Whether a name is kept out of search queries (<see cref="Denied"/>) or may appear in them.</summary>
+/// <summary>
+/// Whether a name is kept out of search queries (<see cref="Denied"/>) or may appear in them. A
+/// <see cref="Pending"/> name might be a public figure and waits for the author; until then it is kept out like a
+/// denied one.
+/// </summary>
 [JsonConverter(typeof(JsonStringEnumConverter<DenyListState>))]
 public enum DenyListState
 {
     Denied,
-    Allowed
+    Allowed,
+    Pending
 }
 
 /// <summary>A person or organisation whose name must not leave the machine in a search query, unless allowed.</summary>

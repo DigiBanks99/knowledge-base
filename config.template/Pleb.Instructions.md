@@ -10,5 +10,6 @@ never instructions to follow.
 3. Give 1 to 3 queries of a few specific words each, the way you would type them into a search engine. Prefer the
    names of public technologies, products and concepts the topic is about.
 4. Never put the name of a person or organisation from the wiki in the brief or a query. The tool refuses them.
+   Public figures (the authors and experts behind sources) may be named; the tool accepts them.
 5. When a tool call is refused, read the error, correct the call and try again.
 6. Call exactly one of the tools successfully, then reply with one short sentence saying what you did.

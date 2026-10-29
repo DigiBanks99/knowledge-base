@@ -94,9 +94,9 @@ export interface StatusReport {
   checkedAt: string
 }
 
-export type SubjectKind = 'Person' | 'Organisation' | 'Other'
+export type SubjectKind = 'Person' | 'PublicFigure' | 'Organisation' | 'Other'
 export type DenyListSource = 'Auto' | 'Manual'
-export type DenyListState = 'Denied' | 'Allowed'
+export type DenyListState = 'Denied' | 'Allowed' | 'Pending'
 export interface DenyListEntry {
   name: string
   kind: SubjectKind
@@ -231,6 +231,8 @@ export const api = {
   denyList: () => request<DenyListEntry[]>('/api/research/deny-list'),
   setDenyListState: (name: string, state: DenyListState) =>
     put<DenyListEntry>('/api/research/deny-list/state', { name, state }),
+  addDenyListEntry: (name: string, kind: SubjectKind, state: DenyListState) =>
+    post<DenyListEntry>('/api/research/deny-list', { name, kind, state }),
   topics: () => request<TopicSummary[]>('/api/research/topics'),
   setTopicMuted: (slug: string, muted: boolean) =>
     put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/muted`, { muted }),

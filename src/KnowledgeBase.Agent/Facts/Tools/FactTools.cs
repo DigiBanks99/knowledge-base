@@ -107,7 +107,7 @@ internal sealed class FactTools(
         if (unclassified is not null)
         {
             throw new InvalidOperationException(
-                $"The subject '{unclassified.Name}' has no `kind`. Give every subject, including related subjects, a `kind` of `{SubjectKind.Person}`, `{SubjectKind.Organisation}` or `{SubjectKind.Other}`.");
+                $"The subject '{unclassified.Name}' has no `kind`. Give every subject, including related subjects, a `kind` of `{SubjectKind.Person}`, `{SubjectKind.PublicFigure}`, `{SubjectKind.Organisation}` or `{SubjectKind.Other}`.");
         }
     }
 
