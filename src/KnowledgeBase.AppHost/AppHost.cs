@@ -20,6 +20,9 @@ IResourceBuilder<ParameterResource> rootDirectory = builder
     .AddParameter("WikiRootDirectory");
 IResourceBuilder<ParameterResource> apiKey = builder
     .AddParameter("AnthropicApiKey", true);
+// The model is the provider's, not the agent's, so an agent can be switched between providers on the settings page.
+IResourceBuilder<ParameterResource> anthropicModel = builder
+    .AddParameter("AnthropicModel");
 
 // Sign-in with Entra ID (the app registration's directory, application id and a client secret).
 IResourceBuilder<ParameterResource> entraTenantId = builder
@@ -34,6 +37,8 @@ IResourceBuilder<ParameterResource> openAICompatibleEndpoint = builder
     .AddParameter("OpenAICompatibleEndpoint");
 IResourceBuilder<ParameterResource> openAICompatibleApiKey = builder
     .AddParameter("OpenAICompatibleApiKey", secret: true);
+IResourceBuilder<ParameterResource> openAICompatibleModel = builder
+    .AddParameter("OpenAICompatibleModel");
 
 // An optional private repository the wiki's history is pushed to over SSH, and the folder on the host holding its
 // deploy key and pinned host keys. Neither is secret: the key itself never leaves that folder.
@@ -85,6 +90,9 @@ IResourceBuilder<ProjectResource> api = builder
     .WithEnvironment("Authentication__ClientSecret", entraClientSecret)
     .WithEnvironment("OpenAICompatible__Endpoint", openAICompatibleEndpoint)
     .WithEnvironment("OpenAICompatible__ApiKey", openAICompatibleApiKey)
+    .WithEnvironment("OpenAICompatible__Model", openAICompatibleModel)
+    .WithEnvironment("Anthropic__ApiKey", apiKey)
+    .WithEnvironment("Anthropic__Model", anthropicModel)
     .WithEnvironment("Wiki__Backup__Remote", wikiBackupRemote)
     .WithEnvironment("Wiki__Backup__KeyDirectory", wikiBackupKeyDirectory);
 
@@ -92,8 +100,6 @@ foreach (string agent in agents)
 {
     api
         .WithEnvironment($"{agent}__Provider", builder.AddParameter($"{agent}Provider"))
-        .WithEnvironment($"{agent}__ApiKey", apiKey)
-        .WithEnvironment($"{agent}__Model", builder.AddParameter($"{agent}Model"))
         .WithEnvironment($"{agent}__EnableThinking", builder.AddParameter($"{agent}EnableThinking"));
 }
 

@@ -7,19 +7,17 @@ public enum ModelProvider
 }
 
 /// <summary>
-/// The model settings of one agent, bound from the configuration section named after the agent.
+/// The model settings of one agent, bound from the configuration section named after the agent. The model itself is
+/// the provider's (<see cref="AnthropicOptions"/>, <see cref="OpenAICompatibleOptions"/>), so an agent can switch
+/// provider while the app runs.
 /// </summary>
 public sealed class AgentModelOptions
 {
-    public ModelProvider Provider { get; init; } = ModelProvider.Anthropic;
-
-    /// <summary>The Anthropic API key. Only the Anthropic provider uses it.</summary>
-    public string? ApiKey { get; init; }
-
     /// <summary>
-    /// The model name. A llama.cpp server running a single model answers with that model whatever name is sent.
+    /// The provider the agent runs on. The deployment configures a default; a choice made on the settings page
+    /// overrides it (see <see cref="AgentProviderOverrides"/>).
     /// </summary>
-    public string Model { get; init; } = "claude-haiku-5-5";
+    public ModelProvider Provider { get; init; } = ModelProvider.Anthropic;
 
     /// <summary>
     /// The most tokens one Anthropic response may hold. A tool call's arguments count towards it, and a call cut off
@@ -37,6 +35,16 @@ public sealed class AgentModelOptions
     public required string Instructions { get; init; }
 }
 
+/// <summary>The Anthropic API, shared by every agent whose provider is <see cref="ModelProvider.Anthropic"/>.</summary>
+public sealed class AnthropicOptions
+{
+    public const string SectionName = "Anthropic";
+
+    public string? ApiKey { get; init; }
+
+    public string Model { get; init; } = "claude-haiku-5-5";
+}
+
 /// <summary>
 /// A server with an OpenAI-compatible chat completions API, such as llama.cpp's llama-server, shared by every agent
 /// whose provider is <see cref="ModelProvider.OpenAICompatible"/>.
@@ -47,6 +55,12 @@ public sealed class OpenAICompatibleOptions
 
     /// <summary>The base address of the API, including the version segment, e.g. <c>http://localhost:8080/v1</c>.</summary>
     public Uri? Endpoint { get; init; }
+
+    /// <summary>
+    /// The model name. A llama.cpp server running a single model answers with that model whatever name is sent, so
+    /// this mostly labels the runs.
+    /// </summary>
+    public string Model { get; init; } = "Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL";
 
     /// <summary>The key the server was started with (llama-server's <c>--api-key</c>), if any.</summary>
     public string? ApiKey { get; init; }

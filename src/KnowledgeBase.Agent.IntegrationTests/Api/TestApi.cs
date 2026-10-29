@@ -32,7 +32,8 @@ namespace KnowledgeBase.Agent.IntegrationTests.Api;
 /// replaced: Entra sign-in by <see cref="TestSignIn"/>, Redis by an in-memory output cache, every agent by a
 /// <see cref="FakeAgent"/> and the web the search sources reach by <see cref="FakeWeb"/>. The rest (authorization, the CSRF check, routing, the watchers) runs as in production.
 /// </summary>
-internal sealed class TestApi : WebApplicationFactory<Program>
+/// <param name="settings">More settings for <c>Program</c>, such as a model server's endpoint.</param>
+internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = null) : WebApplicationFactory<Program>
 {
     /// <summary>The object id of the one user the API lets in.</summary>
     public const string OwnerObjectId = "6f1c8f0e-7f4a-4a52-9a43-0b0d2c1a9e11";
@@ -49,6 +50,9 @@ internal sealed class TestApi : WebApplicationFactory<Program>
     };
 
     public WikiConfigurationSettings Settings => Services.GetRequiredService<IOptions<WikiConfigurationSettings>>().Value;
+
+    /// <summary>The root directory's settings before the API starts, so a test can lay out what a restart finds.</summary>
+    public WikiConfigurationSettings SettingsBeforeStart => new() { RootDirectory = _root.Path };
 
     public FakeAgent Agent(string name) => _agents[name];
 
@@ -91,10 +95,15 @@ internal sealed class TestApi : WebApplicationFactory<Program>
         builder.UseSetting($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.FetchPolitenessDelay)}", "00:00:00");
         builder.UseSetting(AgentInstructions.SharedInstructionsKey, "Shared instructions.");
         builder.UseSetting(AgentInstructions.WikiRulesKey, "Wiki rules.");
+        builder.UseSetting($"{AnthropicOptions.SectionName}:{nameof(AnthropicOptions.ApiKey)}", "not-a-key");
         foreach (string agent in KnownAgentNames)
         {
             builder.UseSetting($"{agent}:Instructions", $"You are the {agent}.");
-            builder.UseSetting($"{agent}:ApiKey", "not-a-key");
+        }
+
+        foreach ((string key, string? value) in settings ?? new Dictionary<string, string?>())
+        {
+            builder.UseSetting(key, value);
         }
 
         builder.ConfigureLogging(logging => logging.ClearProviders());

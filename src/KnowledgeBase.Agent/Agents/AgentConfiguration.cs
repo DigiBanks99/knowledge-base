@@ -7,6 +7,7 @@ using KnowledgeBase.Agent.Wiki.Tools;
 
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 
 using OpenAI;
 using OpenAI.Chat;
@@ -60,12 +61,15 @@ internal static class AgentConfiguration
                 ? AgentInstructions.ComposeRoleOnly(agentName, options.Instructions)
                 : AgentInstructions.Compose(builder.Configuration, agentName, options.Instructions, includeWikiRules);
 
-            Func<AITool[], AIAgent> createAgent = options.Provider switch
+            // Only the provider the agent starts on must be usable; another is checked when it is chosen.
+            string? problem = AgentProviders.Problem(builder.Configuration, options.Provider);
+            if (problem is not null)
             {
-                ModelProvider.Anthropic => CreateAnthropicAgent(agentName, options, instructions),
-                ModelProvider.OpenAICompatible => CreateOpenAICompatibleAgent(builder.Configuration, agentName, options, instructions),
-                _ => throw new InvalidOperationException($"Agent {agentName} has an unknown model provider '{options.Provider}'.")
-            };
+                throw new InvalidOperationException($"Agent {agentName} cannot start: {problem}");
+            }
+
+            IConfiguration configuration = builder.Configuration;
+            builder.Services.Configure<AgentModelOptions>(agentName, configuration.GetSection(agentName));
 
             AIAgentToolsBuilder toolsBuilder = new(builder, agentName, []);
             builder.Services.AddKeyedSingleton<AIAgent>(agentName, (sp, _) =>
@@ -76,7 +80,11 @@ internal static class AgentConfiguration
                 AITool[] agentTools = roleOnly
                     ? tools.Tools
                     : [.. tools.Tools, AIFunctionFactory.Create(dateTools.GetCurrentDateTimeIso)];
-                return createAgent(agentTools)
+                ProviderSwitchingChatClient chatClient = new(
+                    agentName,
+                    sp.GetRequiredService<IOptionsMonitor<AgentModelOptions>>(),
+                    provider => CreateChatClient(configuration, agentName, provider));
+                return new ChatClientAgent(WithDetailedToolErrors(chatClient), instructions, agentName, tools: agentTools)
                     .AsBuilder()
                     .Use((_, context, next, cancellationToken) => RecordToolCall(runTracker, context, next, cancellationToken))
                     .Build();
@@ -86,44 +94,37 @@ internal static class AgentConfiguration
         }
     }
 
-    private static Func<AITool[], AIAgent> CreateAnthropicAgent(
-        string agentName,
-        AgentModelOptions options,
-        string instructions)
+    private static IChatClient CreateChatClient(IConfiguration configuration, string agentName, ModelProvider provider)
     {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        string? problem = AgentProviders.Problem(configuration, provider);
+        if (problem is not null)
         {
-            throw new InvalidOperationException($"Agent {agentName} uses the Anthropic provider and requires '{agentName}:ApiKey'.");
+            throw new InvalidOperationException($"Agent {agentName} cannot run on {provider}: {problem}");
         }
 
-        AnthropicClient client = new()
+        AgentModelOptions options = configuration.GetSection(agentName).Get<AgentModelOptions>()!;
+        return provider switch
         {
-            ApiKey = options.ApiKey,
+            ModelProvider.Anthropic => CreateAnthropicChatClient(configuration, options),
+            ModelProvider.OpenAICompatible => CreateOpenAICompatibleChatClient(configuration, options),
+            _ => throw new InvalidOperationException($"Agent {agentName} has an unknown model provider '{provider}'.")
         };
-
-        return tools => client.AsAIAgent(
-            options.Model,
-            instructions,
-            agentName,
-            tools: tools,
-            defaultMaxTokens: options.MaxOutputTokens,
-            clientFactory: WithDetailedToolErrors);
     }
 
-    private static Func<AITool[], AIAgent> CreateOpenAICompatibleAgent(
-        IConfiguration configuration,
-        string agentName,
-        AgentModelOptions options,
-        string instructions)
+    private static IChatClient CreateAnthropicChatClient(IConfiguration configuration, AgentModelOptions options)
     {
-        OpenAICompatibleOptions server = configuration
-            .GetSection(OpenAICompatibleOptions.SectionName)
-            .Get<OpenAICompatibleOptions>() ?? new OpenAICompatibleOptions();
-        if (server.Endpoint is null)
+        AnthropicOptions anthropic = AgentProviders.AnthropicSettings(configuration);
+        AnthropicClient client = new()
         {
-            throw new InvalidOperationException(
-                $"Agent {agentName} uses the OpenAICompatible provider and requires '{OpenAICompatibleOptions.SectionName}:Endpoint'.");
-        }
+            ApiKey = anthropic.ApiKey,
+        };
+
+        return client.AsIChatClient(anthropic.Model, options.MaxOutputTokens);
+    }
+
+    private static IChatClient CreateOpenAICompatibleChatClient(IConfiguration configuration, AgentModelOptions options)
+    {
+        OpenAICompatibleOptions server = AgentProviders.OpenAICompatibleSettings(configuration);
 
         // The client refuses to send a request without a key, but a server started without one accepts any.
         ApiKeyCredential credential = new(string.IsNullOrWhiteSpace(server.ApiKey) ? "unused" : server.ApiKey);
@@ -132,13 +133,9 @@ internal static class AgentConfiguration
             Endpoint = server.Endpoint,
             NetworkTimeout = server.NetworkTimeout,
         });
-        ChatClient chatClient = client.GetChatClient(options.Model);
+        IChatClient chatClient = client.GetChatClient(server.Model).AsIChatClient();
 
-        return tools => chatClient.AsAIAgent(
-            instructions,
-            agentName,
-            tools: tools,
-            clientFactory: inner => WithDetailedToolErrors(options.EnableThinking ? inner : WithoutThinking(inner)));
+        return options.EnableThinking ? chatClient : WithoutThinking(chatClient);
     }
 
     /// <summary>
