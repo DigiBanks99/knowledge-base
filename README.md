@@ -163,7 +163,8 @@ The agents depend on tool calling, so the server must support it. For `llama-ser
   support tools.
 - Give it enough context (`-c`). The Reviewer reads the whole wiki in one run. The context is split between parallel
   slots (`-np`), so `-c 32768 -np 2` gives each request 16k tokens.
-- A single-model server ignores the model name, so `OpenAICompatibleModel` can be any label.
+- A single-model server ignores the model name, so `OpenAICompatibleModel` can be any label. A server in router mode
+  (`--models-preset`, several models) routes by it, so it must be the preset's section name.
 - Reasoning models such as Qwen 3 think before every answer, which on a CPU can take minutes. Set
   `{Agent}EnableThinking` to `false` to send `chat_template_kwargs.enable_thinking = false` with each request, so the
   chat template skips it.

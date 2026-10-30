@@ -19,7 +19,7 @@ internal sealed class TokenCountUnavailableError(string reason)
 
 /// <summary>
 /// Asks llama-server's <c>/tokenize</c> route, which tokenizes with the model it has loaded, so the count is exact
-/// whatever model is configured.
+/// whatever model is configured. The model is named because a router-mode server refuses to tokenize without one.
 /// </summary>
 internal sealed class LlamaServerTokenCounter(IHttpClientFactory httpClientFactory, IConfiguration configuration)
     : IPromptTokenCounter
@@ -39,7 +39,7 @@ internal sealed class LlamaServerTokenCounter(IHttpClientFactory httpClientFacto
         Uri tokenizeUri = ModelServerHealthCheck.ServerUri(server.Endpoint, "tokenize");
         using HttpRequestMessage request = new(HttpMethod.Post, tokenizeUri)
         {
-            Content = JsonContent.Create(new { content = prompt })
+            Content = JsonContent.Create(new { content = prompt, model = server.Model })
         };
         if (!string.IsNullOrWhiteSpace(server.ApiKey))
         {
