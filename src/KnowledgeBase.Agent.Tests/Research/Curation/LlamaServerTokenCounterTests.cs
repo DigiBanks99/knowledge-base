@@ -21,7 +21,8 @@ public sealed class LlamaServerTokenCounterTests : IDisposable
         _configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"{OpenAICompatibleOptions.SectionName}:Endpoint"] = "http://localhost:8080/v1",
-            [$"{OpenAICompatibleOptions.SectionName}:ApiKey"] = "a-key"
+            [$"{OpenAICompatibleOptions.SectionName}:ApiKey"] = "a-key",
+            [$"{OpenAICompatibleOptions.SectionName}:Model"] = "qwen3.5-4b"
         });
         _counter = new LlamaServerTokenCounter(httpClientFactory, _configuration);
     }
@@ -41,7 +42,7 @@ public sealed class LlamaServerTokenCounterTests : IDisposable
 
         ItShouldCountTheTokens();
         ItShouldAskTheTokenizeRoute();
-        ItShouldSendThePrompt();
+        ItShouldSendThePromptForTheConfiguredModel();
 
         void ItShouldCountTheTokens() => result.Value.ShouldBe(4);
 
@@ -50,7 +51,8 @@ public sealed class LlamaServerTokenCounterTests : IDisposable
             request => request.RequestUri.ShouldBe(new Uri("http://localhost:8080/tokenize")),
             request => request.Headers.Authorization.ShouldNotBeNull().ToString().ShouldBe("Bearer a-key"));
 
-        void ItShouldSendThePrompt() => _handler.Bodies.Single().ShouldBe("""{"content":"Curate the topic."}""");
+        void ItShouldSendThePromptForTheConfiguredModel() =>
+            _handler.Bodies.Single().ShouldBe("""{"content":"Curate the topic.","model":"qwen3.5-4b"}""");
     }
 
     [Test]

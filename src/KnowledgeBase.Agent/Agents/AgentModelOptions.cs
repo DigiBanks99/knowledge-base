@@ -57,8 +57,8 @@ public sealed class OpenAICompatibleOptions
     public Uri? Endpoint { get; init; }
 
     /// <summary>
-    /// The model name. A llama.cpp server running a single model answers with that model whatever name is sent, so
-    /// this mostly labels the runs.
+    /// The model name. A llama.cpp server running a single model answers with that model whatever name is sent; one in
+    /// router mode (several models) routes chat and tokenize requests by it, so it must match a preset's name there.
     /// </summary>
     public string Model { get; init; } = "Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL";
 
