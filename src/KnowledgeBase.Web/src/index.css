@@ -303,12 +303,15 @@ details.card summary {
 .badge-medium,
 .badge-degraded,
 .badge-triaging,
+.badge-needsreview,
 .badge-pending {
   background: var(--warning-soft);
   color: var(--warning);
 }
 
-.badge-muted {
+.badge-muted,
+.badge-pinned,
+.badge-approved {
   background: transparent;
   color: var(--muted);
   outline: 1px solid var(--muted);
@@ -416,6 +419,52 @@ details.card summary {
 
 .topics .pending-results {
   margin-top: 0.6rem;
+}
+
+.topics .review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.topics .review-form input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.topics .review-form input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.topics .review-form .actions {
+  margin-top: 0;
+}
+
+.topics .question {
+  margin: 0.4rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--warning);
+  background: var(--warning-soft);
+}
+
+.topics .guidance {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.topics .guidance summary {
+  cursor: pointer;
+}
+
+.topics .guidance ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
 }
 
 .topics .pending-results summary {
