@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Net.Mime;
 
+using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Wiki;
 
@@ -75,9 +76,20 @@ internal sealed class FileTools(
         [Description("The path of the directory to list, relative to the wiki root.")]
         string desiredDirectoryPath)
     {
+        FactOrigin origin = runTracker.CurrentOrigin;
+        string directoryPath = wikiPaths.Resolve(desiredDirectoryPath);
+        if (RunToolPolicy.Hides(origin, wikiPaths.ToRelative(directoryPath)))
+        {
+            // Empty whether or not the folder exists, so a research run can't probe which personal pages there are.
+            return [];
+        }
+
         Result<IEnumerable<string>, Error> result = listFilesHandler
-            .Handle(new ListFilesRequest(wikiPaths.Resolve(desiredDirectoryPath), IncludeDirectories: true))
-            .Map(paths => paths.Where(path => !wikiPaths.IsRepositoryPath(path)).Select(wikiPaths.ToRelative))
+            .Handle(new ListFilesRequest(directoryPath, IncludeDirectories: true))
+            .Map(paths => paths
+                .Where(path => !wikiPaths.IsRepositoryPath(path))
+                .Select(wikiPaths.ToRelative)
+                .Where(path => !RunToolPolicy.Hides(origin, path)))
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -131,8 +143,10 @@ internal sealed class FileTools(
         string filePath,
         CancellationToken cancellationToken = default)
     {
+        string fullPath = wikiPaths.Resolve(filePath);
+        EnsureAllowed(nameof(ReadFile), fullPath);
         Result<string, Error> result = await readFileHandler
-            .Handle(new ReadFileRequest(wikiPaths.Resolve(filePath)), cancellationToken)
+            .Handle(new ReadFileRequest(fullPath), cancellationToken)
             .TapError(logger.ErrorOccurred);
         return result.Match(
             success => success,
@@ -156,10 +170,12 @@ internal sealed class FileTools(
             return [];
         }
 
+        FactOrigin origin = runTracker.CurrentOrigin;
         List<string> matches = [];
         IEnumerable<string> pages = Directory
             .EnumerateFiles(wikiPaths.Root, "*.md", SearchOption.AllDirectories)
-            .Where(filePath => !wikiPaths.IsRepositoryPath(filePath));
+            .Where(filePath => !wikiPaths.IsRepositoryPath(filePath))
+            .Where(filePath => !RunToolPolicy.Hides(origin, wikiPaths.ToRelative(filePath)));
         foreach (string filePath in pages)
         {
             string[] lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
