@@ -151,6 +151,20 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         }
     }
 
+    public async Task<UnitResult<Error>> CancelCurationAsync(string topic, CancellationToken cancellationToken)
+    {
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            return Delete(TopicFilePath(_curationRequestsDirectory, topic))
+                .Bind(() => Delete(TopicFilePath(_curationFailedDirectory, topic)));
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+    }
+
     public Task<Result<IReadOnlyList<FailedCuration>, Error>> ListFailedCurationsAsync(CancellationToken cancellationToken) =>
         ReadAllAsync<FailedCuration>(_curationFailedDirectory, cancellationToken);
 

@@ -11,6 +11,9 @@ public enum TopicState
     CurationFailed,
     Muted,
 
+    /// <summary>The Pleb could not pin the subject down and asked the author a question; the topic is not searched.</summary>
+    NeedsReview,
+
     /// <summary>The topic's last search kept results that wait for the Scout.</summary>
     Triaging,
 
@@ -24,6 +27,10 @@ public enum TopicState
 /// <param name="PendingResults">How many results of its last search wait to be triaged.</param>
 /// <param name="Interval">How long after a search the topic is due again.</param>
 /// <param name="LastPositiveAt">When the ThreadWeaver last filed something from the topic's research.</param>
+/// <param name="ReviewQuestion">The Pleb's question waiting for the author, if any.</param>
+/// <param name="Guidance">The author's clarifications and rejections the Pleb is given, oldest first.</param>
+/// <param name="Pinned">Whether the author edited the brief and queries, so page changes leave them alone.</param>
+/// <param name="ApprovedAt">When the author approved the current brief and queries.</param>
 public sealed record TopicSummary(
     string Path,
     string Slug,
@@ -36,4 +43,8 @@ public sealed record TopicSummary(
     DateTimeOffset? NextSearchAt = null,
     int PendingResults = 0,
     TimeSpan? Interval = null,
-    DateTimeOffset? LastPositiveAt = null);
+    DateTimeOffset? LastPositiveAt = null,
+    string? ReviewQuestion = null,
+    IReadOnlyList<AuthorGuidance>? Guidance = null,
+    bool Pinned = false,
+    DateTimeOffset? ApprovedAt = null);

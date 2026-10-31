@@ -38,6 +38,61 @@ public sealed class ListTopicsQueryHandlerTests
     }
 
     [Test]
+    public async Task ThePlebAskedTheAuthorAboutATopic()
+    {
+        AuthorGuidance answer = new(GuidanceKind.Clarification, "The robotics framework.", Discovered, "Which Atlas?");
+        _state.Topics["projects/asked"] = ResearchTopic.New("projects/asked", Discovered) with { ReviewQuestion = "Which Atlas?" };
+        _state.Topics["projects/answered"] = ResearchTopic.New("projects/answered", Discovered) with
+        {
+            ReviewQuestion = "Which Atlas?",
+            Guidance = [answer],
+            Pinned = true
+        };
+        _state.CurationRequests["projects/answered"] = new CurationRequest("projects/answered", [], Discovered, ByAuthor: true);
+
+        Result<IReadOnlyList<TopicSummary>, Error> result = await _handler.Handle(new ListTopicsQuery(), CancellationToken.None);
+
+        ItShouldShowAnUnansweredQuestionAsNeedingReview();
+        ItShouldShowAnAnsweredOneAsWaitingForTheCuration();
+        ItShouldShowTheQuestionAndGuidance();
+
+        void ItShouldShowAnUnansweredQuestionAsNeedingReview() => result.Value[1].State.ShouldBe(TopicState.NeedsReview);
+
+        void ItShouldShowAnAnsweredOneAsWaitingForTheCuration() => result.Value[0].State.ShouldBe(TopicState.AwaitingCuration);
+
+        void ItShouldShowTheQuestionAndGuidance() => result.Value[0].ShouldSatisfyAllConditions(
+            topic => topic.ReviewQuestion.ShouldBe("Which Atlas?"),
+            topic => topic.Guidance.ShouldBe([answer]),
+            topic => topic.Pinned.ShouldBeTrue());
+    }
+
+    [Test]
+    public async Task TheCurationAfterTheAuthorsAnswerFails()
+    {
+        _state.Topics["learning/okf.md"] = ResearchTopic.New("learning/okf.md", Discovered) with { ReviewQuestion = "Which OKF?" };
+        _state.FailedCurations["learning/okf.md"] = new FailedCuration(new CurationRequest("learning/okf.md", [], Discovered, ByAuthor: true), "No verdict.", Discovered);
+
+        Result<IReadOnlyList<TopicSummary>, Error> result = await _handler.Handle(new ListTopicsQuery(), CancellationToken.None);
+
+        ItShouldShowTheFailureRatherThanAskAgain();
+
+        void ItShouldShowTheFailureRatherThanAskAgain() => result.Value.Single().State.ShouldBe(TopicState.CurationFailed);
+    }
+
+    [Test]
+    public async Task TheAuthorEditsATopicWhileItIsCurated()
+    {
+        _state.Topics["projects/atlas"] = ResearchTopic.New("projects/atlas", Discovered) with { Queries = ["atlas"], Pinned = true };
+        _state.FailedCurations["projects/atlas"] = new FailedCuration(new CurationRequest("projects/atlas", [], Discovered), "Pinned.", Discovered);
+
+        Result<IReadOnlyList<TopicSummary>, Error> result = await _handler.Handle(new ListTopicsQuery(), CancellationToken.None);
+
+        ItShouldLetTheEditSupersedeTheFailure();
+
+        void ItShouldLetTheEditSupersedeTheFailure() => result.Value.Single().State.ShouldBe(TopicState.Idle);
+    }
+
+    [Test]
     public async Task ATopicsCurationFailed()
     {
         DateTimeOffset curated = Discovered.AddDays(1);

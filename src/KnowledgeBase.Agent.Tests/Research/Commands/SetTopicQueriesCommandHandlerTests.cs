@@ -51,6 +51,66 @@ public sealed class SetTopicQueriesCommandHandlerTests
     }
 
     [Test]
+    public async Task ThePlebCuratesATopicAfterTheAuthorsAnswer()
+    {
+        _state.Topics["projects/atlas"] = _state.Topics["projects/atlas"] with
+        {
+            Queries = ["atlas"],
+            ReviewQuestion = "Which Atlas?",
+            ApprovedAt = Discovered
+        };
+
+        await _handler.Handle(
+            new SetTopicQueriesCommand("projects/atlas", "News about the Atlas robotics framework.", ["atlas robotics release"]),
+            CancellationToken.None);
+
+        ItShouldCloseTheQuestion();
+        ItShouldNeedApprovingAgain();
+
+        void ItShouldCloseTheQuestion() => _state.Topics["projects/atlas"].NeedsReview.ShouldBeFalse();
+
+        void ItShouldNeedApprovingAgain() => _state.Topics["projects/atlas"].ApprovedAt.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task ThePlebCuratesATopicTheAuthorEdited()
+    {
+        _state.Topics["projects/atlas"] = _state.Topics["projects/atlas"] with { Brief = "The author's brief.", Queries = ["authors query"], Pinned = true };
+
+        Result<ResearchTopic, Error> result = await _handler.Handle(
+            new SetTopicQueriesCommand("projects/atlas", "News about Atlas.", ["atlas release"]),
+            CancellationToken.None);
+
+        ItShouldBeRefused();
+        ItShouldKeepTheAuthorsEdit();
+
+        void ItShouldBeRefused() => result.Error.ShouldBeOfType<TopicPinnedError>();
+
+        void ItShouldKeepTheAuthorsEdit() => _state.Topics["projects/atlas"].Queries.ShouldBe(["authors query"]);
+    }
+
+    [Test]
+    public async Task ThePlebProposesQueriesTheAuthorRejected()
+    {
+        _state.Topics["projects/atlas"] = _state.Topics["projects/atlas"] with
+        {
+            Queries = ["atlas"],
+            Guidance = [new AuthorGuidance(GuidanceKind.Rejection, "Too vague.", Discovered, RejectedBrief: "Atlas.", RejectedQueries: ["atlas"])]
+        };
+
+        Result<ResearchTopic, Error> result = await _handler.Handle(
+            new SetTopicQueriesCommand("projects/atlas", "A different brief about Atlas.", ["Atlas"]),
+            CancellationToken.None);
+
+        ItShouldBeRefused();
+        ItShouldStoreNothing();
+
+        void ItShouldBeRefused() => result.Error.Code.ShouldBe("RejectedQueries");
+
+        void ItShouldStoreNothing() => _state.Topics["projects/atlas"].LastCuratedAt.ShouldBeNull();
+    }
+
+    [Test]
     public async Task ThePlebPutsADeniedNameInAQuery()
     {
         Result<ResearchTopic, Error> result = await _handler.Handle(

@@ -85,6 +85,25 @@ public sealed class RecordTopicChangesCommandHandlerTests
     }
 
     [Test]
+    public async Task TheThreadWeaverChangesATopicTheAuthorEdited()
+    {
+        _state.Topics[KnownTopic] = _state.Topics[KnownTopic] with { Pinned = true };
+
+        TopicChanges changes = (await _handler.Handle(Run(KnownAgents.ThreadWeaver, Call("PatchFile", "projects/known/index.md")), CancellationToken.None)).Value;
+
+        ItShouldNotRequestCuration();
+        ItShouldKeepTheTopic();
+
+        void ItShouldNotRequestCuration()
+        {
+            changes.CurationRequested.ShouldBeEmpty();
+            _state.CurationRequests.ShouldBeEmpty();
+        }
+
+        void ItShouldKeepTheTopic() => _state.Topics[KnownTopic].Pinned.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task TheThreadWeaverChangesAKnownTopicTwice()
     {
         await _handler.Handle(Run(KnownAgents.ThreadWeaver, Call("PatchFile", "projects/known/a.md")), CancellationToken.None);

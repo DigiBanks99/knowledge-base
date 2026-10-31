@@ -51,6 +51,12 @@ internal interface IResearchStore
     /// </summary>
     Task<UnitResult<Error>> FailCurationAsync(FailedCuration failure, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Drops any curation request waiting for the topic and any failure recorded for it, for a topic whose brief and
+    /// queries the author set by hand.
+    /// </summary>
+    Task<UnitResult<Error>> CancelCurationAsync(string topic, CancellationToken cancellationToken);
+
     /// <summary>The curations that failed, at most one per topic.</summary>
     Task<Result<IReadOnlyList<FailedCuration>, Error>> ListFailedCurationsAsync(CancellationToken cancellationToken);
 

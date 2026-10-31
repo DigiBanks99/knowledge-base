@@ -40,7 +40,9 @@ internal sealed class CurateTopicsCommandHandler(
     IConfiguration configuration,
     TimeProvider timeProvider)
 {
-    private static readonly HashSet<string> VerdictTools = [nameof(PlebTools.SetTopicQueries), nameof(PlebTools.KeepQueries)];
+    // Asking the author is a verdict too: the curation is done, and the topic waits for the author's answer.
+    private static readonly HashSet<string> VerdictTools =
+        [nameof(PlebTools.SetTopicQueries), nameof(PlebTools.KeepQueries), nameof(PlebTools.RequestHumanReview)];
 
     private readonly ResearchSettings _settings = settings.Value;
 
@@ -58,8 +60,8 @@ internal sealed class CurateTopicsCommandHandler(
     }
 
     /// <summary>
-    /// The oldest requests go first, up to <see cref="ResearchSettings.CurationsPerCycle"/>, so adopting research (a
-    /// request for every topic) drains gradually. Muted topics' requests keep waiting until they are unmuted. Nothing
+    /// The author's requests go first, as the author is waiting on them, then the oldest, up to
+    /// <see cref="ResearchSettings.CurationsPerCycle"/>, so adopting research (a request for every topic) drains gradually. Muted topics' requests keep waiting until they are unmuted. Nothing
     /// runs while the model server is unhealthy, so an outage doesn't turn the queue into failures.
     /// </summary>
     public async Task<Result<CurationCycle, Error>> Handle(CurateTopicsCommand _, CancellationToken cancellationToken)
@@ -87,7 +89,8 @@ internal sealed class CurateTopicsCommandHandler(
         [
             .. requests
                 .Where(request => topicsByPath.TryGetValue(request.Topic, out ResearchTopic? topic) && !topic.Muted)
-                .OrderBy(request => request.QueuedSince)
+                .OrderByDescending(request => request.ByAuthor)
+                .ThenBy(request => request.QueuedSince)
                 .Take(Math.Max(0, _settings.CurationsPerCycle))
                 .Select(request => (topicsByPath[request.Topic], request))
         ];
@@ -166,7 +169,7 @@ internal sealed class CurateTopicsCommandHandler(
                 return HasVerdict(runTracker.Current)
                     ? response
                     : throw new InvalidOperationException(
-                        $"The Pleb ended without a verdict: it must call `{nameof(PlebTools.SetTopicQueries)}` or `{nameof(PlebTools.KeepQueries)}` successfully.");
+                        $"The Pleb ended without a verdict: it must call `{nameof(PlebTools.SetTopicQueries)}`, `{nameof(PlebTools.KeepQueries)}` or `{nameof(PlebTools.RequestHumanReview)}` successfully.");
             },
             cancellationToken);
 

@@ -7,13 +7,15 @@ using KnowledgeBase.Agent.Runs;
 namespace KnowledgeBase.Agent.Research.Tools;
 
 /// <summary>
-/// The Pleb's only tools: one to give a topic a new brief and queries, one to keep them. A curation run is for one
+/// The Pleb's only tools: one to give a topic a new brief and queries, one to keep them and one to ask the author
+/// when it cannot tell what the topic is about. A curation run is for one
 /// topic, so a call naming another is refused.
 /// </summary>
 internal sealed class PlebTools(
     AgentRunTracker runTracker,
     SetTopicQueriesCommandHandler setQueriesHandler,
-    KeepTopicQueriesCommandHandler keepQueriesHandler)
+    KeepTopicQueriesCommandHandler keepQueriesHandler,
+    RequestTopicReviewCommandHandler requestReviewHandler)
 {
     // The limits are spelled out because attribute arguments cannot interpolate the TopicQueries constants.
     [Description("""
@@ -49,6 +51,23 @@ internal sealed class PlebTools(
         return result.IsFailure
             ? throw new InvalidOperationException(result.Error.Message)
             : $"Kept the queries for {topic}. You are done.";
+    }
+
+    [Description("""
+                 Asks the author what the topic is about, instead of setting or keeping its queries. Call this only when you cannot name the subject unambiguously: a name or acronym with several plausible meanings, or a page that does not say what kind of thing the subject is or who makes it.
+                 The topic is not searched until the author answers; you are then asked to curate it again with the answer. Do not also call `SetTopicQueries` or `KeepQueries` in this run.
+                 """)]
+    public async Task<string> RequestHumanReview(
+        [Description("The topic's path exactly as the prompt gives it, for example `projects/example`.")] string topic,
+        [Description("One or two sentences (at most 500 characters) saying what is unclear, for example which meanings of an acronym you could not choose between.")] string question,
+        CancellationToken cancellationToken)
+    {
+        EnsureIsTheRunsTopic(topic);
+        Result<ResearchTopic, Error> result = await requestReviewHandler
+            .Handle(new RequestTopicReviewCommand(topic, question), cancellationToken);
+        return result.IsFailure
+            ? throw new InvalidOperationException(result.Error.Message)
+            : $"Asked the author about {topic}. You are done.";
     }
 
     private void EnsureIsTheRunsTopic(string topic)

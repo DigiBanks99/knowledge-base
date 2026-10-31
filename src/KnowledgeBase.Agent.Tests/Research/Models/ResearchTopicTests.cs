@@ -105,4 +105,19 @@ public sealed class ResearchTopicTests
 
         void ItShouldBeTheSameTopic() => pruned.ShouldBeSameAs(topic);
     }
+
+    [Test]
+    public void TheAuthorGuidesATopicMoreOftenThanItKeeps()
+    {
+        ResearchTopic guided = _topic;
+        foreach (int day in new[] { 1, 2, 3, 4 })
+        {
+            guided = guided.WithGuidance(new AuthorGuidance(GuidanceKind.Rejection, $"Reason {day}.", Now.AddDays(day)), limit: 3);
+        }
+
+        ItShouldKeepOnlyTheLatestEntries();
+
+        void ItShouldKeepOnlyTheLatestEntries() =>
+            guided.Guidance.ShouldNotBeNull().Select(entry => entry.Text).ShouldBe(["Reason 2.", "Reason 3.", "Reason 4."]);
+    }
 }

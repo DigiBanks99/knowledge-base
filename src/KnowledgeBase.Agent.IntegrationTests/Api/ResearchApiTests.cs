@@ -266,6 +266,103 @@ public sealed class ResearchApiTests : IDisposable
     }
 
     [Test]
+    public async Task TheAuthorEditsATopicsCuration()
+    {
+        await CurateAsync("projects/garden", "raised beds");
+
+        HttpResponseMessage response = await _api.Client().PutAsJsonAsync(
+            "/api/research/topics/projects--garden/curation",
+            new { brief = "News about drip irrigation.", queries = new[] { "drip irrigation kit" } },
+            TestApi.Json);
+        ResearchTopic stored = (await _api.Get<IResearchStore>().ListTopicsAsync(CancellationToken.None)).Value.Single();
+
+        ItShouldSucceed();
+        ItShouldStoreAndPinTheEdit();
+
+        void ItShouldSucceed() => response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        void ItShouldStoreAndPinTheEdit() => stored.ShouldSatisfyAllConditions(
+            topic => topic.Queries.ShouldBe(["drip irrigation kit"]),
+            topic => topic.Pinned.ShouldBeTrue());
+    }
+
+    [Test]
+    public async Task TheAuthorPutsADeniedNameInAnEditedQuery()
+    {
+        await CurateAsync("projects/garden", "raised beds");
+        await DenyAsync(JaneDoe);
+
+        HttpResponseMessage response = await _api.Client().PutAsJsonAsync(
+            "/api/research/topics/projects--garden/curation",
+            new { brief = "News about raised beds.", queries = new[] { "jane doe raised beds" } },
+            TestApi.Json);
+
+        await ItShouldBeABadRequestThatNamesTheProblem();
+
+        async Task ItShouldBeABadRequestThatNamesTheProblem()
+        {
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+            (await response.Content.ReadAsStringAsync()).ShouldContain("contains the name 'Jane Doe'");
+        }
+    }
+
+    [Test]
+    public async Task TheAuthorClarifiesATopicThePlebAskedNothingAbout()
+    {
+        await CurateAsync("projects/garden", "raised beds");
+
+        HttpResponseMessage response = await _api.Client().PostAsJsonAsync(
+            "/api/research/topics/projects--garden/clarify",
+            new { answer = "Vegetable gardening." },
+            TestApi.Json);
+
+        ItShouldBeAConflict();
+
+        void ItShouldBeAConflict() => response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    [Test]
+    [Arguments("reject")]
+    [Arguments("approve")]
+    [Arguments("recurate")]
+    public async Task TheAuthorReviewsATopicWithoutTheCsrfHeader(string action)
+    {
+        await CurateAsync("projects/garden", "raised beds");
+
+        HttpResponseMessage response = await _api.Client(sendsCsrfHeader: false).PostAsJsonAsync(
+            $"/api/research/topics/projects--garden/{action}",
+            new { },
+            TestApi.Json);
+        IReadOnlyList<CurationRequest> requests = (await _api.Get<IResearchStore>().ListCurationRequestsAsync(CancellationToken.None)).Value;
+
+        ItShouldBeRefused();
+        ItShouldQueueNothing();
+
+        void ItShouldBeRefused() => response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        void ItShouldQueueNothing() => requests.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task TheAuthorRejectsACuration()
+    {
+        await CurateAsync("projects/garden", "raised beds");
+
+        HttpResponseMessage response = await _api.Client().PostAsJsonAsync(
+            "/api/research/topics/projects--garden/reject",
+            new { reason = "Too broad." },
+            TestApi.Json);
+        IReadOnlyList<CurationRequest> requests = (await _api.Get<IResearchStore>().ListCurationRequestsAsync(CancellationToken.None)).Value;
+
+        ItShouldSucceed();
+        ItShouldQueueACurationForTheAuthor();
+
+        void ItShouldSucceed() => response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        void ItShouldQueueACurationForTheAuthor() => requests.ShouldHaveSingleItem().ByAuthor.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task TheResultsOfATopicWithNoneWaitingAreRequested()
     {
         await DiscoverAsync("projects/garden");

@@ -16,6 +16,15 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// </param>
 /// <param name="LastPositiveAt">When the ThreadWeaver last filed something from the topic's research; none until it has.</param>
 /// <param name="ConsecutiveFailures">How many research notes in a row ended in the failed notes folder.</param>
+/// <param name="ReviewQuestion">
+/// What the Pleb could not settle about the topic and asked the author; while it is open the topic is not searched.
+/// </param>
+/// <param name="Guidance">The author's latest clarifications and rejections, given to every later curation.</param>
+/// <param name="Pinned">
+/// Whether the author edited the brief and queries, so page changes no longer ask the Pleb to revisit them.
+/// </param>
+/// <param name="ApprovedAt">When the author approved the current brief and queries; none once they change.</param>
+/// <param name="ReviewRequestedAt">When the Pleb asked its open question, so an older answer to it does not count.</param>
 public sealed record ResearchTopic(
     string Path,
     string? Brief,
@@ -27,7 +36,12 @@ public sealed record ResearchTopic(
     TimeSpan? Interval = null,
     IReadOnlyDictionary<string, DateTimeOffset>? SeenUrls = null,
     DateTimeOffset? LastPositiveAt = null,
-    int ConsecutiveFailures = 0)
+    int ConsecutiveFailures = 0,
+    string? ReviewQuestion = null,
+    IReadOnlyList<AuthorGuidance>? Guidance = null,
+    bool Pinned = false,
+    DateTimeOffset? ApprovedAt = null,
+    DateTimeOffset? ReviewRequestedAt = null)
 {
     /// <summary>How long a topic waits between searches until its outcomes say otherwise.</summary>
     public static TimeSpan DefaultInterval { get; } = TimeSpan.FromHours(24);
@@ -48,6 +62,29 @@ public sealed record ResearchTopic(
 
     /// <summary>Whether the pipeline keeps failing on the topic's research, which is not the same as the topic being quiet.</summary>
     public bool IsFailing => ConsecutiveFailures >= FailureLimit;
+
+    /// <summary>Whether the Pleb asked the author a question about the topic that is still unanswered by a new curation.</summary>
+    public bool NeedsReview => ReviewQuestion is not null;
+
+    /// <summary>Whether the author has answered the open question since the Pleb asked it.</summary>
+    public bool ReviewAnswered => NeedsReview && (Guidance ?? []).Any(entry =>
+        entry.Kind == GuidanceKind.Clarification && (ReviewRequestedAt is null || entry.At >= ReviewRequestedAt));
+
+    /// <summary>Whether the author rejected the brief and queries the topic has now, so the Pleb may not keep them.</summary>
+    public bool CurationRejected => IsRejected(Queries);
+
+    /// <summary>Whether <paramref name="queries"/> are a set of queries the author has rejected for this topic.</summary>
+    public bool IsRejected(IReadOnlyList<string> queries) => queries.Count > 0 && (Guidance ?? []).Any(entry =>
+        entry.Kind == GuidanceKind.Rejection
+        && entry.RejectedQueries is { } rejected
+        && rejected.Order(StringComparer.OrdinalIgnoreCase).SequenceEqual(queries.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// This topic with <paramref name="entry"/> added to its guidance, keeping only the latest <paramref name="limit"/>
+    /// entries so the curation prompt stays within its budget.
+    /// </summary>
+    public ResearchTopic WithGuidance(AuthorGuidance entry, int limit) =>
+        this with { Guidance = [.. (Guidance ?? []).Append(entry).TakeLast(Math.Max(1, limit))] };
 
     /// <summary>Whether the topic has been searched for <paramref name="normalisedUrl"/> before.</summary>
     public bool HasSeen(string normalisedUrl) => SeenUrls?.ContainsKey(normalisedUrl) == true;

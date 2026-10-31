@@ -17,25 +17,36 @@ public sealed class ResearchLoopCountsTests
             Curated("projects/in-flight"),
             Curated("projects/backed-off") with { LastSearchedAt = Now.AddDays(-1), Interval = TimeSpan.FromDays(8) },
             Curated("projects/muted") with { Muted = true },
-            Curated("projects/failing") with { LastSearchedAt = Now, ConsecutiveFailures = 3 }
+            Curated("projects/failing") with { LastSearchedAt = Now, ConsecutiveFailures = 3 },
+            Curated("learning/okf.md") with { ReviewQuestion = "Which OKF is meant?" },
+            Curated("learning/muted-question.md") with { Muted = true, ReviewQuestion = "Which one?" }
         ];
 
         ResearchLoopCounts counts = ResearchLoopCounts.Of(topics, new HashSet<string> { "projects/in-flight" }, awaiting: 1, Now);
 
         ItShouldCountEachState();
+        ItShouldListTheUnmutedTopicsThatNeedReview();
         ItShouldDescribeThemWithTheNextCycle();
 
-        void ItShouldCountEachState() => counts.ShouldBe(new ResearchLoopCounts(Due: 1, Awaiting: 1, BackedOff: 1, Muted: 1, Failing: 1));
+        void ItShouldCountEachState() => counts.ShouldSatisfyAllConditions(
+            () => counts.Due.ShouldBe(1),
+            () => counts.Awaiting.ShouldBe(1),
+            () => counts.BackedOff.ShouldBe(1),
+            () => counts.Muted.ShouldBe(2),
+            () => counts.Failing.ShouldBe(1));
+
+        void ItShouldListTheUnmutedTopicsThatNeedReview() =>
+            counts.NeedsReview.ShouldBe([new TopicQuestion("learning/okf.md", "Which OKF is meant?")]);
 
         void ItShouldDescribeThemWithTheNextCycle() => counts
             .Describe(new DateTimeOffset(2026, 10, 28, 18, 0, 0, TimeSpan.Zero))
-            .ShouldBe("1 due, 1 awaiting, 1 backed off, 1 muted, 1 failing; next cycle 2026-10-28 18:00 UTC.");
+            .ShouldBe("1 due, 1 awaiting, 1 backed off, 2 muted, 1 failing, 1 need review; next cycle 2026-10-28 18:00 UTC. learning/okf.md asks: Which OKF is meant?");
     }
 
     [Test]
     public void NoCycleHasBeenScheduled()
     {
-        string description = new ResearchLoopCounts(0, 0, 0, 0, 0).Describe(null);
+        string description = new ResearchLoopCounts(0, 0, 0, 0, 0, []).Describe(null);
 
         ItShouldSaySo();
 

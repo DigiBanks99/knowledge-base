@@ -54,6 +54,7 @@ public sealed class DueTopicsTests
             Curated("projects/muted") with { Muted = true },
             ResearchTopic.New("projects/uncurated", Discovered),
             Curated("projects/in-flight"),
+            Curated("projects/needs-review") with { ReviewQuestion = "Which Atlas is meant?" },
             Curated("projects/ready")
         ];
 

@@ -28,6 +28,12 @@ public sealed class ResearchSettings
     /// <summary>How much of a topic's page the curation prompt includes.</summary>
     public int TopicPageCharacterLimit { get; init; } = 6000;
 
+    /// <summary>
+    /// How many of the author's clarifications and rejections a topic keeps for its curation prompts; older ones are
+    /// dropped.
+    /// </summary>
+    public int GuidanceLimit { get; init; } = 5;
+
     /// <summary>How many of a request's changed pages the curation prompt lists.</summary>
     public int ChangedPathsLimit { get; init; } = 20;
 

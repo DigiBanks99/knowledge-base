@@ -10,11 +10,16 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// When the first change still waiting was requested, which places the request in the queue; none for a request that
 /// has had nothing merged into it, whose place is <paramref name="RequestedAt"/>.
 /// </param>
+/// <param name="ByAuthor">
+/// Whether the author asked for the curation from the Topics page (clarifying, rejecting or recurating), which puts
+/// it ahead of curations that page changes asked for.
+/// </param>
 public sealed record CurationRequest(
     string Topic,
     IReadOnlyList<string> ChangedPaths,
     DateTimeOffset RequestedAt,
-    DateTimeOffset? FirstRequestedAt = null)
+    DateTimeOffset? FirstRequestedAt = null,
+    bool ByAuthor = false)
 {
     /// <summary>
     /// How long the request has waited. Merging never moves it back in the queue, so a topic that keeps changing is
@@ -27,7 +32,8 @@ public sealed record CurationRequest(
     {
         ChangedPaths = [.. ChangedPaths.Union(later.ChangedPaths, StringComparer.Ordinal)],
         RequestedAt = later.RequestedAt > RequestedAt ? later.RequestedAt : RequestedAt,
-        FirstRequestedAt = later.QueuedSince < QueuedSince ? later.QueuedSince : QueuedSince
+        FirstRequestedAt = later.QueuedSince < QueuedSince ? later.QueuedSince : QueuedSince,
+        ByAuthor = ByAuthor || later.ByAuthor
     };
 
     /// <summary>
@@ -37,5 +43,6 @@ public sealed record CurationRequest(
     public bool IsSameAs(CurationRequest other) =>
         Topic == other.Topic
         && RequestedAt == other.RequestedAt
+        && ByAuthor == other.ByAuthor
         && ChangedPaths.SequenceEqual(other.ChangedPaths, StringComparer.Ordinal);
 }

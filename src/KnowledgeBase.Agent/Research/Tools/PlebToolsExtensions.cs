@@ -16,6 +16,7 @@ internal static class PlebToolsExtensions
                 PlebTools plebTools = sp.GetRequiredService<PlebTools>();
                 tools.AddTool(AIFunctionFactory.Create(plebTools.SetTopicQueries));
                 tools.AddTool(AIFunctionFactory.Create(plebTools.KeepQueries));
+                tools.AddTool(AIFunctionFactory.Create(plebTools.RequestHumanReview));
                 return tools;
             });
             return builder;
