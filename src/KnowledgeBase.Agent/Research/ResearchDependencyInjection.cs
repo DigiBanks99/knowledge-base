@@ -60,6 +60,7 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<SearchTopicsCommandHandler>()
                 .AddSingleton<ResearchTopicNowCommandHandler>()
                 .AddSingleton<GetTopicResultsQueryHandler>()
+                .AddSingleton<ListTopicRunsQueryHandler>()
                 .AddSingleton<IHostResolver, DnsHostResolver>()
                 .AddSingleton<FetchTarget>()
                 .AddSingleton<PolitenessGate>()

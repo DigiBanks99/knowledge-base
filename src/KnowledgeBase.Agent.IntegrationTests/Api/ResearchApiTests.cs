@@ -6,7 +6,10 @@ using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Queries;
 using KnowledgeBase.Agent.Research.Search;
+using KnowledgeBase.Agent.Runs;
+using KnowledgeBase.Agent.Runs.Models;
 
 namespace KnowledgeBase.Agent.IntegrationTests.Api;
 
@@ -372,6 +375,76 @@ public sealed class ResearchApiTests : IDisposable
         ItShouldBeNotFound();
 
         void ItShouldBeNotFound() => response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task TheRunsOfATopicArePagedThrough()
+    {
+        AgentRunStore store = _api.Get<AgentRunStore>();
+        foreach (int minute in Enumerable.Range(1, 12))
+        {
+            await store.SaveAsync(TopicRun($"garden-{minute:D2}", "projects/garden", minute), CancellationToken.None);
+        }
+
+        await store.SaveAsync(TopicRun("rust-01", "learning/rust.md", 30), CancellationToken.None);
+
+        HttpResponseMessage firstResponse = await _api.Client().GetAsync("/api/research/topics/projects--garden/runs");
+        TopicRunsPage first = await TestApi.ReadAsync<TopicRunsPage>(firstResponse);
+        TopicRunsPage second = await TestApi.ReadAsync<TopicRunsPage>(
+            await _api.Client().GetAsync("/api/research/topics/projects--garden/runs?page=2"));
+        TopicRunsPage beforeTheFirst = await TestApi.ReadAsync<TopicRunsPage>(
+            await _api.Client().GetAsync("/api/research/topics/projects--garden/runs?page=0"));
+
+        ItShouldSucceed();
+        ItShouldStartWithTheTenNewestRunsOfTheTopic();
+        ItShouldSayOlderRunsExist();
+        ItShouldEndWithTheOldestRuns();
+        ItShouldTreatAPageBeforeTheFirstAsTheFirst();
+
+        void ItShouldSucceed() => firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        void ItShouldStartWithTheTenNewestRunsOfTheTopic() => first.ShouldSatisfyAllConditions(
+            page => page.Page.ShouldBe(1),
+            page => page.Runs.Select(run => run.Id).ShouldBe(Enumerable.Range(3, 10).Reverse().Select(minute => $"garden-{minute:D2}")));
+
+        void ItShouldSayOlderRunsExist() => first.HasOlder.ShouldBeTrue();
+
+        void ItShouldEndWithTheOldestRuns() => second.ShouldSatisfyAllConditions(
+            page => page.Page.ShouldBe(2),
+            page => page.Runs.Select(run => run.Id).ShouldBe(["garden-02", "garden-01"]),
+            page => page.HasOlder.ShouldBeFalse());
+
+        void ItShouldTreatAPageBeforeTheFirstAsTheFirst() =>
+            beforeTheFirst.Runs.Select(run => run.Id).ShouldBe(first.Runs.Select(run => run.Id));
+    }
+
+    [Test]
+    [Arguments("people--jane-doe")]
+    [Arguments("..--notes")]
+    public async Task TheRunsOfSomethingThatIsNotATopicAreRequested(string slug)
+    {
+        HttpResponseMessage response = await _api.Client().GetAsync($"/api/research/topics/{slug}/runs");
+
+        ItShouldBeRefused();
+
+        void ItShouldBeRefused() => response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    private static AgentRun TopicRun(string id, string topic, int minutes)
+    {
+        DateTimeOffset startedAt = DateTimeOffset.Parse("2026-10-24T10:00:00Z").AddMinutes(minutes);
+        return new AgentRun(
+            id,
+            KnownAgents.Scout,
+            new AgentRunTrigger(AgentRunTriggerKind.Triage, $"https://example.com/{id}"),
+            AgentRunStatus.Succeeded,
+            startedAt,
+            startedAt.AddSeconds(30),
+            "Done.",
+            null,
+            [],
+            FactOrigin.Research,
+            topic);
     }
 
     private async Task CurateAsync(string topic, string query) =>

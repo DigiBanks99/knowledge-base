@@ -20,18 +20,16 @@ internal sealed class AgentRunStore(IOptions<WikiConfigurationSettings> options,
             : Task.FromResult<AgentRun?>(null);
 
     public async Task<IReadOnlyList<AgentRun>> ListAsync(
-        string? agent,
-        AgentRunTriggerKind? triggerKind,
-        string? triggerReference,
+        AgentRunFilter filter,
+        int offset,
         int limit,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<AgentRun> runs = await JsonFileStore.ReadAllAsync<AgentRun>(_settings.RunsDirectory, cancellationToken);
         return runs
-            .Where(run => agent is null || run.Agent.Equals(agent, StringComparison.OrdinalIgnoreCase))
-            .Where(run => triggerKind is null || run.Trigger.Kind == triggerKind)
-            .Where(run => triggerReference is null || run.Trigger.Reference.Equals(triggerReference, StringComparison.OrdinalIgnoreCase))
+            .Where(filter.Matches)
             .OrderByDescending(run => run.StartedAt)
+            .Skip(Math.Max(0, offset))
             .Take(limit)
             .ToList();
     }

@@ -54,7 +54,7 @@ internal sealed class ResolveAwaitingBatchesCommandHandler(
             NoteLocation location = noteWriter.Locate(batch.NoteFile);
             // The run store is only read once, and only when a note has been processed and its runs matter.
             runs ??= location == NoteLocation.Processed
-                ? await runStore.ListAsync(KnownAgents.ThreadWeaver, AgentRunTriggerKind.Facts, null, int.MaxValue, cancellationToken)
+                ? await runStore.ListAsync(new AgentRunFilter(KnownAgents.ThreadWeaver, AgentRunTriggerKind.Facts), 0, int.MaxValue, cancellationToken)
                 : null;
             IngestionOutcome outcome = IngestionOutcomes.Classify(location, batch.NoteFile, runs ?? []);
             if (outcome == IngestionOutcome.Waiting)

@@ -19,16 +19,18 @@ public sealed class RunsApiTests : IDisposable
         AgentRunStore store = _api.Get<AgentRunStore>();
         await store.SaveAsync(Run("run-1", KnownAgents.FactFinder, minutes: 0), CancellationToken.None);
         await store.SaveAsync(Run("run-2", KnownAgents.ThreadWeaver, minutes: 1), CancellationToken.None);
-        await store.SaveAsync(Run("run-3", KnownAgents.FactFinder, minutes: 2), CancellationToken.None);
+        await store.SaveAsync(Run("run-3", KnownAgents.FactFinder, minutes: 2) with { Topic = "projects/garden" }, CancellationToken.None);
 
         IReadOnlyList<AgentRun> all = await ListAsync(client, "/api/runs");
         IReadOnlyList<AgentRun> byAgent = await ListAsync(client, "/api/runs?agent=FactFinder");
         IReadOnlyList<AgentRun> byTrigger = await ListAsync(client, "/api/runs?triggerKind=Note&trigger=run-2.md");
+        IReadOnlyList<AgentRun> byTopic = await ListAsync(client, "/api/runs?topic=projects%2Fgarden");
         IReadOnlyList<AgentRun> atLeastOne = await ListAsync(client, "/api/runs?limit=0");
 
         ItShouldListTheNewestFirst();
         ItShouldFilterByAgent();
         ItShouldFilterByTrigger();
+        ItShouldFilterByTopic();
         ItShouldAlwaysReturnAtLeastOneRun();
 
         void ItShouldListTheNewestFirst() => all.Select(run => run.Id).ShouldBe(["run-3", "run-2", "run-1"]);
@@ -36,6 +38,8 @@ public sealed class RunsApiTests : IDisposable
         void ItShouldFilterByAgent() => byAgent.Select(run => run.Id).ShouldBe(["run-3", "run-1"]);
 
         void ItShouldFilterByTrigger() => byTrigger.Select(run => run.Id).ShouldBe(["run-2"]);
+
+        void ItShouldFilterByTopic() => byTopic.Select(run => run.Id).ShouldBe(["run-3"]);
 
         void ItShouldAlwaysReturnAtLeastOneRun() => atLeastOne.Select(run => run.Id).ShouldBe(["run-3"]);
     }
