@@ -104,7 +104,24 @@ export interface DenyListEntry {
   state: DenyListState
 }
 
-export type TopicState = 'Idle' | 'AwaitingCuration' | 'CurationFailed' | 'Muted' | 'Triaging' | 'Failing'
+export type TopicState =
+  | 'Idle'
+  | 'AwaitingCuration'
+  | 'CurationFailed'
+  | 'Muted'
+  | 'NeedsReview'
+  | 'Triaging'
+  | 'Failing'
+export type GuidanceKind = 'Clarification' | 'Rejection'
+/** Something the author told the Pleb about a topic, given to every later curation of it. */
+export interface AuthorGuidance {
+  kind: GuidanceKind
+  text: string | null
+  at: string
+  question: string | null
+  rejectedBrief: string | null
+  rejectedQueries: string[] | null
+}
 export interface TopicSummary {
   path: string
   slug: string
@@ -119,6 +136,12 @@ export interface TopicSummary {
   /** How long after a search the topic is due again, as a .NET TimeSpan (`d.hh:mm:ss`). */
   interval: string | null
   lastPositiveAt: string | null
+  /** The Pleb's question waiting for the author's answer. */
+  reviewQuestion: string | null
+  guidance: AuthorGuidance[]
+  /** Whether the author set the brief and queries by hand, so page changes leave them alone. */
+  pinned: boolean
+  approvedAt: string | null
 }
 export interface SearchResult {
   url: string
@@ -256,6 +279,14 @@ export const api = {
     put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/muted`, { muted }),
   researchNow: (slug: string) =>
     post<TopicSearchOutcome>(`/api/research/topics/${encodeURIComponent(slug)}/research`),
+  clarifyTopic: (slug: string, answer: string) =>
+    post<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/clarify`, { answer }),
+  rejectTopic: (slug: string, reason: string | null) =>
+    post<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/reject`, { reason }),
+  approveTopic: (slug: string) => post<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/approve`),
+  recurateTopic: (slug: string) => post<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/recurate`),
+  editTopicCuration: (slug: string, brief: string, queries: string[]) =>
+    put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/curation`, { brief, queries }),
   topicResults: (slug: string) =>
     request<ResearchBatch>(`/api/research/topics/${encodeURIComponent(slug)}/results`),
 
