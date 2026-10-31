@@ -9,12 +9,8 @@ internal interface IAgentRunStore
 
     Task<AgentRun?> GetAsync(string id, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<AgentRun>> ListAsync(
-        string? agent,
-        AgentRunTriggerKind? triggerKind,
-        string? triggerReference,
-        int limit,
-        CancellationToken cancellationToken);
+    /// <summary>The runs matching <paramref name="filter"/>, newest first, skipping the newest <paramref name="offset"/>.</summary>
+    Task<IReadOnlyList<AgentRun>> ListAsync(AgentRunFilter filter, int offset, int limit, CancellationToken cancellationToken);
 
     /// <summary>
     /// Runs still marked as running when the app starts were cut off by a restart or crash.

@@ -48,6 +48,47 @@ public sealed class AgentRunStoreTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task TheRunsOfATopicArePagedThrough()
+    {
+        await _wiki.InitialiseAsync();
+        AgentRun[] runs =
+        [
+            Run("run-1", KnownAgents.Pleb, AgentRunTriggerKind.Curation, "projects--garden", minutes: 0) with { Topic = "projects/garden" },
+            Run("run-2", KnownAgents.Scout, AgentRunTriggerKind.Triage, "https://example.com/a", minutes: 1) with { Topic = "projects/garden" },
+            Run("run-3", KnownAgents.Scout, AgentRunTriggerKind.Triage, "https://example.com/b", minutes: 2) with { Topic = "projects/rust" },
+            Run("run-4", KnownAgents.ThreadWeaver, AgentRunTriggerKind.Facts, "facts-a.json", minutes: 3) with { Topic = "projects/garden" },
+            Run("run-5", KnownAgents.FactFinder, AgentRunTriggerKind.Note, "note-a.md", minutes: 4)
+        ];
+        foreach (AgentRun run in runs)
+        {
+            await _store.SaveAsync(run, CancellationToken.None);
+        }
+
+        IReadOnlyList<AgentRun> topic = await List(topic: "projects/garden");
+        IReadOnlyList<AgentRun> otherCase = await List(topic: "Projects/Garden");
+        IReadOnlyList<AgentRun> firstPage = await List(topic: "projects/garden", limit: 2);
+        IReadOnlyList<AgentRun> secondPage = await List(topic: "projects/garden", offset: 2, limit: 2);
+        IReadOnlyList<AgentRun> pastTheEnd = await List(topic: "projects/garden", offset: 3);
+
+        ItShouldListOnlyTheTopicsRunsNewestFirst();
+        ItShouldMatchTheTopicsPathExactly();
+        ItShouldPageThroughThemInOrder();
+        ItShouldFindNothingPastTheLastRun();
+
+        void ItShouldListOnlyTheTopicsRunsNewestFirst() => Ids(topic).ShouldBe(["run-4", "run-2", "run-1"]);
+
+        void ItShouldMatchTheTopicsPathExactly() => otherCase.ShouldBeEmpty();
+
+        void ItShouldPageThroughThemInOrder()
+        {
+            Ids(firstPage).ShouldBe(["run-4", "run-2"]);
+            Ids(secondPage).ShouldBe(["run-1"]);
+        }
+
+        void ItShouldFindNothingPastTheLastRun() => pastTheEnd.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task ARunIsReadBack()
     {
         await _wiki.InitialiseAsync();
@@ -90,8 +131,10 @@ public sealed class AgentRunStoreTests : IAsyncDisposable
         string? agent = null,
         AgentRunTriggerKind? triggerKind = null,
         string? triggerReference = null,
+        string? topic = null,
+        int offset = 0,
         int limit = 50) =>
-        _store.ListAsync(agent, triggerKind, triggerReference, limit, CancellationToken.None);
+        _store.ListAsync(new AgentRunFilter(agent, triggerKind, triggerReference, topic), offset, limit, CancellationToken.None);
 
     private static IReadOnlyList<string> Ids(IEnumerable<AgentRun> runs) => runs.Select(run => run.Id).ToList();
 

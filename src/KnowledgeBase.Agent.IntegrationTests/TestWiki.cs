@@ -113,7 +113,7 @@ internal sealed class TestWiki : IAsyncDisposable
     }
 
     public Task<IReadOnlyList<AgentRun>> RunsAsync() =>
-        Get<AgentRunStore>().ListAsync(null, null, null, 100, CancellationToken.None);
+        Get<AgentRunStore>().ListAsync(AgentRunFilter.All, 0, 100, CancellationToken.None);
 
     /// <summary>
     /// Whether every run recorded so far has finished, and, when <paramref name="expected"/> is given, that there are

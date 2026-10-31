@@ -38,7 +38,7 @@ public sealed class ResolveAwaitingBatchesCommandHandlerTests
         TimeProvider timeProvider = Substitute.For<TimeProvider>();
         timeProvider.GetUtcNow().Returns(Now);
         _runStore
-            .ListAsync(KnownAgents.ThreadWeaver, AgentRunTriggerKind.Facts, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .ListAsync(new AgentRunFilter(KnownAgents.ThreadWeaver, AgentRunTriggerKind.Facts), Arg.Is(0), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(_ => (IReadOnlyList<AgentRun>)_runs);
         _handler = new ResolveAwaitingBatchesCommandHandler(
             NullLogger<ResolveAwaitingBatchesCommandHandler>.Instance,
