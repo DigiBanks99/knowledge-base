@@ -173,6 +173,44 @@ The agents depend on tool calling, so the server must support it. For `llama-ser
 - The app's Status page checks the server's `/health` route (the endpoint with `/v1` replaced) every 30 seconds and
   shows a badge in the header while it is unreachable. `/health` on the API then reports `Degraded`, not `Unhealthy`.
 
+The research Keeper is a decision model served by the same llama-server through `/v1/systemone`, so the server runs
+in router mode: one port, one child process per model, chosen by each request's `model` field. The deployment's VM (4
+ARM cores) runs the Qwen chat model next to Laya with this preset:
+
+```ini
+[*]
+threads = 4
+
+[qwen3.5-4b]
+hf-repo = unsloth/Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL
+ctx-size = 16384
+parallel = 1
+jinja = true
+flash-attn = on
+cache-type-k = q8_0
+cache-type-v = q8_0
+spec-type = draft-mtp
+spec-draft-n-max = 6
+no-mmproj = true
+
+[laya]
+hf-repo = ggml-org/Laya-GGUF
+ctx-size = 8192
+batch-size = 8192
+ubatch-size = 8192
+parallel = 1
+```
+
+```shell
+llama-server --models-preset models.ini --models-max 2 --timeout 600 --api-key <key> --host 127.0.0.1 --port 9931
+```
+
+- The section names are the model names: `OpenAICompatibleModel` is `qwen3.5-4b` here.
+- `--models-max 2` keeps both loaded, so neither waits for a reload. `no-mmproj` skips the image projector the agents
+  never use.
+- Laya evaluates its whole prompt in one batch, so its batch sizes match its context.
+- Models in the Hugging Face cache are listed too; only the preset's are configured.
+
 In the [deployment](#deployment), the API container shares the host's network, so a llama-server bound to
 `127.0.0.1` on the same machine is reached at its loopback address. Do not expose the llama-server port publicly. If
 it has to listen beyond loopback, start it with `--api-key` and set `OpenAICompatibleApiKey`.
