@@ -1,8 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
 /**
- * The research section: what is researched (topics), how the Pleb curated their queries (curation) and what never
- * leaves the machine (the deny-list).
+ * The research section: what is researched (topics, each with its own page of runs) and what never leaves the machine
+ * (the deny-list).
  */
 export function ResearchPage() {
   return (
@@ -10,7 +10,6 @@ export function ResearchPage() {
       <h1>Research</h1>
       <nav className="tabs">
         <NavLink to="/research/topics">Topics</NavLink>
-        <NavLink to="/research/curation">Curation</NavLink>
         <NavLink to="/research/deny-list">Deny-list</NavLink>
       </nav>
       <Outlet />

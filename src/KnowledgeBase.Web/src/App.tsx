@@ -12,7 +12,7 @@ import { StatusPage } from './pages/StatusPage'
 import { DenyListPage } from './pages/DenyListPage'
 import { ResearchPage } from './pages/ResearchPage'
 import { TopicsPage } from './pages/TopicsPage'
-import { CurationPage } from './pages/CurationPage'
+import { TopicPage } from './pages/TopicPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 const sections = [
@@ -70,7 +70,9 @@ export function App() {
           <Route path="/research" element={<ResearchPage />}>
             <Route index element={<Navigate to="topics" replace />} />
             <Route path="topics" element={<TopicsPage />} />
-            <Route path="curation" element={<CurationPage />} />
+            <Route path="topics/:slug" element={<TopicPage />} />
+            {/* Each topic's page now shows its curations, so the old Curation tab leads to the topics. */}
+            <Route path="curation" element={<Navigate to="/research/topics" replace />} />
             <Route path="deny-list" element={<DenyListPage />} />
           </Route>
           <Route path="/settings" element={<SettingsPage />} />
