@@ -16,7 +16,7 @@ internal static class ResearchTopicNow
                 .MapPost("topics/{slug}/research", Handle)
                 .WithName(nameof(ResearchTopicNow))
                 .WithSummary("Research a topic now")
-                .WithDescription("Searches the topic's queries now, whether or not it is due, and keeps the new results for triage. Refused for a muted topic, one the Pleb has not curated yet and one whose last results are still waiting.")
+                .WithDescription("Searches the topic's queries now, whether or not it is due, and keeps the new results for triage. Refused for a muted topic, one waiting for the author to answer the Pleb's question, one the Pleb has not curated yet and one whose last results are still waiting.")
                 .Produces<TopicSearchOutcome>()
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status404NotFound)
@@ -39,7 +39,7 @@ internal static class ResearchTopicNow
             {
                 ValidationError => StatusCodes.Status400BadRequest,
                 TopicNotFoundError => StatusCodes.Status404NotFound,
-                TopicMutedError or TopicNotCuratedError or BatchInFlightError or TopicBeingSearchedError => StatusCodes.Status409Conflict,
+                TopicMutedError or TopicNeedsReviewError or TopicNotCuratedError or BatchInFlightError or TopicBeingSearchedError => StatusCodes.Status409Conflict,
                 SearchSourceError or AggregateError => StatusCodes.Status502BadGateway,
                 _ => StatusCodes.Status500InternalServerError
             }));

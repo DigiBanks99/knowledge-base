@@ -41,6 +41,7 @@ internal sealed class TopicSearch(
                 .ReadTopicAsync(topic, cancellationToken)
                 .Bind(current => current.ToResult<ResearchTopic, Error>(new TopicNotFoundError(topic)))
                 .Ensure(current => !current.Muted, current => new TopicMutedError(current.Path))
+                .Ensure(current => !current.NeedsReview, current => new TopicNeedsReviewError(current.Path))
                 .Ensure(current => current.Queries.Count > 0, current => new TopicNotCuratedError(current.Path))
                 .Bind(async current => await store
                     .ListTopicsInFlightAsync(cancellationToken)

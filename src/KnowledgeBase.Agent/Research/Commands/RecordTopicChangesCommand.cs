@@ -39,7 +39,8 @@ internal sealed class RecordTopicChangesCommandHandler(
     /// A run's changes persist whether it succeeded or failed, so both are recorded. A topic gone from the wiki after
     /// the run was deleted or moved away, and is pruned; its new location is a new topic. A new topic is curated
     /// straight away. Only the ThreadWeaver adds knowledge, so only its changes to a known topic ask for the topic's
-    /// queries to be revisited; the Editor's restructuring does not. A muted topic still collects its changes in a
+    /// queries to be revisited; the Editor's restructuring does not, nor does any change to a topic whose brief and
+    /// queries the author edited (pinned). A muted topic still collects its changes in a
     /// request, so its queries catch up once it is unmuted; the Pleb leaves muted topics' requests waiting.
     /// One topic that cannot be updated never stops the others; the failures are returned together.
     /// </summary>
@@ -134,7 +135,8 @@ internal sealed class RecordTopicChangesCommandHandler(
             return TopicOutcome.Pruned;
         }
 
-        if (wasKnown && agent != KnownAgents.ThreadWeaver)
+        // The author's own brief and queries stand until the author asks for a curation again.
+        if (wasKnown && (agent != KnownAgents.ThreadWeaver || updated.Value.Value.Pinned))
         {
             return TopicOutcome.Unchanged;
         }

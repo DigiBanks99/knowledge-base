@@ -59,7 +59,8 @@ public sealed class CurateTopicsCommandHandlerTests : IDisposable
         _tools = new PlebTools(
             _runTracker,
             new SetTopicQueriesCommandHandler(NullLogger<SetTopicQueriesCommandHandler>.Instance, _store, timeProvider),
-            new KeepTopicQueriesCommandHandler(NullLogger<KeepTopicQueriesCommandHandler>.Instance, _store, timeProvider));
+            new KeepTopicQueriesCommandHandler(NullLogger<KeepTopicQueriesCommandHandler>.Instance, _store, timeProvider),
+            new RequestTopicReviewCommandHandler(NullLogger<RequestTopicReviewCommandHandler>.Instance, _store, timeProvider));
         _handler = new CurateTopicsCommandHandler(
             NullLogger<CurateTopicsCommandHandler>.Instance,
             settings,
@@ -370,6 +371,81 @@ public sealed class CurateTopicsCommandHandlerTests : IDisposable
 
         void ItShouldLeaveTheRestWaiting() =>
             _state.CurationRequests.Keys.Order(StringComparer.Ordinal).ShouldBe(["plans/middle.md", "projects/newest"]);
+    }
+
+    [Test]
+    public async Task TheAuthorAskedForANewerCurationThanThoseWaiting()
+    {
+        foreach ((string topic, int hours) in new[] { ("learning/oldest.md", -3), ("plans/asked.md", 5) })
+        {
+            _state.Topics[topic] = ResearchTopic.New(topic, Discovered);
+            _state.CurationRequests[topic] = new CurationRequest(topic, [], Discovered.AddHours(hours), ByAuthor: topic == "plans/asked.md");
+        }
+
+        List<string> curated = [];
+        _pleb.Behaviour = async (_, token) =>
+        {
+            string topic = _runTracker.Current!.Topic!;
+            curated.Add(topic);
+            await CallToolAsync(nameof(PlebTools.SetTopicQueries), () => _tools.SetTopicQueries(topic, "News.", ["release notes"], token));
+            return "Set the queries.";
+        };
+
+        await _handler.Handle(new CurateTopicsCommand(), CancellationToken.None);
+
+        ItShouldCurateTheAuthorsRequestFirst();
+
+        void ItShouldCurateTheAuthorsRequestFirst() => curated.ShouldBe(["plans/asked.md", "learning/oldest.md"]);
+    }
+
+    [Test]
+    public async Task ThePlebCannotTellWhatTheTopicIsAbout()
+    {
+        _state.Topics[Atlas] = _state.Topics[Atlas] with { Brief = "News about Atlas.", Queries = ["atlas release"] };
+        _pleb.Behaviour = async (_, token) =>
+        {
+            await CallToolAsync(
+                nameof(PlebTools.RequestHumanReview),
+                () => _tools.RequestHumanReview(Atlas, "Is Atlas the MongoDB service or the robotics framework?", token));
+            return "Asked the author.";
+        };
+
+        Result<CurationCycle, Error> result = await _handler.Handle(new CurateTopicsCommand(), CancellationToken.None);
+
+        ItShouldEndTheCuration();
+        ItShouldLeaveTheTopicNeedingReview();
+
+        void ItShouldEndTheCuration()
+        {
+            result.Value.Curated.ShouldBe([Atlas]);
+            _state.CurationRequests.ShouldBeEmpty();
+            _state.FailedCurations.ShouldBeEmpty();
+        }
+
+        void ItShouldLeaveTheTopicNeedingReview() => _state.Topics[Atlas].ShouldSatisfyAllConditions(
+            topic => topic.ReviewQuestion.ShouldBe("Is Atlas the MongoDB service or the robotics framework?"),
+            topic => topic.ReviewRequestedAt.ShouldBe(Now),
+            topic => topic.Queries.ShouldBe(["atlas release"]));
+    }
+
+    [Test]
+    public async Task ThePlebAsksAnEmptyQuestion()
+    {
+        _pleb.Behaviour = async (_, token) =>
+        {
+            await CallToolAsync(nameof(PlebTools.RequestHumanReview), () => _tools.RequestHumanReview(Atlas, "  ", token));
+            return "Asked the author.";
+        };
+
+        Result<CurationCycle, Error> result = await _handler.Handle(new CurateTopicsCommand(), CancellationToken.None);
+
+        ItShouldFailTheCuration();
+        ItShouldTellThePlebWhatToAsk();
+
+        void ItShouldFailTheCuration() => result.Value.Failed.ShouldBe([Atlas]);
+
+        void ItShouldTellThePlebWhatToAsk() => _runs.Values.ShouldHaveSingleItem().ToolCalls.Single()
+            .Error.ShouldNotBeNull().ShouldStartWith("The `question` is empty.");
     }
 
     [Test]

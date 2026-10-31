@@ -38,7 +38,9 @@ internal sealed class ListTopicsQueryHandler(IResearchStore store)
 
     /// <summary>
     /// Results waiting for triage come first, as they block the topic's next search. A failed curation is superseded by
-    /// a newer request waiting for the same topic.
+    /// a newer request waiting for the same topic, and by the author's edit of a pinned topic (a curation that was
+    /// running when the author edited it fails on the pin). A failure comes before an open question: asking succeeds,
+    /// so a failure recorded alongside a question came from the curation after the author answered it.
     /// </summary>
     private static TopicState State(
         ResearchTopic topic,
@@ -48,7 +50,8 @@ internal sealed class ListTopicsQueryHandler(IResearchStore store)
         topic.Muted ? TopicState.Muted
         : pendingResults.ContainsKey(topic.Path) ? TopicState.Triaging
         : awaitingCuration.Contains(topic.Path) ? TopicState.AwaitingCuration
-        : curationFailed.Contains(topic.Path) ? TopicState.CurationFailed
+        : curationFailed.Contains(topic.Path) && !topic.Pinned ? TopicState.CurationFailed
+        : topic.NeedsReview ? TopicState.NeedsReview
         : topic.IsFailing ? TopicState.Failing
         : TopicState.Idle;
 
@@ -64,5 +67,9 @@ internal sealed class ListTopicsQueryHandler(IResearchStore store)
         topic.Queries.Count > 0 ? topic.DueAt : null,
         pendingResults,
         topic.Interval ?? ResearchTopic.DefaultInterval,
-        topic.LastPositiveAt);
+        topic.LastPositiveAt,
+        topic.ReviewQuestion,
+        topic.Guidance ?? [],
+        topic.Pinned,
+        topic.ApprovedAt);
 }

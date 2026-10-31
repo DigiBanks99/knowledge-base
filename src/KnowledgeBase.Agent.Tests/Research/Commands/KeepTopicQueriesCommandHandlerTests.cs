@@ -65,4 +65,44 @@ public sealed class KeepTopicQueriesCommandHandlerTests
 
         void ItShouldNotRecordACuration() => _state.Topics["projects/atlas"].LastCuratedAt.ShouldBeNull();
     }
+
+    [Test]
+    public async Task ThePlebKeepsTheQueriesOfATopicWaitingForReview()
+    {
+        _state.Topics["projects/atlas"] = ResearchTopic.New("projects/atlas", Discovered) with
+        {
+            Queries = ["atlas"],
+            ReviewQuestion = "Which Atlas?"
+        };
+
+        Result<ResearchTopic, Error> result = await _handler.Handle(new KeepTopicQueriesCommand("projects/atlas"), CancellationToken.None);
+
+        ItShouldBeRefused();
+        ItShouldLeaveTheQuestionOpen();
+
+        void ItShouldBeRefused() => result.Error.ShouldBeOfType<ValidationError>().ShouldSatisfyAllConditions(
+            error => error.Code.ShouldBe("ReviewPending"),
+            error => error.Message.ShouldContain("Call `SetTopicQueries`"));
+
+        void ItShouldLeaveTheQuestionOpen() => _state.Topics["projects/atlas"].NeedsReview.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task ThePlebKeepsQueriesTheAuthorRejected()
+    {
+        _state.Topics["projects/atlas"] = ResearchTopic.New("projects/atlas", Discovered) with
+        {
+            Queries = ["atlas", "atlas news"],
+            Guidance = [new AuthorGuidance(GuidanceKind.Rejection, null, Discovered, RejectedBrief: "Atlas.", RejectedQueries: ["Atlas News", "atlas"])]
+        };
+
+        Result<ResearchTopic, Error> result = await _handler.Handle(new KeepTopicQueriesCommand("projects/atlas"), CancellationToken.None);
+
+        ItShouldBeRefused();
+        ItShouldNotRecordACuration();
+
+        void ItShouldBeRefused() => result.Error.ShouldBeOfType<ValidationError>().Code.ShouldBe("RejectedQueries");
+
+        void ItShouldNotRecordACuration() => _state.Topics["projects/atlas"].LastCuratedAt.ShouldBeNull();
+    }
 }

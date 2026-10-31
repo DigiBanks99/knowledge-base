@@ -40,6 +40,12 @@ public static partial class LoggerMessages
     [LoggerMessage(LogLevel.Information, "The Pleb kept the queries of research topic '{Topic}'.")]
     public static partial void TopicQueriesKept(this ILogger logger, string topic);
 
+    [LoggerMessage(LogLevel.Information, "The Pleb asked the author to review research topic '{Topic}'.")]
+    public static partial void TopicReviewRequested(this ILogger logger, string topic);
+
+    [LoggerMessage(LogLevel.Information, "The author reviewed research topic '{Topic}': {Review}.")]
+    public static partial void TopicReviewed(this ILogger logger, string topic, string review);
+
     [LoggerMessage(LogLevel.Information, "Skipping the curation cycle: the model server is not healthy.")]
     public static partial void CurationSkippedModelServerUnhealthy(this ILogger logger);
 

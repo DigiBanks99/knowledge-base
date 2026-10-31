@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Queries;
 using KnowledgeBase.Agent.Research.Tools;
 using KnowledgeBase.Agent.Runs.Models;
 
@@ -67,6 +68,85 @@ public sealed class CurationTests : IAsyncDisposable
             run => run.Agent.ShouldBe(KnownAgents.Pleb),
             run => run.Status.ShouldBe(AgentRunStatus.Succeeded),
             run => run.Trigger.Kind.ShouldBe(AgentRunTriggerKind.Curation));
+    }
+
+    [Test]
+    public async Task ThePlebAsksWhatATopicIsAboutAndTheAuthorAnswers()
+    {
+        _wiki.Write(Path.Combine(_wiki.Settings.WikiDirectory, "learning"), "okf.md", "# OKF\n\nTrying OKF for my notes.\n");
+        int runs = 0;
+        _wiki.Pleb.Behaviour = async (_, cancellationToken) =>
+        {
+            PlebTools tools = _wiki.Get<PlebTools>();
+            if (runs++ == 0)
+            {
+                await _wiki.CallToolAsync(
+                    nameof(PlebTools.RequestHumanReview),
+                    null,
+                    () => tools.RequestHumanReview("learning/okf.md", "OKF could be several things; which one is meant?", cancellationToken));
+                return "Asked the author.";
+            }
+
+            await _wiki.CallToolAsync(
+                nameof(PlebTools.SetTopicQueries),
+                null,
+                () => tools.SetTopicQueries(
+                    "learning/okf.md",
+                    "News about the Open Knowledge Format, a file format for agent knowledge bases.",
+                    ["open knowledge format release"],
+                    cancellationToken));
+            return "Set the queries.";
+        };
+        await _wiki.InitialiseAsync();
+        _wiki.Start();
+
+        Result<CurationCycle, Error> asked = await _wiki.Get<CurateTopicsCommandHandler>().Handle(new CurateTopicsCommand(), CancellationToken.None);
+        TopicSummary needingReview = await TopicAsync();
+        Result<SearchCycle, Error> searchedWhileAsking = await _wiki.Get<SearchTopicsCommandHandler>().Handle(new SearchTopicsCommand(), CancellationToken.None);
+        Result<ResearchTopic, Error> clarified = await _wiki.Get<ClarifyTopicCommandHandler>()
+            .Handle(new ClarifyTopicCommand("learning--okf.md", "The Open Knowledge Format for agent knowledge bases."), CancellationToken.None);
+        TopicSummary awaitingCuration = await TopicAsync();
+        Result<CurationCycle, Error> answered = await _wiki.Get<CurateTopicsCommandHandler>().Handle(new CurateTopicsCommand(), CancellationToken.None);
+        TopicSummary ready = await TopicAsync();
+
+        ItShouldEndTheFirstCurationNeedingReview();
+        ItShouldNotSearchTheTopicWhileTheQuestionIsOpen();
+        ItShouldQueueACurationWithTheAnswer();
+        ItShouldGiveThePlebTheAnswerWithItsQuestion();
+        ItShouldBeReadyOnceThePlebSetsQueries();
+
+        void ItShouldEndTheFirstCurationNeedingReview()
+        {
+            asked.Value.Curated.ShouldBe(["learning/okf.md"]);
+            needingReview.State.ShouldBe(TopicState.NeedsReview);
+            needingReview.ReviewQuestion.ShouldBe("OKF could be several things; which one is meant?");
+        }
+
+        void ItShouldNotSearchTheTopicWhileTheQuestionIsOpen() => searchedWhileAsking.Value.Searched.ShouldBeEmpty();
+
+        void ItShouldQueueACurationWithTheAnswer()
+        {
+            clarified.IsSuccess.ShouldBeTrue();
+            awaitingCuration.State.ShouldBe(TopicState.AwaitingCuration);
+        }
+
+        void ItShouldGiveThePlebTheAnswerWithItsQuestion() => _wiki.Pleb.Prompts.Last().ShouldSatisfyAllConditions(
+            prompt => prompt.ShouldContain("you asked: OKF could be several things; which one is meant?"),
+            prompt => prompt.ShouldContain("<guidance>The Open Knowledge Format for agent knowledge bases.</guidance>"),
+            prompt => prompt.ShouldNotContain("still unanswered"));
+
+        void ItShouldBeReadyOnceThePlebSetsQueries()
+        {
+            answered.Value.Curated.ShouldBe(["learning/okf.md"]);
+            ready.ShouldSatisfyAllConditions(
+                topic => topic.State.ShouldBe(TopicState.Idle),
+                topic => topic.ReviewQuestion.ShouldBeNull(),
+                topic => topic.Queries.ShouldBe(["open knowledge format release"]),
+                topic => topic.NextSearchAt.ShouldNotBeNull());
+        }
+
+        async Task<TopicSummary> TopicAsync() =>
+            (await _wiki.Get<ListTopicsQueryHandler>().Handle(new ListTopicsQuery(), CancellationToken.None)).Value.Single();
     }
 
     [Test]

@@ -86,6 +86,14 @@ internal static class FakeResearchStore
                 RemoveUnlessChanged(failure.Request);
                 return UnitResult.Success<Error>();
             });
+        store.CancelCurationAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                string topic = call.Arg<string>();
+                topics.CurationRequests.Remove(topic);
+                topics.FailedCurations.Remove(topic);
+                return UnitResult.Success<Error>();
+            });
         store.ListFailedCurationsAsync(Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success<IReadOnlyList<FailedCuration>, Error>([.. topics.FailedCurations.Values]));
         store.ReadDenyListAsync(Arg.Any<CancellationToken>())
