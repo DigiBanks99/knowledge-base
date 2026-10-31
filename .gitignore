@@ -492,3 +492,6 @@ NUL
 
 # Aspire publish and deploy output (the env files hold resolved secrets)
 aspire-output/
+
+# Lock file of the file-based scripts: it pins the runtime packages of whichever machine ran them
+scripts/packages.lock.json
