@@ -33,6 +33,13 @@ export interface AgentRun {
   summary: string | null
   error: string | null
   toolCalls: AgentToolCall[]
+  topic: string | null
+}
+/** One page of a topic's runs, newest first; `page` counts from 1. */
+export interface TopicRunsPage {
+  runs: AgentRun[]
+  page: number
+  hasOlder: boolean
 }
 
 export type PriorityLevel = 'Low' | 'Medium' | 'High'
@@ -248,10 +255,11 @@ export const api = {
   captureNote: (content: string) => post<{ name: string }>('/api/notes', { content }),
   retryNote: (name: string) => post<void>(`/api/notes/${encodeURIComponent(name)}/retry`),
 
-  runs: (filter: { agent?: AgentName; trigger?: string; limit?: number } = {}) => {
+  runs: (filter: { agent?: AgentName; trigger?: string; topic?: string; limit?: number } = {}) => {
     const query = new URLSearchParams()
     if (filter.agent) query.set('agent', filter.agent)
     if (filter.trigger) query.set('trigger', filter.trigger)
+    if (filter.topic) query.set('topic', filter.topic)
     if (filter.limit) query.set('limit', String(filter.limit))
     return request<AgentRun[]>(`/api/runs?${query}`)
   },
@@ -289,6 +297,8 @@ export const api = {
     put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/curation`, { brief, queries }),
   topicResults: (slug: string) =>
     request<ResearchBatch>(`/api/research/topics/${encodeURIComponent(slug)}/results`),
+  topicRuns: (slug: string, page: number) =>
+    request<TopicRunsPage>(`/api/research/topics/${encodeURIComponent(slug)}/runs?page=${page}`),
 
   conversations: () => request<ConversationSummary[]>('/api/conversations'),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${id}`),

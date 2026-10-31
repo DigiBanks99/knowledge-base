@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { api, type AuthorGuidance, type FetchedPage, type TopicState, type TopicSummary } from '../api'
 import { Badge, Empty, ErrorMessage, Loading, Markdown } from '../components'
 import { formatDate, formatInterval } from '../format'
@@ -15,16 +16,7 @@ const stateLabels: Record<TopicState, string> = {
 }
 
 export function TopicsPage() {
-  const queryClient = useQueryClient()
   const topics = useQuery({ queryKey: ['topics'], queryFn: api.topics })
-  const setMuted = useMutation({
-    mutationFn: ({ slug, muted }: { slug: string; muted: boolean }) => api.setTopicMuted(slug, muted),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['topics'] }),
-  })
-  const researchNow = useMutation({
-    mutationFn: (slug: string) => api.researchNow(slug),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['topics'] }),
-  })
 
   return (
     <>
@@ -35,27 +27,17 @@ export function TopicsPage() {
       <p className="muted">
         Review each curation: approve a good one, mark a wrong one invalid with a reason, answer the Pleb when it asks
         what a topic is about, or edit the brief and queries yourself. Your answers and reasons go into every later
-        curation of the topic. An edited topic stays as you set it until you recurate it.
+        curation of the topic. An edited topic stays as you set it until you recurate it. Open a topic to see the runs
+        research has made for it.
       </p>
 
-      {setMuted.isError && <ErrorMessage error={setMuted.error} />}
-      {researchNow.isError && <ErrorMessage error={researchNow.error} />}
       {topics.isPending && <Loading what="the topics" />}
       {topics.isError && <ErrorMessage error={topics.error} />}
       {topics.data?.length === 0 && <Empty>No topics yet.</Empty>}
       {topics.data && topics.data.length > 0 && (
         <ul className="topics">
           {topics.data.map((topic) => (
-            <TopicItem
-              key={topic.slug}
-              topic={topic}
-              busy={
-                (setMuted.isPending && setMuted.variables?.slug === topic.slug) ||
-                (researchNow.isPending && researchNow.variables === topic.slug)
-              }
-              onToggle={(muted) => setMuted.mutate({ slug: topic.slug, muted })}
-              onResearch={() => researchNow.mutate(topic.slug)}
-            />
+            <TopicCard key={topic.slug} topic={topic} linked />
           ))}
         </ul>
       )}
@@ -63,29 +45,33 @@ export function TopicsPage() {
   )
 }
 
-function TopicItem({
-  topic,
-  busy,
-  onToggle,
-  onResearch,
-}: {
-  topic: TopicSummary
-  busy: boolean
-  onToggle: (muted: boolean) => void
-  onResearch: () => void
-}) {
+/**
+ * A topic with its curation and every action the author can take on it, as the Topics list and the topic's own page
+ * both show it. Render it inside a `ul.topics`.
+ */
+export function TopicCard({ topic, linked = false }: { topic: TopicSummary; linked?: boolean }) {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<'none' | 'reject' | 'edit'>('none')
+  const invalidateTopics = () => queryClient.invalidateQueries({ queryKey: ['topics'] })
   const review = useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => {
       setForm('none')
-      return queryClient.invalidateQueries({ queryKey: ['topics'] })
+      return invalidateTopics()
     },
+  })
+  const setMuted = useMutation({
+    mutationFn: (muted: boolean) => api.setTopicMuted(topic.slug, muted),
+    onSuccess: invalidateTopics,
+  })
+  const researchNow = useMutation({
+    mutationFn: () => api.researchNow(topic.slug),
+    onSuccess: invalidateTopics,
   })
   const canResearch =
     !topic.muted && topic.reviewQuestion === null && topic.queries.length > 0 && topic.pendingResults === 0
   const hasCuration = topic.queries.length > 0
+  const busy = setMuted.isPending || researchNow.isPending
   const reviewBusy = busy || review.isPending
 
   return (
@@ -94,21 +80,25 @@ function TopicItem({
         <Badge tone={topic.state}>{stateLabels[topic.state]}</Badge>
         {topic.pinned && <Badge tone="pinned">Edited by you</Badge>}
         {topic.approvedAt && <Badge tone="approved">Approved {formatDate(topic.approvedAt)}</Badge>}
-        <strong>{topic.path}</strong>
+        <strong>
+          {linked ? <Link to={`/research/topics/${encodeURIComponent(topic.slug)}`}>{topic.path}</Link> : topic.path}
+        </strong>
         <span className="actions">
           <button
             className="secondary"
             disabled={busy || !canResearch}
             title={canResearch ? undefined : researchUnavailableReason(topic)}
-            onClick={onResearch}
+            onClick={() => researchNow.mutate()}
           >
             Research now
           </button>
-          <button className="secondary" disabled={busy} onClick={() => onToggle(!topic.muted)}>
+          <button className="secondary" disabled={busy} onClick={() => setMuted.mutate(!topic.muted)}>
             {topic.muted ? 'Unmute' : 'Mute'}
           </button>
         </span>
       </div>
+      {setMuted.isError && <ErrorMessage error={setMuted.error} />}
+      {researchNow.isError && <ErrorMessage error={researchNow.error} />}
       {topic.brief && <p className="small">{topic.brief}</p>}
       <p className="muted small">
         {topic.lastCuratedAt ? `Last curated ${formatDate(topic.lastCuratedAt)}` : 'Not curated yet.'}
