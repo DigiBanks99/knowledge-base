@@ -46,6 +46,17 @@ internal sealed class SearxngSearchSource(IHttpClientFactory httpClientFactory, 
             return new SearchSourceError(Name, "the answer has no `results` array; is JSON enabled in its search formats?");
         }
 
+        // An instance whose engines are all blocked (CAPTCHA, timeouts, rate limits) still answers 200 with no results
+        // and names the failures here. Reporting that as an empty success would mark the topic searched.
+        if (results.GetArrayLength() == 0)
+        {
+            string[] unresponsive = UnresponsiveEngines(body.RootElement);
+            if (unresponsive.Length > 0)
+            {
+                return new SearchSourceError(Name, $"no results, and these engines did not answer: {string.Join(", ", unresponsive)}.");
+            }
+        }
+
         return Result.Success<IReadOnlyList<SearchResult>, Error>(
         [
             .. results.EnumerateArray()
@@ -76,6 +87,16 @@ internal sealed class SearxngSearchSource(IHttpClientFactory httpClientFactory, 
             return new SearchSourceError(Name, $"{uri}: {ex.Message}");
         }
     }
+
+    /// <summary>Each failed engine as <c>name (reason)</c>, from the answer's <c>unresponsive_engines</c> pairs.</summary>
+    private static string[] UnresponsiveEngines(JsonElement root) =>
+        root.TryGetProperty("unresponsive_engines", out JsonElement engines) && engines.ValueKind == JsonValueKind.Array
+            ? [
+                .. engines.EnumerateArray()
+                    .Where(engine => engine.ValueKind == JsonValueKind.Array && engine.GetArrayLength() > 0)
+                    .Select(engine => engine.GetArrayLength() > 1 ? $"{engine[0]} ({engine[1]})" : engine[0].ToString())
+            ]
+            : [];
 
     private SearchSourceError NotConfigured() =>
         new(Name, $"'{ResearchSettings.SectionName}:{nameof(ResearchSettings.SearxngEndpoint)}' is not set.");
