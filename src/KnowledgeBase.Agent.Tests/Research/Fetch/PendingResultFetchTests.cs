@@ -1,6 +1,8 @@
 using KnowledgeBase.Agent.Research.Errors;
 using KnowledgeBase.Agent.Research.Fetch;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Search;
+using KnowledgeBase.Agent.Runs.Models;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -16,6 +18,7 @@ public sealed class PendingResultFetchTests
 
     private readonly ResearchTopics _state = new();
     private readonly IPageFetcher _fetcher = Substitute.For<IPageFetcher>();
+    private readonly ISearchRunLog _searchRunLog = Substitute.For<ISearchRunLog>();
     private readonly PendingResultFetch _fetch;
 
     public PendingResultFetchTests()
@@ -30,6 +33,7 @@ public sealed class PendingResultFetchTests
             NullLogger<PendingResultFetch>.Instance,
             FakeResearchStore.Holding(_state),
             _fetcher,
+            _searchRunLog,
             Substitute.For<IHostApplicationLifetime>(),
             timeProvider);
     }
@@ -73,6 +77,42 @@ public sealed class PendingResultFetchTests
         void ItShouldStillFetchTheOthers() => _state.PendingBatches[Atlas].Results[0].Page!.Markdown.ShouldNotBeNull();
 
         void ItShouldKeepTheBatchPending() => outcome.Value.ShouldBe(new TopicFetchOutcome(Atlas, 1, 1));
+    }
+
+    [Test]
+    public async Task ABatchFromARecordedSearchIsFetched()
+    {
+        _state.PendingBatches[Atlas] = Batch(Found("https://example.com/a"), Found("https://example.com/private")) with { SearchRunId = "search-run" };
+        _fetcher.FetchAsync("https://example.com/private", Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<FittedContent, Error>(new PageFetchRefusedError("https://example.com/private", "the site's robots.txt disallows it.")));
+        List<AgentToolCall> appended = [];
+        _searchRunLog
+            .AppendAsync("search-run", Arg.Do<IReadOnlyList<AgentToolCall>>(appended.AddRange), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        await _fetch.FetchAsync(Atlas, CancellationToken.None);
+
+        ItShouldAddEachPageToTheSearchRun();
+
+        void ItShouldAddEachPageToTheSearchRun() => appended
+            .Select(line => (line.Tool, line.Target, line.At, line.Succeeded, HasError: line.Error is not null))
+            .ShouldBe(
+            [
+                (SearchRuns.FetchStep, "https://example.com/a", Now, true, false),
+                (SearchRuns.FetchStep, "https://example.com/private", Now, false, true)
+            ]);
+    }
+
+    [Test]
+    public async Task ABatchFromBeforeSearchesWereRecordedIsFetched()
+    {
+        _state.PendingBatches[Atlas] = Batch(Found("https://example.com/a"));
+
+        await _fetch.FetchAsync(Atlas, CancellationToken.None);
+
+        await ItShouldAddToNoRun();
+
+        async Task ItShouldAddToNoRun() => await _searchRunLog.DidNotReceiveWithAnyArgs().AppendAsync(default!, default!, default);
     }
 
     [Test]

@@ -42,7 +42,7 @@ internal sealed class SearchTopicsCommandHandler(
         List<string> failed = [];
         foreach (ResearchTopic topic in due)
         {
-            Result<TopicSearchOutcome, Error> outcome = await topicSearch.SearchAsync(topic.Path, cancellationToken);
+            Result<TopicSearchOutcome, Error> outcome = await topicSearch.SearchAsync(topic.Path, SearchStart.Scheduled, cancellationToken);
             if (outcome.IsSuccess)
             {
                 searched.Add(outcome.Value);

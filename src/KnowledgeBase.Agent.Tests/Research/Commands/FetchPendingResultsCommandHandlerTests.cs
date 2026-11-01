@@ -3,6 +3,7 @@ using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Errors;
 using KnowledgeBase.Agent.Research.Fetch;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Search;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -34,6 +35,7 @@ public sealed class FetchPendingResultsCommandHandlerTests
                 NullLogger<PendingResultFetch>.Instance,
                 _store,
                 _fetcher,
+                Substitute.For<ISearchRunLog>(),
                 Substitute.For<IHostApplicationLifetime>(),
                 timeProvider));
     }

@@ -4,6 +4,7 @@ using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Curation;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Search;
 using KnowledgeBase.Agent.Research.Tools;
 using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs;
@@ -30,6 +31,7 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
     private readonly IResearchNoteWriter _noteWriter = Substitute.For<IResearchNoteWriter>();
     private readonly IModelServerHealth _modelServer = Substitute.For<IModelServerHealth>();
     private readonly IPromptTokenCounter _tokenCounter = Substitute.For<IPromptTokenCounter>();
+    private readonly ISearchRunLog _searchRunLog = Substitute.For<ISearchRunLog>();
     private readonly ConcurrentDictionary<string, AgentRun> _runs = new();
     private readonly List<ResearchNote> _notes = [];
     private readonly ScriptedAgent _scout = new(KnownAgents.Scout);
@@ -143,6 +145,69 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
         void ItShouldWriteNoNote() => _notes.ShouldBeEmpty();
 
         void ItShouldBackTheTopicOff() => _state.Topics[Atlas].Interval.ShouldBe(TimeSpan.FromHours(48));
+    }
+
+    [Test]
+    public async Task ABatchFromARecordedSearchIsTriaged()
+    {
+        _state.PendingBatches[Atlas] = _state.PendingBatches[Atlas] with { SearchRunId = "search-run" };
+        List<AgentToolCall> appended = [];
+        _searchRunLog
+            .AppendAsync("search-run", Arg.Do<IReadOnlyList<AgentToolCall>>(appended.AddRange), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        _scout.Behaviour = async (prompt, token) =>
+        {
+            await (prompt.Contains(Release)
+                ? CallToolAsync(nameof(ScoutTools.KeepResult), () => _tools.KeepResult("Atlas 2 is released.", ["Atlas 2 is out."], token))
+                : CallToolAsync(nameof(ScoutTools.DiscardResult), () => _tools.DiscardResult("A rant.", token)));
+            return "Judged.";
+        };
+
+        await _handler.Handle(new TriageResultsCommand(), CancellationToken.None);
+
+        ItShouldAddEachPageAgainInCaseOneMissedItsLine();
+        ItShouldAddEachVerdictToTheSearchRun();
+        ItShouldAddTheNoteToTheSearchRun();
+
+        void ItShouldAddEachPageAgainInCaseOneMissedItsLine() => appended
+            .Where(line => line.Tool == SearchRuns.FetchStep)
+            .Select(line => line.Target)
+            .ShouldBe([Release, Rant]);
+
+        void ItShouldAddEachVerdictToTheSearchRun() => appended
+            .Where(line => line.Tool is SearchRuns.KeepStep or SearchRuns.DiscardStep)
+            .Select(line => (line.Tool, line.Target, line.Succeeded, line.Detail))
+            .ShouldBe(
+            [
+                (SearchRuns.KeepStep, Release, true, null),
+                (SearchRuns.DiscardStep, Rant, true, "A rant.")
+            ]);
+
+        void ItShouldAddTheNoteToTheSearchRun() => appended
+            .Where(line => line.Tool == SearchRuns.NoteStep)
+            .ShouldHaveSingleItem()
+            .Target.ShouldBe("research-projects--atlas-20261027-070000.md");
+    }
+
+    [Test]
+    public async Task ABatchFromARecordedSearchIsAllDiscarded()
+    {
+        _state.PendingBatches[Atlas] = _state.PendingBatches[Atlas] with { SearchRunId = "search-run" };
+        List<AgentToolCall> appended = [];
+        _searchRunLog
+            .AppendAsync("search-run", Arg.Do<IReadOnlyList<AgentToolCall>>(appended.AddRange), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        await _handler.Handle(new TriageResultsCommand(), CancellationToken.None);
+
+        ItShouldAddEachFailedVerdictToTheSearchRun();
+        ItShouldAddNoNote();
+
+        void ItShouldAddEachFailedVerdictToTheSearchRun() => appended.Where(line => line.Tool != SearchRuns.FetchStep).ToList().ShouldSatisfyAllConditions(
+            lines => lines.Select(line => line.Target).ShouldBe([Release, Rant], ignoreOrder: true),
+            lines => lines.ShouldAllBe(line => line.Tool == SearchRuns.DiscardStep && !line.Succeeded && line.Error!.Contains("The Scout ended without a verdict")));
+
+        void ItShouldAddNoNote() => appended.ShouldNotContain(line => line.Tool == SearchRuns.NoteStep);
     }
 
     [Test]
@@ -355,6 +420,7 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
             _tokenCounter,
             _gate,
             _runTracker,
+            _searchRunLog,
             _scout,
             new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { [$"{KnownAgents.Scout}:Instructions"] = "Keep or discard each result." })

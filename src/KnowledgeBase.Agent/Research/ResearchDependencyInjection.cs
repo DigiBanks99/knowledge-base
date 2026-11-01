@@ -56,6 +56,7 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<HackerNewsSearchSource>()
                 .AddSingleton<ISearchSource>(services => services.GetRequiredService<SearxngSearchSource>())
                 .AddSingleton<ISearchSource>(services => services.GetRequiredService<HackerNewsSearchSource>())
+                .AddSingleton<ISearchRunLog, SearchRunLog>()
                 .AddSingleton<TopicSearch>()
                 .AddSingleton<SearchTopicsCommandHandler>()
                 .AddSingleton<ResearchTopicNowCommandHandler>()

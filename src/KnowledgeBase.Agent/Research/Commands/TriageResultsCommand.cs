@@ -3,6 +3,7 @@ using KnowledgeBase.Agent.Facts.Models;
 using KnowledgeBase.Agent.Research.Curation;
 using KnowledgeBase.Agent.Research.Errors;
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Search;
 using KnowledgeBase.Agent.Research.Tools;
 using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs;
@@ -40,6 +41,7 @@ internal sealed class TriageResultsCommandHandler(
     IPromptTokenCounter tokenCounter,
     ModelGate modelGate,
     AgentRunTracker runTracker,
+    ISearchRunLog searchRunLog,
     [FromKeyedServices(KnownAgents.Scout)] AIAgent scout,
     IConfiguration configuration,
     TimeProvider timeProvider)
@@ -266,6 +268,7 @@ internal sealed class TriageResultsCommandHandler(
         if (kept.Length == 0)
         {
             logger.TopicTriagedEmpty(topic, batch.Results.Count);
+            await AppendToSearchRunAsync(batch, [], cancellationToken);
             // Nothing to ingest, so there is no outcome to wait for: the topic backs off now, as for a note that filed nothing.
             return await store
                 .UpdateTopicAsync(topic, current => Result.Success<Maybe<ResearchTopic>, Error>(current.Select(existing => existing.Empty())), cancellationToken)
@@ -287,6 +290,7 @@ internal sealed class TriageResultsCommandHandler(
         }
 
         logger.TopicTriaged(topic, kept.Length, batch.Results.Count, note.FileName);
+        await AppendToSearchRunAsync(batch, [SearchRuns.Noted(note.FileName, timeProvider.GetUtcNow())], cancellationToken);
         return await store
             .AwaitBatchAsync(topic, note.FileName, timeProvider.GetUtcNow(), cancellationToken)
             .Map(_ => Finish.Awaiting);
@@ -302,6 +306,22 @@ internal sealed class TriageResultsCommandHandler(
                 },
                 cancellationToken)
             .Map(batch => batch.HasValue);
+
+    /// <summary>
+    /// Adds the batch's pages, verdicts and any <paramref name="more"/> (its note) to the run of the search that found
+    /// it, before the batch moves on, so a finish retried after a failure adds them again and the log skips what it
+    /// already has. The pages are added again too: one fetched just before a restart may have missed its line.
+    /// </summary>
+    private async Task AppendToSearchRunAsync(ResearchBatch batch, IReadOnlyList<AgentToolCall> more, CancellationToken cancellationToken)
+    {
+        if (batch.SearchRunId is { } searchRunId)
+        {
+            await searchRunLog.AppendAsync(
+                searchRunId,
+                [.. SearchRuns.Fetched(batch.Results), .. SearchRuns.Judged(batch.Results), .. more],
+                cancellationToken);
+        }
+    }
 
     private static bool HasVerdict(AgentRun? run) =>
         run?.ToolCalls.Any(call => call.Succeeded && VerdictTools.Contains(call.Tool)) == true;
