@@ -4,18 +4,17 @@ using Microsoft.Extensions.AI;
 
 namespace KnowledgeBase.Agent.Research.Tools;
 
-internal static class ScoutToolsExtensions
+internal static class ClerkToolsExtensions
 {
     extension(AIAgentToolsBuilder builder)
     {
-        public AIAgentToolsBuilder WithScoutTools()
+        public AIAgentToolsBuilder WithClerkTools()
         {
             builder.HostBuilder.Services.AddKeyedSingleton(builder.AgentName, (sp, _) =>
             {
                 AgentToolCollection tools = new();
-                ScoutTools scoutTools = sp.GetRequiredService<ScoutTools>();
-                tools.AddTool(AIFunctionFactory.Create(scoutTools.KeepResult));
-                tools.AddTool(AIFunctionFactory.Create(scoutTools.DiscardResult));
+                ClerkTools clerkTools = sp.GetRequiredService<ClerkTools>();
+                tools.AddTool(AIFunctionFactory.Create(clerkTools.RecordSummary));
                 return tools;
             });
             return builder;

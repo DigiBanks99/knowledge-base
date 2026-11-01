@@ -76,7 +76,7 @@ internal sealed class TestWiki : IAsyncDisposable
     public FakeAgent Librarian { get; } = new(KnownAgents.Librarian);
     public FakeAgent Pleb { get; } = new(KnownAgents.Pleb);
 
-    public FakeAgent Scout { get; } = new(KnownAgents.Scout);
+    public FakeAgent Clerk { get; } = new(KnownAgents.Clerk);
 
     /// <summary>The research Keeper, which a test scripts.</summary>
     public FakeKeeper Keeper { get; } = new();
@@ -84,7 +84,7 @@ internal sealed class TestWiki : IAsyncDisposable
     /// <summary>The only search source, which a test scripts.</summary>
     public FakeSearchSource Search { get; } = new();
 
-    private IEnumerable<FakeAgent> Agents => [FactFinder, ThreadWeaver, Reviewer, Editor, Librarian, Pleb, Scout];
+    private IEnumerable<FakeAgent> Agents => [FactFinder, ThreadWeaver, Reviewer, Editor, Librarian, Pleb, Clerk];
 
     public T Get<T>() where T : notnull => _app.Services.GetRequiredService<T>();
 

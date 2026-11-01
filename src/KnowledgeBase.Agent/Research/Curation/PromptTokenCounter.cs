@@ -72,7 +72,7 @@ internal sealed class LlamaServerTokenCounter(IHttpClientFactory httpClientFacto
 }
 
 /// <summary>
-/// Counts with llama-server while a research agent (the Pleb or the Scout) runs on it, and estimates otherwise: only
+/// Counts with llama-server while a research agent (the Pleb or the Clerk) runs on it, and estimates otherwise: only
 /// llama-server can count tokens for the model it has loaded, and another provider's context is far larger than a
 /// curation prompt. Decided per count, as an agent's provider can be switched while the app runs.
 /// </summary>
@@ -82,7 +82,7 @@ internal sealed class ResearchTokenCounter(
     EstimatedTokenCounter estimate)
     : IPromptTokenCounter
 {
-    private static readonly string[] ResearchAgents = [KnownAgents.Pleb, KnownAgents.Scout];
+    private static readonly string[] ResearchAgents = [KnownAgents.Pleb, KnownAgents.Clerk];
 
     public Task<Result<int, Error>> CountAsync(string prompt, CancellationToken cancellationToken) =>
         ResearchAgents.Any(agent => AgentProviders.Current(configuration, agent) == ModelProvider.OpenAICompatible)

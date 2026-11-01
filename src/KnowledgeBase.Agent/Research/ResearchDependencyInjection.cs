@@ -46,7 +46,7 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<EditTopicCurationCommandHandler>()
                 .AddSingleton<CurateTopicsCommandHandler>()
                 .AddSingleton<PlebTools>()
-                .AddSingleton<ScoutTools>()
+                .AddSingleton<ClerkTools>()
                 .AddSingleton<IResearchNoteWriter, ResearchNoteWriter>()
                 .AddSingleton<IKeeper, LlamaServerKeeper>()
                 .AddSingleton<TriageResultsCommandHandler>()

@@ -8,7 +8,8 @@ namespace KnowledgeBase.Agent.Research.Jobs;
 /// Runs a search cycle shortly after start, then again <see cref="ResearchSettings.SearchCycleInterval"/> after each
 /// one finishes, so cycles never overlap however long one takes. A cycle first settles the batches awaiting the
 /// ThreadWeaver, so their topics' intervals are current, then searches the due topics, fetches the pages of every
-/// pending batch, including any a restart interrupted, and has the Scout judge the fetched results.
+/// pending batch, including any a restart interrupted, and has the Keeper judge the fetched results and the Clerk
+/// summarise the kept ones.
 /// </summary>
 internal sealed class SearchJob(
     ILogger<SearchJob> logger,

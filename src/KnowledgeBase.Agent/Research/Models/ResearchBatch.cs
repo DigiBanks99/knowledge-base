@@ -8,21 +8,36 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// How many times the Keeper failed to answer for the result. It is given up on after a few, so a page the model can
 /// never answer doesn't hold up its batch.
 /// </param>
+/// <param name="SummaryAttempts">
+/// How many Clerk runs for a kept result timed out. It is given up on after a few, keeping its quotes alone.
+/// </param>
 public sealed record BatchResult(
     string Query,
     string Url,
     SearchResult Result,
     FetchedPage? Page = null,
     Verdict? Verdict = null,
-    int Attempts = 0);
+    int Attempts = 0,
+    int SummaryAttempts = 0)
+{
+    /// <summary>
+    /// Kept, and waiting for the Clerk: it has neither a summary nor a failed Clerk run. A discarded result, including
+    /// one flagged as an injection, never waits for one, so its page never reaches a generative model.
+    /// </summary>
+    public bool NeedsSummary => Verdict is { Kept: true, Summary: null, SummaryFailure: null };
+
+    /// <summary>Whether triage is done with the result: it is judged and, if kept, summarised or given up on.</summary>
+    public bool Triaged => Verdict is not null && !NeedsSummary;
+}
 
 /// <summary>
 /// What triage decided about one result. A kept result carries exact quotes and, once written, a summary (never the
 /// page's whole text, which may hold instructions aimed at later agents); a discard carries its reason. The Keeper's
 /// probabilities are stored with the verdict so the thresholds can be tuned against real results.
 /// </summary>
-/// <param name="Summary">A model-written summary of a kept result; null until one is written.</param>
+/// <param name="Summary">The Clerk's summary of a kept result; null until one is written.</param>
 /// <param name="Failure">Why there is no real verdict, when the result was discarded for lack of one.</param>
+/// <param name="SummaryFailure">Why a kept result has no summary, once the Clerk's run for it failed.</param>
 /// <param name="Useful">The Keeper's probability that the result is worth passing on.</param>
 /// <param name="Injection">The Keeper's probability that the result holds instructions aimed at an AI.</param>
 /// <param name="Kind">What kind of content a kept result is. Unreliable, so stored but never gated on.</param>
@@ -37,7 +52,8 @@ public sealed record Verdict(
     double? Useful = null,
     double? Injection = null,
     string? Kind = null,
-    double? KindProbability = null)
+    double? KindProbability = null,
+    string? SummaryFailure = null)
 {
     public static Verdict Keep(string? summary, IReadOnlyList<string> quotes, DateTimeOffset judgedAt) =>
         new(true, summary, quotes, null, judgedAt);
@@ -65,7 +81,7 @@ public sealed record FetchedPage(DateTimeOffset FetchedAt, string? Markdown, boo
 }
 
 /// <summary>
-/// The results one search of a topic kept, waiting for the Scout. While it waits the topic is in flight and is not
+/// The results one search of a topic kept, waiting for triage. While it waits the topic is in flight and is not
 /// searched again.
 /// </summary>
 /// <param name="SearchRunId">

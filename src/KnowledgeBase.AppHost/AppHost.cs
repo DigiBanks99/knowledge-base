@@ -14,7 +14,7 @@ const string ContainerWikiBackupKeyDirectory = "/run/wiki-backup";
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
-string[] agents = ["FactFinder", "ThreadWeaver", "Reviewer", "Editor", "Librarian", "Pleb", "Scout"];
+string[] agents = ["FactFinder", "ThreadWeaver", "Reviewer", "Editor", "Librarian", "Pleb", "Clerk"];
 
 IResourceBuilder<ParameterResource> rootDirectory = builder
     .AddParameter("WikiRootDirectory");

@@ -1,7 +1,5 @@
 using System.Globalization;
 
-using KnowledgeBase.Agent.Research.Tools;
-
 namespace KnowledgeBase.Agent.Research.Triage;
 
 /// <summary>Whether a screening keeps a result, and why not when it doesn't.</summary>
@@ -43,7 +41,7 @@ internal static class KeeperPolicy
     public static IReadOnlyList<string> Quotes(IReadOnlyDictionary<int, double> probabilities, IReadOnlyList<string> paragraphs, double floor) =>
     [
         .. Chosen(probabilities, paragraphs.Count, floor)
-            .Select(number => ScoutTools.Tidy(paragraphs[number - 1], MaxQuoteLength))
+            .Select(number => ModelText.Tidy(paragraphs[number - 1], MaxQuoteLength))
     ];
 
     /// <summary>The run summary of a screening, so the topic's history shows the probabilities behind each verdict.</summary>

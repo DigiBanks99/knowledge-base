@@ -48,7 +48,7 @@ public sealed class ModelGateTests : IDisposable
     }
 
     [Test]
-    public async Task ThePlebAndTheScoutWaitForTheModel()
+    public async Task ThePlebTheClerkAndTheKeeperWaitForTheModel()
     {
         TaskCompletionSource releaseFirst = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource firstStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -62,13 +62,14 @@ public sealed class ModelGateTests : IDisposable
         }, CancellationToken.None);
         await firstStarted.Task;
         Task pleb = _gate.RunAsync(_ => Record("Pleb"), CancellationToken.None);
-        Task scout = _gate.RunAsync(_ => Record("Scout"), CancellationToken.None, ModelPriority.High);
+        Task clerk = _gate.RunAsync(_ => Record("Clerk"), CancellationToken.None, ModelPriority.Medium);
+        Task keeper = _gate.RunAsync(_ => Record("Keeper"), CancellationToken.None, ModelPriority.High);
         releaseFirst.SetResult();
-        await Task.WhenAll(first, pleb, scout);
+        await Task.WhenAll(first, pleb, clerk, keeper);
 
-        ItShouldRunTheScoutFirst();
+        ItShouldRunTheKeeperThenTheClerkThenThePleb();
 
-        void ItShouldRunTheScoutFirst() => order.ShouldBe(["Scout", "Pleb"]);
+        void ItShouldRunTheKeeperThenTheClerkThenThePleb() => order.ShouldBe(["Keeper", "Clerk", "Pleb"]);
 
         Task<int> Record(string who)
         {

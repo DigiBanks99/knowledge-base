@@ -1,13 +1,12 @@
 using System.Text;
 
 using KnowledgeBase.Agent.Research.Models;
-using KnowledgeBase.Agent.Research.Tools;
 
 namespace KnowledgeBase.Agent.Research.Triage;
 
 /// <summary>
 /// The note triage writes for a topic: the research header <c>ResearchNoteHeader</c> reads, then each kept result's
-/// source, the search engine's snippet, its kind, any summary and the exact quotes the Keeper chose. The page's text
+/// source, the search engine's snippet, its kind, the Clerk's summary (when it wrote one) and the exact quotes the Keeper chose. The page's text
 /// never goes in beyond those length-capped quotes, as it may hold instructions aimed at the agents that read the note.
 /// </summary>
 /// <param name="FileName">
@@ -16,7 +15,7 @@ namespace KnowledgeBase.Agent.Research.Triage;
 internal sealed record ResearchNote(string FileName, string Content)
 {
     /// <summary>
-    /// The snippet is third-party text too, so like the Scout's quotes it is made one bounded line after a label: it
+    /// The snippet is third-party text too, so like the Keeper's quotes it is made one bounded line after a label: it
     /// cannot carry markdown structure or much of an instruction into the note.
     /// </summary>
     internal const int MaxSnippetLength = 300;
@@ -44,12 +43,12 @@ internal sealed record ResearchNote(string FileName, string Content)
             Verdict verdict = result.Verdict!;
             content.AppendLine();
             content.AppendLine($"## {OneLine(result.Result.Title)}");
-            string snippet = ScoutTools.Tidy(result.Result.Snippet, MaxSnippetLength);
+            string snippet = ModelText.Tidy(result.Result.Snippet, MaxSnippetLength);
             string?[] blocks =
             [
                 $"Source: {result.Result.Url}",
                 snippet.Length > 0 ? $"Search snippet: {snippet}" : null,
-                string.IsNullOrWhiteSpace(verdict.Kind) ? null : $"Kind: {ScoutTools.Tidy(verdict.Kind, MaxKindLength)}",
+                string.IsNullOrWhiteSpace(verdict.Kind) ? null : $"Kind: {ModelText.Tidy(verdict.Kind, MaxKindLength)}",
                 string.IsNullOrWhiteSpace(verdict.Summary) ? null : Plain(verdict.Summary),
                 .. verdict.Quotes.Select(quote => $"> {quote}")
             ];
@@ -66,7 +65,7 @@ internal sealed record ResearchNote(string FileName, string Content)
     }
 
     /// <summary>
-    /// The Scout's words are model output derived from a web page, so a summary that opens with markdown syntax is
+    /// The Clerk's words are model output derived from a web page, so a summary that opens with markdown syntax is
     /// escaped to stay a paragraph rather than becoming a heading, rule or list of the note's own.
     /// </summary>
     private static string Plain(string text) =>

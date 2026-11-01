@@ -24,7 +24,7 @@ internal sealed partial class ReadabilityExtractor : IContentExtractor
     // Kept only when Readability finds no article, as the next best guess at the content.
     private static readonly string[] Chrome = ["script", "style", "noscript", "nav", "header", "footer", "aside", "form", "iframe", "svg"];
 
-    // Media cost tokens and tell the Scout nothing, and an image left in would be loaded by the author's browser when
+    // Media cost tokens and tell triage nothing, and an image left in would be loaded by the author's browser when
     // the Topics page shows the content.
     private static readonly string[] Media = ["img", "picture", "source", "video", "audio", "svg", "iframe", "object", "embed"];
 

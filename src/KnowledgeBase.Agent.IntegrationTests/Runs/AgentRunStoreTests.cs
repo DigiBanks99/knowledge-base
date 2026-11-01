@@ -54,8 +54,8 @@ public sealed class AgentRunStoreTests : IAsyncDisposable
         AgentRun[] runs =
         [
             Run("run-1", KnownAgents.Pleb, AgentRunTriggerKind.Curation, "projects--garden", minutes: 0) with { Topic = "projects/garden" },
-            Run("run-2", KnownAgents.Scout, AgentRunTriggerKind.Triage, "https://example.com/a", minutes: 1) with { Topic = "projects/garden" },
-            Run("run-3", KnownAgents.Scout, AgentRunTriggerKind.Triage, "https://example.com/b", minutes: 2) with { Topic = "projects/rust" },
+            Run("run-2", "Scout", AgentRunTriggerKind.Triage, "https://example.com/a", minutes: 1) with { Topic = "projects/garden" },
+            Run("run-3", "Scout", AgentRunTriggerKind.Triage, "https://example.com/b", minutes: 2) with { Topic = "projects/rust" },
             Run("run-4", KnownAgents.ThreadWeaver, AgentRunTriggerKind.Facts, "facts-a.json", minutes: 3) with { Topic = "projects/garden" },
             Run("run-5", KnownAgents.FactFinder, AgentRunTriggerKind.Note, "note-a.md", minutes: 4)
         ];

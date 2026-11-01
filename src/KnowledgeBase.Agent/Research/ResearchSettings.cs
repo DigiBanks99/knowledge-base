@@ -65,16 +65,10 @@ public sealed class ResearchSettings
     public int TriageContentTokenBudget { get; init; } = 2500;
 
     /// <summary>
-    /// Whether the Keeper triages fetched results. Off, the search cycle is a dry run: results are searched and fetched
-    /// and left pending, to be inspected before the loop closes.
+    /// Whether the Keeper and the Clerk triage fetched results. Off, the search cycle is a dry run: results are searched
+    /// and fetched and left pending, to be inspected before the loop closes.
     /// </summary>
     public bool TriageEnabled { get; init; } = true;
-
-    /// <summary>
-    /// The old name of <see cref="TriageEnabled"/>, still honoured so a dry run configured under it stays a dry run:
-    /// triage runs only while both are on.
-    /// </summary>
-    public bool ScoutEnabled { get; init; } = true;
 
     /// <summary>
     /// The Keeper's decision model. On the shared llama-server in router mode it is the preset's section name.
@@ -135,9 +129,19 @@ public sealed class ResearchSettings
     public int KeeperMaxAttempts { get; init; } = 3;
 
     /// <summary>
-    /// The most tokens a Scout prompt may hold. A prompt over it is not run rather than letting the server truncate it.
+    /// The most tokens a Clerk prompt may hold. A prompt over it is not run rather than letting the server truncate it,
+    /// and its result keeps its quotes alone.
     /// </summary>
-    public int ScoutPromptTokenBudget { get; init; } = 6000;
+    public int ClerkPromptTokenBudget { get; init; } = 6000;
+
+    /// <summary>The most Clerk runs in one research cycle, so summaries never queue unbounded model time.</summary>
+    public int ClerkRunsPerCycle { get; init; } = 10;
+
+    /// <summary>
+    /// How many Clerk runs for a kept result may time out before it is given up on and keeps its quotes alone, so a
+    /// page the model never finishes doesn't hold up its batch.
+    /// </summary>
+    public int ClerkMaxAttempts { get; init; } = 3;
 
     /// <summary>The largest page the fetcher reads; anything larger is recorded as a failed fetch.</summary>
     public long FetchMaxBytes { get; init; } = 2 * 1024 * 1024;

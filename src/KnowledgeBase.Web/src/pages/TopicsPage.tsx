@@ -345,7 +345,7 @@ function PendingResults({ slug, count }: { slug: string; count: number }) {
   )
 }
 
-/** The page the fetcher reduced a result to, as the Scout will see it, or why there is none. */
+/** The page the fetcher reduced a result to, as the Keeper and the Clerk see it, or why there is none. */
 function FetchedContent({ page }: { page: FetchedPage | null }) {
   if (!page) return <p className="muted small">Page not fetched yet.</p>
   if (page.error !== null || page.markdown === null)

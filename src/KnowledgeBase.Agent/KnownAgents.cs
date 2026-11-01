@@ -8,7 +8,7 @@ public static class KnownAgents
     public const string Reviewer = "Reviewer";
     public const string Librarian = "Librarian";
     public const string Pleb = "Pleb";
-    public const string Scout = "Scout";
+    public const string Clerk = "Clerk";
 
-    public static readonly string[] All = [Editor, FactFinder, ThreadWeaver, Reviewer, Librarian, Pleb, Scout];
+    public static readonly string[] All = [Editor, FactFinder, ThreadWeaver, Reviewer, Librarian, Pleb, Clerk];
 }
