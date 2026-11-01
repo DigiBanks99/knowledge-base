@@ -27,8 +27,11 @@ export interface AgentToolCall {
 }
 export interface AgentRun {
   id: string
-  /** The agent that ran, or `Search` for a research topic's search, which is recorded as a run without being an agent. */
-  agent: AgentName | 'Search'
+  /**
+   * The agent that ran, or `Search` for a research topic's search and `Keeper` for a call to the research Keeper's
+   * decision model, which are recorded as runs without being agents.
+   */
+  agent: AgentName | 'Search' | 'Keeper'
   trigger: { kind: AgentRunTriggerKind; reference: string }
   status: AgentRunStatus
   startedAt: string
