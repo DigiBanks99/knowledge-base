@@ -48,7 +48,15 @@ public sealed record FetchedPage(DateTimeOffset FetchedAt, string? Markdown, boo
 /// The results one search of a topic kept, waiting for the Scout. While it waits the topic is in flight and is not
 /// searched again.
 /// </summary>
-public sealed record ResearchBatch(string Topic, DateTimeOffset SearchedAt, IReadOnlyList<BatchResult> Results);
+/// <param name="SearchRunId">
+/// The run recording the search that found these results, to which fetching and triage add what became of them. Null
+/// for a batch written before searches were recorded.
+/// </param>
+public sealed record ResearchBatch(
+    string Topic,
+    DateTimeOffset SearchedAt,
+    IReadOnlyList<BatchResult> Results,
+    string? SearchRunId = null);
 
 /// <summary>
 /// A batch whose kept results were written to a research note, waiting for the ThreadWeaver to file it. The topic stays

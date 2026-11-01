@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 
 using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Search;
 
 namespace KnowledgeBase.Agent.Research.Fetch;
 
@@ -12,12 +13,14 @@ public sealed record TopicFetchOutcome(string Topic, int Fetched, int Failed);
 /// <summary>
 /// Fetches the pages of a topic's pending batch that have not been fetched yet. Each page is written back to the batch
 /// as soon as it is fetched, so a restart resumes with the pages still missing, and a page that cannot be fetched is
-/// recorded with its reason rather than failing the batch.
+/// recorded with its reason rather than failing the batch. Each page is also added to the run of the search that found
+/// it, so the topic's history shows what was fetched.
 /// </summary>
 internal sealed class PendingResultFetch(
     ILogger<PendingResultFetch> logger,
     IResearchStore store,
     IPageFetcher fetcher,
+    ISearchRunLog searchRunLog,
     IHostApplicationLifetime lifetime,
     TimeProvider timeProvider)
 {
@@ -85,6 +88,14 @@ internal sealed class PendingResultFetch(
                 if (written.Value.HasNoValue)
                 {
                     break;
+                }
+
+                if (written.Value.Value.SearchRunId is { } searchRunId)
+                {
+                    await searchRunLog.AppendAsync(
+                        searchRunId,
+                        SearchRuns.Fetched(written.Value.Value.Results.Where(result => result.Url == url)),
+                        cancellationToken);
                 }
 
                 if (page.Error is null)

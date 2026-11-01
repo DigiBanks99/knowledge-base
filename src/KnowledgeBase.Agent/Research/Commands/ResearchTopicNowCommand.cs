@@ -22,7 +22,7 @@ internal sealed class ResearchTopicNowCommandHandler(
         ResearchTopicNowCommand request,
         CancellationToken cancellationToken) => await TopicSlugs
         .Resolve(request.Slug, wikiPaths)
-        .Bind(topic => topicSearch.SearchAsync(topic, cancellationToken))
+        .Bind(topic => topicSearch.SearchAsync(topic, SearchStart.ResearchNow, cancellationToken))
         .Tap(searched =>
         {
             if (searched.Kept > 0)

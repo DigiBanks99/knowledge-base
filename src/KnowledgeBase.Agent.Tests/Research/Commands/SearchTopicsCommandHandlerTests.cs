@@ -32,7 +32,7 @@ public sealed class SearchTopicsCommandHandlerTests
             NullLogger<SearchTopicsCommandHandler>.Instance,
             Options.Create(new ResearchSettings { TopicsPerCycle = 2 }),
             store,
-            new TopicSearch(NullLogger<TopicSearch>.Instance, store, [_source], timeProvider),
+            new TopicSearch(NullLogger<TopicSearch>.Instance, store, [_source], Substitute.For<ISearchRunLog>(), timeProvider),
             timeProvider);
     }
 

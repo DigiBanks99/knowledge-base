@@ -1,6 +1,7 @@
 using System.Text;
 
 using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Research.Search;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -50,6 +52,10 @@ internal sealed class TestWiki : IAsyncDisposable
             builder.Services.AddKeyedSingleton<AIAgent>(agent.Name, agent);
         }
 
+        // Searches go to a scripted source rather than SearXNG or Hacker News.
+        builder.Services.RemoveAll<ISearchSource>();
+        builder.Services.AddSingleton<ISearchSource>(Search);
+
         _app = builder.Build();
         Settings = _app.Services.GetRequiredService<IOptions<WikiConfigurationSettings>>().Value;
     }
@@ -64,6 +70,9 @@ internal sealed class TestWiki : IAsyncDisposable
     public FakeAgent Pleb { get; } = new(KnownAgents.Pleb);
 
     public FakeAgent Scout { get; } = new(KnownAgents.Scout);
+
+    /// <summary>The only search source, which a test scripts.</summary>
+    public FakeSearchSource Search { get; } = new();
 
     private IEnumerable<FakeAgent> Agents => [FactFinder, ThreadWeaver, Reviewer, Editor, Librarian, Pleb, Scout];
 

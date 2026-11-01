@@ -1,6 +1,8 @@
 using KnowledgeBase.Agent.Research.Errors;
 using KnowledgeBase.Agent.Research.Models;
 using KnowledgeBase.Agent.Research.Search;
+using KnowledgeBase.Agent.Runs;
+using KnowledgeBase.Agent.Runs.Models;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -17,6 +19,8 @@ public sealed class TopicSearchTests
     private readonly ResearchTopics _state = new();
     private readonly ISearchSource _searxng = Source("SearXNG");
     private readonly ISearchSource _hackerNews = Source("Hacker News");
+    private readonly List<AgentRun> _recorded = [];
+    private readonly TimeProvider _timeProvider = Substitute.For<TimeProvider>();
     private readonly TopicSearch _search;
 
     public TopicSearchTests()
@@ -29,9 +33,10 @@ public sealed class TopicSearchTests
             SeenUrls = new Dictionary<string, DateTimeOffset> { ["https://example.com/seen"] = LastSearched }
         };
 
-        TimeProvider timeProvider = Substitute.For<TimeProvider>();
-        timeProvider.GetUtcNow().Returns(Now);
-        _search = new TopicSearch(NullLogger<TopicSearch>.Instance, FakeResearchStore.Holding(_state), [_searxng, _hackerNews], timeProvider);
+        _timeProvider.GetUtcNow().Returns(Now);
+        ISearchRunLog searchRunLog = Substitute.For<ISearchRunLog>();
+        searchRunLog.RecordAsync(Arg.Do<AgentRun>(_recorded.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        _search = new TopicSearch(NullLogger<TopicSearch>.Instance, FakeResearchStore.Holding(_state), [_searxng, _hackerNews], searchRunLog, _timeProvider);
     }
 
     [Test]
@@ -42,12 +47,31 @@ public sealed class TopicSearchTests
         Answer(_hackerNews, "atlas framework release", Found("https://www.example.com/atlas-2/", Now.AddHours(-1)));
         Answer(_hackerNews, "atlas migration guide", Found("https://example.com/old", LastSearched.AddDays(-1)));
 
-        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldSearchEveryQueryOnEverySourceSinceTheLastSearch();
         ItShouldReportWhatItFoundAndKept();
         ItShouldWriteTheKeptResultsAsThePendingBatch();
         ItShouldMarkTheTopicSearched();
+        ItShouldRecordTheSearchAsRunningBeforeWritingItsBatch();
+        ItShouldRecordTheSearchAsARunForTheTopic();
+        ItShouldLinkTheBatchToItsRun();
+
+        void ItShouldRecordTheSearchAsRunningBeforeWritingItsBatch() => _recorded.ShouldSatisfyAllConditions(
+            recorded => recorded.Count.ShouldBe(2),
+            recorded => recorded[0].Status.ShouldBe(AgentRunStatus.Running),
+            recorded => recorded[0].Id.ShouldBe(recorded[1].Id));
+
+        void ItShouldRecordTheSearchAsARunForTheTopic() => _recorded[^1].ShouldSatisfyAllConditions(
+            run => run.Agent.ShouldBe(SearchRuns.Agent),
+            run => run.Trigger.ShouldBe(new AgentRunTrigger(AgentRunTriggerKind.Search, "Scheduled")),
+            run => run.Topic.ShouldBe(Atlas),
+            run => run.Status.ShouldBe(AgentRunStatus.Succeeded),
+            run => run.StartedAt.ShouldBe(Now),
+            run => run.ToolCalls.Count.ShouldBe(4),
+            run => run.Summary.ShouldBe("Found 5 results: 0 blocked, 2 already seen, 1 too old, 2 kept. Wrote a batch of 2 for triage."));
+
+        void ItShouldLinkTheBatchToItsRun() => _state.PendingBatches[Atlas].SearchRunId.ShouldBe(_recorded[^1].Id);
 
         void ItShouldSearchEveryQueryOnEverySourceSinceTheLastSearch()
         {
@@ -78,7 +102,7 @@ public sealed class TopicSearchTests
     {
         _state.Topics[Atlas] = _state.Topics[Atlas] with { LastSearchedAt = null, SeenUrls = null };
 
-        await _search.SearchAsync(Atlas, CancellationToken.None);
+        await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldAskForTheLastThirtyDays();
 
@@ -91,11 +115,15 @@ public sealed class TopicSearchTests
     {
         Answer(_searxng, "atlas framework release", Found("https://example.com/seen", Now.AddHours(-3)));
 
-        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldKeepNothing();
         ItShouldWriteNoBatch();
         ItShouldStillMarkTheTopicSearched();
+        ItShouldStillRecordTheSearch();
+
+        void ItShouldStillRecordTheSearch() => _recorded.ShouldHaveSingleItem().Summary.ShouldBe(
+            "Found 1 result: 0 blocked, 1 already seen, 0 too old, 0 kept. Kept nothing, so no batch was written.");
 
         void ItShouldKeepNothing() => outcome.Value.Kept.ShouldBe(0);
 
@@ -110,7 +138,7 @@ public sealed class TopicSearchTests
         Fail(_searxng);
         Answer(_hackerNews, "atlas framework release", Found("https://example.com/atlas-2", Now.AddHours(-1)));
 
-        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldUseTheOther();
         ItShouldRecordWhatItSaw();
@@ -130,8 +158,8 @@ public sealed class TopicSearchTests
         TaskCompletionSource<Result<IReadOnlyList<SearchResult>, Error>> slowAnswer = new();
         _searxng.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(slowAnswer.Task);
 
-        Task<Result<TopicSearchOutcome, Error>> first = _search.SearchAsync(Atlas, CancellationToken.None);
-        Result<TopicSearchOutcome, Error> second = await _search.SearchAsync(Atlas, CancellationToken.None);
+        Task<Result<TopicSearchOutcome, Error>> first = _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> second = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
         slowAnswer.SetResult(Result.Success<IReadOnlyList<SearchResult>, Error>([]));
         Result<TopicSearchOutcome, Error> firstOutcome = await first;
 
@@ -149,10 +177,16 @@ public sealed class TopicSearchTests
         Fail(_searxng);
         Fail(_hackerNews);
 
-        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldFail();
         ItShouldLeaveTheTopicDue();
+        ItShouldRecordTheSearchAsFailed();
+
+        void ItShouldRecordTheSearchAsFailed() => _recorded.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            run => run.Status.ShouldBe(AgentRunStatus.Failed),
+            run => run.Error.ShouldBe(outcome.Error.Message),
+            run => run.ToolCalls.ShouldAllBe(call => !call.Succeeded));
 
         void ItShouldFail() => outcome.Error.ShouldBeOfType<AggregateError>().Errors.Count().ShouldBe(4);
 
@@ -164,7 +198,7 @@ public sealed class TopicSearchTests
     {
         _searxng.IsConfigured.Returns(false);
 
-        await _search.SearchAsync(Atlas, CancellationToken.None);
+        await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldNotSearchIt();
 
@@ -178,7 +212,7 @@ public sealed class TopicSearchTests
         _state.BlockedDomains = new BlockedDomains(["contentfarm.example"]);
         Answer(_searxng, "atlas framework release", Found("https://contentfarm.example/atlas", Now.AddHours(-1)));
 
-        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> outcome = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldNotKeepIt();
 
@@ -192,13 +226,14 @@ public sealed class TopicSearchTests
         _state.Topics["projects/uncurated"] = ResearchTopic.New("projects/uncurated", Discovered);
         _state.PendingBatches[Atlas] = new ResearchBatch(Atlas, LastSearched, []);
 
-        Result<TopicSearchOutcome, Error> muted = await _search.SearchAsync("projects/muted", CancellationToken.None);
-        Result<TopicSearchOutcome, Error> uncurated = await _search.SearchAsync("projects/uncurated", CancellationToken.None);
-        Result<TopicSearchOutcome, Error> inFlight = await _search.SearchAsync(Atlas, CancellationToken.None);
-        Result<TopicSearchOutcome, Error> unknown = await _search.SearchAsync("projects/unknown", CancellationToken.None);
+        Result<TopicSearchOutcome, Error> muted = await _search.SearchAsync("projects/muted", SearchStart.Scheduled, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> uncurated = await _search.SearchAsync("projects/uncurated", SearchStart.Scheduled, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> inFlight = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
+        Result<TopicSearchOutcome, Error> unknown = await _search.SearchAsync("projects/unknown", SearchStart.Scheduled, CancellationToken.None);
 
         ItShouldRefuseEachWithItsReason();
         ItShouldSearchNothing();
+        ItShouldRecordNothing();
 
         void ItShouldRefuseEachWithItsReason() => this.ShouldSatisfyAllConditions(
             () => muted.Error.ShouldBeOfType<TopicMutedError>(),
@@ -208,6 +243,43 @@ public sealed class TopicSearchTests
 
         void ItShouldSearchNothing() =>
             _searxng.DidNotReceive().SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+
+        void ItShouldRecordNothing() => _recorded.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task TheAuthorAsksForResearchNow()
+    {
+        Answer(_searxng, "atlas framework release", Found("https://example.com/atlas-2", Now.AddHours(-2)));
+
+        await _search.SearchAsync(Atlas, SearchStart.ResearchNow, CancellationToken.None);
+
+        ItShouldRecordHowTheSearchWasStarted();
+
+        void ItShouldRecordHowTheSearchWasStarted() =>
+            _recorded[^1].Trigger.ShouldBe(new AgentRunTrigger(AgentRunTriggerKind.Search, "ResearchNow"));
+    }
+
+    [Test]
+    public async Task TheSearchCannotBeRecorded()
+    {
+        IAgentRunStore runStore = Substitute.For<IAgentRunStore>();
+        runStore.SaveAsync(Arg.Any<AgentRun>(), Arg.Any<CancellationToken>()).Returns(_ => throw new IOException("The disk is full."));
+        TopicSearch search = new(
+            NullLogger<TopicSearch>.Instance,
+            FakeResearchStore.Holding(_state),
+            [_searxng],
+            new SearchRunLog(NullLogger<SearchRunLog>.Instance, runStore),
+            _timeProvider);
+        Answer(_searxng, "atlas framework release", Found("https://example.com/atlas-2", Now.AddHours(-2)));
+
+        Result<TopicSearchOutcome, Error> outcome = await search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
+
+        ItShouldStillSearch();
+
+        void ItShouldStillSearch() => outcome.ShouldSatisfyAllConditions(
+            () => outcome.Value.Kept.ShouldBe(1),
+            () => _state.PendingBatches.Keys.ShouldBe([Atlas]));
     }
 
     private static ISearchSource Source(string name)

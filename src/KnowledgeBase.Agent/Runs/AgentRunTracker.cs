@@ -57,7 +57,7 @@ internal sealed class AgentRunTracker(
         string? sourceNote = null)
     {
         RunRecorder recorder = new(new AgentRun(
-            $"{timeProvider.GetUtcNow():yyyyMMdd-HHmmss}-{agent.ToLowerInvariant()}-{Guid.NewGuid():N}"[..40],
+            AgentRunIds.New(agent, timeProvider.GetUtcNow()),
             agent,
             trigger,
             AgentRunStatus.Running,

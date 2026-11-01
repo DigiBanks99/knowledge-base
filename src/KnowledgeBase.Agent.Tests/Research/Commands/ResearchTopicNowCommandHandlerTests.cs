@@ -51,11 +51,12 @@ public sealed class ResearchTopicNowCommandHandlerTests
         WikiPaths wikiPaths = new(Options.Create(new WikiConfigurationSettings { RootDirectory = "/data/kb" }));
         IResearchStore store = FakeResearchStore.Holding(_state);
         _handler = new ResearchTopicNowCommandHandler(
-            new TopicSearch(NullLogger<TopicSearch>.Instance, store, [_source], timeProvider),
+            new TopicSearch(NullLogger<TopicSearch>.Instance, store, [_source], Substitute.For<ISearchRunLog>(), timeProvider),
             new PendingResultFetch(
                 NullLogger<PendingResultFetch>.Instance,
                 store,
                 _fetcher,
+                Substitute.For<ISearchRunLog>(),
                 Substitute.For<IHostApplicationLifetime>(),
                 timeProvider),
             wikiPaths);

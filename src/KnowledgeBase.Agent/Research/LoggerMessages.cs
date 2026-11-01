@@ -123,4 +123,10 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Error, "Resolving the awaiting research batches failed: {Error}")]
     public static partial void ResolveCycleFailed(this ILogger logger, Error error);
+
+    [LoggerMessage(LogLevel.Warning, "Failed to record the search of research topic '{Topic}'; the search carries on.")]
+    public static partial void FailedToRecordSearch(this ILogger logger, string topic, Exception exception);
+
+    [LoggerMessage(LogLevel.Warning, "Failed to add what became of its results to search run '{RunId}'.")]
+    public static partial void FailedToAppendToSearchRun(this ILogger logger, string runId, Exception exception);
 }

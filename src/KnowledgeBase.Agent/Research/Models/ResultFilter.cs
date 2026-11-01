@@ -1,7 +1,15 @@
 namespace KnowledgeBase.Agent.Research.Models;
 
 /// <summary>A search's results after filtering, and the URLs the topic now records as seen.</summary>
-public sealed record FilteredResults(IReadOnlyList<BatchResult> Kept, IReadOnlyList<string> Seen);
+/// <param name="Blocked">Results dropped for a blocked domain or a URL that could not be used.</param>
+/// <param name="AlreadySeen">Results the topic had seen, or that an earlier result of the same search found.</param>
+/// <param name="TooOld">Results dated before the cutoff.</param>
+public sealed record FilteredResults(
+    IReadOnlyList<BatchResult> Kept,
+    IReadOnlyList<string> Seen,
+    int Blocked,
+    int AlreadySeen,
+    int TooOld);
 
 /// <summary>Decides which of a topic's search results are worth triaging.</summary>
 public static class ResultFilter
@@ -25,16 +33,21 @@ public static class ResultFilter
         List<BatchResult> kept = [];
         List<string> seen = [];
         HashSet<string> seenThisSearch = new(StringComparer.Ordinal);
+        int blocked = 0;
+        int alreadySeen = 0;
+        int tooOld = 0;
         foreach ((string query, SearchResult result) in results)
         {
             Maybe<string> url = ResultUrls.Normalise(result.Url);
             if (url.HasNoValue || blockedDomains.Blocks(result.Url))
             {
+                blocked++;
                 continue;
             }
 
             if (topic.HasSeen(url.Value) || !seenThisSearch.Add(url.Value))
             {
+                alreadySeen++;
                 continue;
             }
 
@@ -43,8 +56,12 @@ public static class ResultFilter
             {
                 kept.Add(new BatchResult(query, url.Value, result));
             }
+            else
+            {
+                tooOld++;
+            }
         }
 
-        return new FilteredResults(kept, seen);
+        return new FilteredResults(kept, seen, blocked, alreadySeen, tooOld);
     }
 }

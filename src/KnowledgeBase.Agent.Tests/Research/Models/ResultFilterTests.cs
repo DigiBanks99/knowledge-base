@@ -119,6 +119,27 @@ public sealed class ResultFilterTests
             () => filtered.Seen.ShouldBeEmpty());
     }
 
+    [Test]
+    public void ResultsAreDroppedForEveryReason()
+    {
+        FilteredResults filtered = Apply(
+            new BlockedDomains(["contentfarm.example"]),
+            Result("https://contentfarm.example/new", Now.AddHours(-1)),
+            Result("javascript:alert(1)", Now),
+            Result("https://example.com/seen", Now.AddHours(-1)),
+            Result("https://example.com/new", Now.AddHours(-1)),
+            Result("https://www.example.com/new", Now.AddHours(-1)),
+            Result("https://example.com/old", LastSearched.AddDays(-1)));
+
+        ItShouldCountEachReason();
+
+        void ItShouldCountEachReason() => filtered.ShouldSatisfyAllConditions(
+            () => filtered.Blocked.ShouldBe(2),
+            () => filtered.AlreadySeen.ShouldBe(2),
+            () => filtered.TooOld.ShouldBe(1),
+            () => filtered.Kept.Count.ShouldBe(1));
+    }
+
     private FilteredResults Apply(BlockedDomains blocked, params SearchResult[] results) =>
         ResultFilter.Apply(results.Select(result => (Query, result)), _topic, blocked, Now);
 
