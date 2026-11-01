@@ -14,8 +14,8 @@ public sealed class ResearchNoteTests
         ResearchBatch batch = new("projects/atlas", Searched, []);
         BatchResult[] kept =
         [
-            Result("https://example.com/a", "Atlas 2", ScoutVerdict.Keep("Atlas 2 ships.", ["Atlas 2 is out."], Searched)),
-            Result("https://example.com/b", "A talk", ScoutVerdict.Keep("A talk on Atlas.", [], Searched))
+            Result("https://example.com/a", "Atlas 2", Verdict.Keep("Atlas 2 ships.", ["Atlas 2 is out."], Searched)),
+            Result("https://example.com/b", "A talk", Verdict.Keep("A talk on Atlas.", [], Searched))
         ];
 
         ResearchNote note = ResearchNote.Build(batch, kept);
@@ -39,10 +39,24 @@ public sealed class ResearchNoteTests
     }
 
     [Test]
+    public void TheKeeperKeptAResultWithoutASummary()
+    {
+        ResearchBatch batch = new("projects/atlas", Searched, []);
+        BatchResult kept = Result("https://example.com/a", "Atlas 2", Verdict.Keep(null, ["Atlas 2 is out.", "It drops plugins."], Searched) with { Kind = "release" });
+
+        string content = ResearchNote.Build(batch, [kept]).Content.ReplaceLineEndings("\n");
+
+        ItShouldGiveTheTitleSourceKindAndQuotes();
+
+        void ItShouldGiveTheTitleSourceKindAndQuotes() => content.ShouldEndWith(
+            "## Atlas 2\n\nSource: https://example.com/a\n\nKind: release\n\n> Atlas 2 is out.\n\n> It drops plugins.\n");
+    }
+
+    [Test]
     public void AKeptResultHasASnippet()
     {
         ResearchBatch batch = new("projects/atlas", Searched, []);
-        BatchResult kept = Result("https://example.com/a", "Atlas 2", ScoutVerdict.Keep("Atlas 2 ships.", [], Searched)) with
+        BatchResult kept = Result("https://example.com/a", "Atlas 2", Verdict.Keep("Atlas 2 ships.", [], Searched)) with
         {
             Result = new SearchResult("https://example.com/a", "Atlas 2", "# Atlas 2\n\nis   out today.", "SearXNG", null)
         };
@@ -59,7 +73,7 @@ public sealed class ResearchNoteTests
     public void AKeptResultHasALongSnippet()
     {
         ResearchBatch batch = new("projects/atlas", Searched, []);
-        BatchResult kept = Result("https://example.com/a", "Atlas 2", ScoutVerdict.Keep("Atlas 2 ships.", [], Searched)) with
+        BatchResult kept = Result("https://example.com/a", "Atlas 2", Verdict.Keep("Atlas 2 ships.", [], Searched)) with
         {
             Result = new SearchResult("https://example.com/a", "Atlas 2", new string('a', 1000), "SearXNG", null)
         };
@@ -72,6 +86,6 @@ public sealed class ResearchNoteTests
             content.ShouldContain($"Search snippet: {new string('a', ResearchNote.MaxSnippetLength - 1)}…\n");
     }
 
-    private static BatchResult Result(string url, string title, ScoutVerdict verdict) =>
+    private static BatchResult Result(string url, string title, Verdict verdict) =>
         new("a query", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, "Page text that must not appear.", false), verdict);
 }

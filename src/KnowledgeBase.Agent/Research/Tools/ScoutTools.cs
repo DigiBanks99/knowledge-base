@@ -41,7 +41,7 @@ internal sealed class ScoutTools(AgentRunTracker runTracker, IResearchStore stor
                 .Where(quote => quote.Length > 0)
                 .Take(MaxQuotes)
         ];
-        await RecordAsync(ScoutVerdict.Keep(cleanSummary, cleanQuotes, timeProvider.GetUtcNow()), cancellationToken);
+        await RecordAsync(Verdict.Keep(cleanSummary, cleanQuotes, timeProvider.GetUtcNow()), cancellationToken);
         return "Kept the result. You are done.";
     }
 
@@ -58,7 +58,7 @@ internal sealed class ScoutTools(AgentRunTracker runTracker, IResearchStore stor
             throw new InvalidOperationException("The reason is empty. Call `DiscardResult` again with one sentence on why the result is not worth passing on.");
         }
 
-        await RecordAsync(ScoutVerdict.Discard(cleanReason, timeProvider.GetUtcNow()), cancellationToken);
+        await RecordAsync(Verdict.Discard(cleanReason, timeProvider.GetUtcNow()), cancellationToken);
         return "Discarded the result. You are done.";
     }
 
@@ -72,7 +72,7 @@ internal sealed class ScoutTools(AgentRunTracker runTracker, IResearchStore stor
         return line.Length <= limit ? line : $"{line[..(limit - 1)].TrimEnd()}…";
     }
 
-    private async Task RecordAsync(ScoutVerdict verdict, CancellationToken cancellationToken)
+    private async Task RecordAsync(Verdict verdict, CancellationToken cancellationToken)
     {
         AgentRun run = runTracker.Current is { Trigger.Kind: AgentRunTriggerKind.Triage, Topic: not null } current
             ? current

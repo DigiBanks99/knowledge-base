@@ -2,25 +2,26 @@ using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Models;
-using KnowledgeBase.Agent.Research.Tools;
+using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs.Models;
 
 namespace KnowledgeBase.Agent.IntegrationTests.Research;
 
-/// <summary>The Scout judging a fetched batch with its real tools, and the note that lands in the notes inbox.</summary>
+/// <summary>The Keeper judging a fetched batch, and the note that lands in the notes inbox.</summary>
 public sealed class TriageTests : IAsyncDisposable
 {
     private static readonly DateTimeOffset Searched = new(2026, 10, 27, 7, 0, 0, TimeSpan.Zero);
     private const string Topic = "projects/garden";
     private const string Beds = "https://example.com/beds";
     private const string Spam = "https://example.com/spam";
+    private const string Drainage = "Raised beds drain better than ground beds after heavy autumn rain.";
 
     private readonly TestWiki _wiki = new();
 
     public ValueTask DisposeAsync() => _wiki.DisposeAsync();
 
     [Test]
-    public async Task TheScoutKeepsOneFetchedResult()
+    public async Task TheKeeperKeepsOneFetchedResult()
     {
         // Not started, so the note watcher leaves the note in the inbox for the test to read.
         await _wiki.InitialiseAsync();
@@ -32,13 +33,7 @@ public sealed class TriageTests : IAsyncDisposable
         await store.WritePendingBatchAsync(
             new ResearchBatch(Topic, Searched, [Result(Beds, "Raised beds"), Result(Spam, "Ten tricks")]),
             CancellationToken.None);
-        _wiki.Scout.Behaviour = async (prompt, cancellationToken) =>
-        {
-            await (prompt.Contains(Beds)
-                ? _wiki.CallToolAsync(nameof(ScoutTools.KeepResult), null, () => _wiki.Get<ScoutTools>().KeepResult("Raised beds drain better.", ["Raised beds drain better."], cancellationToken))
-                : _wiki.CallToolAsync(nameof(ScoutTools.DiscardResult), null, () => _wiki.Get<ScoutTools>().DiscardResult("SEO spam.", cancellationToken)));
-            return "Judged.";
-        };
+        _wiki.Keeper.Screen = page => new Screening(page.Url == Beds ? 0.85 : 0.2, 0.1);
 
         Result<TriageCycle, Error> cycle = await _wiki.Get<TriageResultsCommandHandler>()
             .Handle(new TriageResultsCommand(), CancellationToken.None);
@@ -47,7 +42,7 @@ public sealed class TriageTests : IAsyncDisposable
 
         ItShouldMoveTheBatchToAwaiting();
         ItShouldDropOneResearchNoteInTheInbox();
-        ItShouldRecordOneRunPerResult();
+        ItShouldRecordEachKeeperCallAsARun();
 
         void ItShouldMoveTheBatchToAwaiting()
         {
@@ -59,16 +54,23 @@ public sealed class TriageTests : IAsyncDisposable
         void ItShouldDropOneResearchNoteInTheInbox()
         {
             notes.ShouldBe(["research-projects--garden-20261027-070000.md"]);
-            Result<NoteProvenance, Error> provenance = ResearchNoteHeader.Parse(File.ReadAllText(Path.Combine(_wiki.Settings.NewNotesDirectory, notes[0])));
+            string content = File.ReadAllText(Path.Combine(_wiki.Settings.NewNotesDirectory, notes[0]));
+            Result<NoteProvenance, Error> provenance = ResearchNoteHeader.Parse(content);
             provenance.Value.Topic.ShouldBe(Topic);
             provenance.Value.Sources.ShouldBe([Beds]);
+            content.ShouldContain("Kind: release");
+            content.ShouldContain($"> {Drainage}");
         }
 
-        void ItShouldRecordOneRunPerResult() => runs.ShouldSatisfyAllConditions(
-            all => all.Count.ShouldBe(2),
-            all => all.ShouldAllBe(run => run.Agent == KnownAgents.Scout && run.Trigger.Kind == AgentRunTriggerKind.Triage));
+        void ItShouldRecordEachKeeperCallAsARun() => runs.ShouldSatisfyAllConditions(
+            all => all.Count.ShouldBe(3),
+            all => all.ShouldAllBe(run => run.Agent == KeeperPolicy.Agent
+                && run.Trigger.Kind == AgentRunTriggerKind.Triage
+                && run.Status == AgentRunStatus.Succeeded
+                && run.Topic == Topic
+                && run.ToolCalls.Count == 0));
     }
 
     private static BatchResult Result(string url, string title) =>
-        new("raised beds", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, $"Page of {title}.", false));
+        new("raised beds", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, $"# {title}\n\n{Drainage}", false));
 }

@@ -48,6 +48,7 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<PlebTools>()
                 .AddSingleton<ScoutTools>()
                 .AddSingleton<IResearchNoteWriter, ResearchNoteWriter>()
+                .AddSingleton<IKeeper, LlamaServerKeeper>()
                 .AddSingleton<TriageResultsCommandHandler>()
                 .AddSingleton<ResolveAwaitingBatchesCommandHandler>()
                 .AddSingleton<ModelGate>()
@@ -99,6 +100,8 @@ internal static class ResearchDependencyInjection
                 .AddSingleton<EstimatedTokenCounter>()
                 .AddSingleton<IPromptTokenCounter, ResearchTokenCounter>()
                 .AddHttpClient(LlamaServerTokenCounter.HttpClientName, client => client.Timeout = TokenizeTimeout);
+            // The Keeper bounds each call with its own configured timeout.
+            builder.Services.AddHttpClient(LlamaServerKeeper.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
 
             return builder;
         }

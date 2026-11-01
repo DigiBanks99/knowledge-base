@@ -12,6 +12,12 @@ internal interface IModelServerHealth
     /// local server being down says nothing about that provider.
     /// </summary>
     Task<bool> IsAvailableToAsync(string agent, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether the research Keeper's server is healthy. On the shared model server that is the server's own signal; a
+    /// server of the Keeper's own is not checked, and a call it fails simply waits for the next cycle.
+    /// </summary>
+    Task<bool> IsKeeperServerAvailableAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>Runs the model server's status signal on its own, so the answer is current rather than up to a period old.</summary>
@@ -23,11 +29,14 @@ internal sealed class ModelServerHealth(HealthCheckService healthChecks, IConfig
             configuration[$"{agent}:{nameof(AgentModelOptions.Provider)}"],
             nameof(ModelProvider.OpenAICompatible),
             StringComparison.OrdinalIgnoreCase);
-        if (!usesModelServer)
-        {
-            return true;
-        }
+        return !usesModelServer || await IsHealthyAsync(cancellationToken);
+    }
 
+    public async Task<bool> IsKeeperServerAvailableAsync(CancellationToken cancellationToken) =>
+        !ModelServerHealthCheck.UsesSharedServerForKeeper(configuration) || await IsHealthyAsync(cancellationToken);
+
+    private async Task<bool> IsHealthyAsync(CancellationToken cancellationToken)
+    {
         HealthReport report = await healthChecks.CheckHealthAsync(
             registration => registration.Name == ModelServerHealthCheck.Name,
             cancellationToken);

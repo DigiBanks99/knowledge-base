@@ -44,7 +44,7 @@ public sealed class ResearchSettings
     public TimeSpan SearchCycleInterval { get; init; } = TimeSpan.FromHours(6);
 
     /// <summary>
-    /// The most topics one search cycle searches. Each one's results later cost a Scout run apiece, so this bounds how
+    /// The most topics one search cycle searches. Each one's results later cost Keeper calls, so this bounds how
     /// much model time a cycle can queue.
     /// </summary>
     public int TopicsPerCycle { get; init; } = 4;
@@ -60,18 +60,79 @@ public sealed class ResearchSettings
 
     /// <summary>
     /// The most tokens of a fetched page kept for triage; longer content is cut at a paragraph. It leaves room in the
-    /// Scout's context for its instructions and the topic brief.
+    /// Keeper's context for the topic brief and its questions.
     /// </summary>
     public int TriageContentTokenBudget { get; init; } = 2500;
 
     /// <summary>
-    /// Whether the Scout triages fetched results. Off, the search cycle is a dry run: results are searched and fetched
+    /// Whether the Keeper triages fetched results. Off, the search cycle is a dry run: results are searched and fetched
     /// and left pending, to be inspected before the loop closes.
+    /// </summary>
+    public bool TriageEnabled { get; init; } = true;
+
+    /// <summary>
+    /// The old name of <see cref="TriageEnabled"/>, still honoured so a dry run configured under it stays a dry run:
+    /// triage runs only while both are on.
     /// </summary>
     public bool ScoutEnabled { get; init; } = true;
 
-    /// <summary>The most Scout runs (one per result) in one research cycle, so triage never queues unbounded model time.</summary>
-    public int ScoutRunsPerCycle { get; init; } = 10;
+    /// <summary>
+    /// The Keeper's decision model. On the shared llama-server in router mode it is the preset's section name.
+    /// </summary>
+    public string KeeperModel { get; init; } = "laya";
+
+    /// <summary>
+    /// The base address of a server of the Keeper's own, including the version segment (e.g.
+    /// <c>http://127.0.0.1:9932/v1</c>). Unset, the Keeper uses the <c>OpenAICompatible</c> server and its key.
+    /// </summary>
+    public Uri? KeeperEndpoint { get; init; }
+
+    /// <summary>The key of <see cref="KeeperEndpoint"/>'s server, if it was started with one.</summary>
+    public string? KeeperApiKey { get; init; }
+
+    /// <summary>
+    /// How long one Keeper call may take. Measured on a 4-core VM, the p95 was about a minute and the slowest 66
+    /// seconds, so this leaves room above both.
+    /// </summary>
+    public TimeSpan KeeperTimeout { get; init; } = TimeSpan.FromSeconds(120);
+
+    /// <summary>
+    /// The least <c>useful</c> probability a result needs to be kept. Provisional: measured only against noise, which
+    /// scored up to 0.52. Changing the Keeper's question wording means tuning it again.
+    /// </summary>
+    public double KeepThreshold { get; init; } = 0.6;
+
+    /// <summary>
+    /// The <c>injection</c> probability at which a result is discarded as instructions aimed at an AI. High because the
+    /// signal is weak (harmless pages scored up to 0.84): the Keeper is a filter, not the security boundary.
+    /// </summary>
+    public double InjectionThreshold { get; init; } = 0.9;
+
+    /// <summary>The most Keeper calls in one research cycle, so triage never queues unbounded model time.</summary>
+    public int KeeperCallsPerCycle { get; init; } = 20;
+
+    /// <summary>
+    /// The most tokens of a page's paragraphs sent to the Keeper. Every question rereads the page, and latency grows
+    /// with it (about 3 seconds at 0.8k tokens, a minute at 10k), so the cap keeps calls near the median. Pages are
+    /// already cut to <see cref="TriageContentTokenBudget"/> when fetched, so this only cuts once that is raised above
+    /// it (or for a page stored before it was lowered).
+    /// </summary>
+    public int KeeperContentTokenBudget { get; init; } = 4500;
+
+    /// <summary>How many of a page's paragraphs the Keeper may choose its quotes from.</summary>
+    public int MaxQuoteOptions { get; init; } = 50;
+
+    /// <summary>
+    /// The least probability a quote needs to go in the note. The first quote is usually above 0.9 and later ones
+    /// near 0, so this drops quotes the model barely chose. Proposed, not measured.
+    /// </summary>
+    public double QuoteProbabilityFloor { get; init; } = 0.1;
+
+    /// <summary>
+    /// How many failed Keeper calls a result gets before it is discarded as failed, so a page the model can never
+    /// answer doesn't hold up its batch.
+    /// </summary>
+    public int KeeperMaxAttempts { get; init; } = 3;
 
     /// <summary>
     /// The most tokens a Scout prompt may hold. A prompt over it is not run rather than letting the server truncate it.

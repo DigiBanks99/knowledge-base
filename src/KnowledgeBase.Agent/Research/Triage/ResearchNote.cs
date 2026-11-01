@@ -7,8 +7,8 @@ namespace KnowledgeBase.Agent.Research.Triage;
 
 /// <summary>
 /// The note triage writes for a topic: the research header <c>ResearchNoteHeader</c> reads, then each kept result's
-/// source, the search engine's snippet and the Scout's own summary and quotes. Page text never goes in, as it may hold
-/// instructions aimed at the agents that read the note.
+/// source, the search engine's snippet, its kind, any summary and the exact quotes the Keeper chose. The page's text
+/// never goes in beyond those length-capped quotes, as it may hold instructions aimed at the agents that read the note.
 /// </summary>
 /// <param name="FileName">
 /// Derived from the topic and the search, so writing the note again after a restart names the same file.
@@ -20,6 +20,9 @@ internal sealed record ResearchNote(string FileName, string Content)
     /// cannot carry markdown structure or much of an instruction into the note.
     /// </summary>
     internal const int MaxSnippetLength = 300;
+
+    /// <summary>A kind is one of the Keeper's options, but it is stored data, so it is bounded like the rest.</summary>
+    private const int MaxKindLength = 40;
 
     public static ResearchNote Build(ResearchBatch batch, IReadOnlyList<BatchResult> kept)
     {
@@ -38,24 +41,22 @@ internal sealed record ResearchNote(string FileName, string Content)
         content.AppendLine($"# Research on {batch.Topic}");
         foreach (BatchResult result in kept)
         {
-            ScoutVerdict verdict = result.Verdict!;
+            Verdict verdict = result.Verdict!;
             content.AppendLine();
             content.AppendLine($"## {OneLine(result.Result.Title)}");
-            content.AppendLine();
-            content.AppendLine($"Source: {result.Result.Url}");
-            content.AppendLine();
             string snippet = ScoutTools.Tidy(result.Result.Snippet, MaxSnippetLength);
-            if (snippet.Length > 0)
+            string?[] blocks =
+            [
+                $"Source: {result.Result.Url}",
+                snippet.Length > 0 ? $"Search snippet: {snippet}" : null,
+                string.IsNullOrWhiteSpace(verdict.Kind) ? null : $"Kind: {ScoutTools.Tidy(verdict.Kind, MaxKindLength)}",
+                string.IsNullOrWhiteSpace(verdict.Summary) ? null : Plain(verdict.Summary),
+                .. verdict.Quotes.Select(quote => $"> {quote}")
+            ];
+            foreach (string block in blocks.OfType<string>())
             {
-                content.AppendLine($"Search snippet: {snippet}");
                 content.AppendLine();
-            }
-
-            content.AppendLine(Plain(verdict.Summary!));
-            foreach (string quote in verdict.Quotes)
-            {
-                content.AppendLine();
-                content.AppendLine($"> {quote}");
+                content.AppendLine(block);
             }
         }
 

@@ -107,7 +107,7 @@ public sealed class ScoutToolsTests
         void ItShouldBeRefused() => error.ShouldBeOfType<InvalidOperationException>().Message.ShouldStartWith("There is no result to judge");
     }
 
-    private ScoutVerdict Verdict => _state.PendingBatches[Atlas].Results.Single().Verdict.ShouldNotBeNull();
+    private Verdict Verdict => _state.PendingBatches[Atlas].Results.Single().Verdict.ShouldNotBeNull();
 
     private Task<string> InTriageRun(Func<Task<string>> call) =>
         _runTracker.RunAsync(

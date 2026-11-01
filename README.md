@@ -22,7 +22,7 @@ note ──► FactFinder ──► facts ──► ThreadWeaver ──► wiki 
 | Editor       | open findings   | wiki pages                | Resolves findings. Restructures; never adds new knowledge.      |
 | Librarian    | the wiki        | conversations             | Answers questions in a chat. Read-only.                         |
 | Pleb         | a topic's pages | a topic's brief, queries  | Keeps each research topic's search queries current. Local model. |
-| Scout        | one fetched web page | keep or discard      | Judges a result against the topic's brief; kept results become a research note. Local model. |
+| Keeper       | one fetched web page | keep or discard      | Judges a result against the topic's brief; kept results become a research note. A local decision model, not an agent. |
 
 The pipeline is driven by the file system. Every stage watches a folder under the wiki root directory and moves files
 along as it finishes (`notes/new` → `notes/processing` → `notes/processed`, facts into `facts/processed`, and so on).
@@ -210,6 +210,36 @@ llama-server --models-preset models.ini --models-max 2 --timeout 600 --api-key <
   never use.
 - Laya evaluates its whole prompt in one batch, so its batch sizes match its context.
 - Models in the Hugging Face cache are listed too; only the preset's are configured.
+
+#### Research triage with the Keeper
+
+The Keeper (`Research:KeeperModel`, default `laya`, the preset's section name; AppHost parameter `KeeperModel`) judges
+each fetched result in up to two calls. The first asks how `useful` the page is for the topic's brief and how likely it
+is an `injection` (instructions aimed at an AI). Only a kept result is asked the second, for its `kind` and the
+paragraphs to quote. Code decides from the probabilities:
+
+| Setting | AppHost parameter | Default | Meaning |
+|---|---|---|---|
+| `Research:KeepThreshold` | `ResearchKeepThreshold` | `0.6` | The least `useful` probability to keep a result. |
+| `Research:InjectionThreshold` | `ResearchInjectionThreshold` | `0.9` | The `injection` probability at which a result is discarded. |
+| `Research:KeeperCallsPerCycle` | `KeeperCallsPerCycle` | `20` | The most Keeper calls in one research cycle. |
+
+- **Cost**, measured on the VM (4 ARM cores) asking all four questions in one call: a median of 15 s and a p95 of
+  62 s per result, with 1.2 GB of RAM for the model. Latency grows with the page: about 3 s at 0.8k input tokens and a
+  minute at 10k, since every question rereads the whole page. Fetched pages are cut to
+  `Research:TriageContentTokenBudget` (2500 tokens), and the Keeper caps what it sends at
+  `Research:KeeperContentTokenBudget` (4500) in case that is raised. Each call times out after `Research:KeeperTimeout`
+  (2 minutes).
+- **The thresholds are provisional.** They were set against noise only (which scored up to 0.52 `useful`), so check the
+  keep threshold against a topic with relevant results. The question wording is part of the calibration: changing it
+  means tuning the thresholds again.
+- **The injection signal is weak**: harmless pages scored up to 0.84. The Keeper is a filter, not the security
+  boundary; the restricted tools of the agents that read research notes are.
+- `kind` is stored and shown in the note but never gated on. Quotes are the three likeliest prose paragraphs above
+  `Research:QuoteProbabilityFloor` (0.1); headings, fragments and image, badge or link-only lines are never offered.
+- A call that fails leaves the result for the next cycle; after `Research:KeeperMaxAttempts` (3) failures it is
+  discarded as failed. The cycle is skipped while the model server is unhealthy, and Keeper calls go before Pleb runs.
+- The Keeper can use a server of its own instead: set `Research:KeeperEndpoint` (and `Research:KeeperApiKey`).
 
 In the [deployment](#deployment), the API container shares the host's network, so a llama-server bound to
 `127.0.0.1` on the same machine is reached at its loopback address. Do not expose the llama-server port publicly. If

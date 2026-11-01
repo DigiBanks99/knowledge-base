@@ -3,30 +3,50 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// <summary>A result kept by a topic's search, with the query that found it.</summary>
 /// <param name="Url">The result's normalised URL, under which the topic records it as seen.</param>
 /// <param name="Page">The fetched page, or null while it waits to be fetched.</param>
-/// <param name="Verdict">The Scout's verdict, or null while the result waits to be judged. A judged result is never judged again.</param>
-public sealed record BatchResult(string Query, string Url, SearchResult Result, FetchedPage? Page = null, ScoutVerdict? Verdict = null);
+/// <param name="Verdict">The result's verdict, or null while it waits to be judged. A judged result is never judged again.</param>
+/// <param name="Attempts">
+/// How many times the Keeper failed to answer for the result. It is given up on after a few, so a page the model can
+/// never answer doesn't hold up its batch.
+/// </param>
+public sealed record BatchResult(
+    string Query,
+    string Url,
+    SearchResult Result,
+    FetchedPage? Page = null,
+    Verdict? Verdict = null,
+    int Attempts = 0);
 
 /// <summary>
-/// What the Scout decided about one result. A kept result carries the Scout's own summary and quotes (never the page's
-/// text, which may hold instructions aimed at later agents); a discard carries its reason.
+/// What triage decided about one result. A kept result carries exact quotes and, once written, a summary (never the
+/// page's whole text, which may hold instructions aimed at later agents); a discard carries its reason. The Keeper's
+/// probabilities are stored with the verdict so the thresholds can be tuned against real results.
 /// </summary>
+/// <param name="Summary">A model-written summary of a kept result; null until one is written.</param>
 /// <param name="Failure">Why there is no real verdict, when the result was discarded for lack of one.</param>
-public sealed record ScoutVerdict(
+/// <param name="Useful">The Keeper's probability that the result is worth passing on.</param>
+/// <param name="Injection">The Keeper's probability that the result holds instructions aimed at an AI.</param>
+/// <param name="Kind">What kind of content a kept result is. Unreliable, so stored but never gated on.</param>
+/// <param name="KindProbability">The Keeper's probability for <paramref name="Kind"/>.</param>
+public sealed record Verdict(
     bool Kept,
     string? Summary,
     IReadOnlyList<string> Quotes,
     string? Reason,
     DateTimeOffset JudgedAt,
-    string? Failure = null)
+    string? Failure = null,
+    double? Useful = null,
+    double? Injection = null,
+    string? Kind = null,
+    double? KindProbability = null)
 {
-    public static ScoutVerdict Keep(string summary, IReadOnlyList<string> quotes, DateTimeOffset judgedAt) =>
+    public static Verdict Keep(string? summary, IReadOnlyList<string> quotes, DateTimeOffset judgedAt) =>
         new(true, summary, quotes, null, judgedAt);
 
-    public static ScoutVerdict Discard(string reason, DateTimeOffset judgedAt) =>
+    public static Verdict Discard(string reason, DateTimeOffset judgedAt) =>
         new(false, null, [], reason, judgedAt);
 
     /// <summary>A discard because no verdict could be had, which says nothing about the result itself.</summary>
-    public static ScoutVerdict Failed(string failure, DateTimeOffset judgedAt) =>
+    public static Verdict Failed(string failure, DateTimeOffset judgedAt) =>
         new(false, null, [], null, judgedAt, failure);
 }
 

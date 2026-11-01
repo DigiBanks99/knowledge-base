@@ -119,9 +119,12 @@ public sealed class ModelServerHealthCheckTests : IDisposable
     }
 
     [Test]
-    public async Task NoAgentUsesTheModelServer()
+    [Arguments("Research:TriageEnabled", "false")]
+    [Arguments("Research:KeeperEndpoint", "http://127.0.0.1:9932/v1")]
+    public async Task NeitherAnAgentNorTheKeeperUsesTheModelServer(string key, string value)
     {
         _configuration[$"{KnownAgents.Librarian}:Provider"] = nameof(ModelProvider.Anthropic);
+        _configuration[key] = value;
 
         HealthCheckResult result = await _check.CheckHealthAsync(_context, CancellationToken.None);
 
@@ -131,6 +134,22 @@ public sealed class ModelServerHealthCheckTests : IDisposable
         void ItShouldBeHealthy() => result.Status.ShouldBe(HealthStatus.Healthy);
 
         void ItShouldNotCallAnything() => _handler.Requests.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task OnlyTheKeeperUsesTheModelServer()
+    {
+        _configuration[$"{KnownAgents.Librarian}:Provider"] = nameof(ModelProvider.Anthropic);
+
+        HealthCheckResult result = await _check.CheckHealthAsync(_context, CancellationToken.None);
+
+        ItShouldCheckTheServer();
+
+        void ItShouldCheckTheServer()
+        {
+            result.Status.ShouldBe(HealthStatus.Healthy);
+            _handler.Requests.Single().RequestUri.ShouldBe(new Uri("http://localhost:8080/health"));
+        }
     }
 
     [Test]

@@ -120,7 +120,7 @@ internal static class SearchRuns
     /// <summary>The line for the research note a batch's kept results became.</summary>
     public static AgentToolCall Noted(string noteFile, DateTimeOffset at) => new(NoteStep, noteFile, at, true, null);
 
-    private static AgentToolCall Judged(string url, ScoutVerdict verdict) => verdict switch
+    private static AgentToolCall Judged(string url, Verdict verdict) => verdict switch
     {
         { Kept: true } => new AgentToolCall(KeepStep, url, verdict.JudgedAt, true, null),
         { Failure: not null } => new AgentToolCall(DiscardStep, url, verdict.JudgedAt, false, verdict.Failure),
