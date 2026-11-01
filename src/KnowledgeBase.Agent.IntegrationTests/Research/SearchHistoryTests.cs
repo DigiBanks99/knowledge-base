@@ -48,7 +48,7 @@ public sealed class SearchHistoryTests : IAsyncDisposable
         TopicRunsPage afterTriage = await HistoryAsync();
 
         ItShouldShowTheSearchInTheTopicsHistory();
-        ItShouldShowTheSearchNextToTheKeepersCalls();
+        ItShouldShowTheSearchNextToTheKeeperCallsAndTheClerkRun();
         ItShouldAddWhatBecameOfTheResultsToTheSearch();
 
         void ItShouldShowTheSearchInTheTopicsHistory() => afterSearch.Runs.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
@@ -59,8 +59,8 @@ public sealed class SearchHistoryTests : IAsyncDisposable
                 call => call.Target.ShouldBe("raised beds"),
                 call => call.Detail.ShouldBe($"{FakeSearchSource.SourceName}: 2 results")));
 
-        void ItShouldShowTheSearchNextToTheKeepersCalls() => afterTriage.Runs.Select(run => run.Agent).ShouldBe(
-            ["Keeper", "Keeper", "Keeper", SearchRuns.Agent],
+        void ItShouldShowTheSearchNextToTheKeeperCallsAndTheClerkRun() => afterTriage.Runs.Select(run => run.Agent).ShouldBe(
+            ["Keeper", "Keeper", "Keeper", KnownAgents.Clerk, SearchRuns.Agent],
             ignoreOrder: true);
 
         void ItShouldAddWhatBecameOfTheResultsToTheSearch() => afterTriage.Runs

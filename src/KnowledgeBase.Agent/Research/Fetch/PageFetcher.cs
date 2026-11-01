@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 namespace KnowledgeBase.Agent.Research.Fetch;
 
-/// <summary>Fetches a search result's page and reduces it to the main content the Scout triages.</summary>
+/// <summary>Fetches a search result's page and reduces it to the main content triage reads.</summary>
 internal interface IPageFetcher
 {
     /// <summary>

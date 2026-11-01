@@ -14,7 +14,7 @@ public enum TopicState
     /// <summary>The Pleb could not pin the subject down and asked the author a question; the topic is not searched.</summary>
     NeedsReview,
 
-    /// <summary>The topic's last search kept results that wait for the Scout.</summary>
+    /// <summary>The topic's last search kept results that wait for triage.</summary>
     Triaging,
 
     /// <summary>A note ending in failure three times running, which says the pipeline is broken rather than the topic quiet.</summary>

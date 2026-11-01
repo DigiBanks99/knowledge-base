@@ -63,7 +63,7 @@ jobs:
 
       - name: Check configuration
         run: |
-          for file in SharedInstructions WikiRules {FactFinder,ThreadWeaver,Reviewer,Editor,Librarian,Pleb,Scout}.Instructions; do
+          for file in SharedInstructions WikiRules {FactFinder,ThreadWeaver,Reviewer,Editor,Librarian,Pleb,Clerk}.Instructions; do
             test -s "config/$file.md" || { echo "::error::config/$file.md is missing or empty"; exit 1; }
           done
 
@@ -141,9 +141,9 @@ jobs:
           # The Pleb runs on the local model by default, without thinking, so its variables may all be left unset.
           Parameters__PlebProvider: ${{ vars.PLEB_PROVIDER || 'OpenAICompatible' }}
           Parameters__PlebEnableThinking: ${{ vars.PLEB_ENABLE_THINKING || 'false' }}
-          # So does the Scout.
-          Parameters__ScoutProvider: ${{ vars.SCOUT_PROVIDER || 'OpenAICompatible' }}
-          Parameters__ScoutEnableThinking: ${{ vars.SCOUT_ENABLE_THINKING || 'false' }}
+          # So does the Clerk.
+          Parameters__ClerkProvider: ${{ vars.CLERK_PROVIDER || 'OpenAICompatible' }}
+          Parameters__ClerkEnableThinking: ${{ vars.CLERK_ENABLE_THINKING || 'false' }}
         run: aspire deploy --environment production --non-interactive
 
       - name: Check health

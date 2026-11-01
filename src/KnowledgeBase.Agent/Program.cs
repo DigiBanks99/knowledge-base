@@ -31,8 +31,8 @@ builder
         .WithTools(toolsBuilder => toolsBuilder.WithReadFileTools())
     .ConfigureAgent(KnownAgents.Pleb, roleOnly: true)
         .WithTools(toolsBuilder => toolsBuilder.WithPlebTools())
-    .ConfigureAgent(KnownAgents.Scout, roleOnly: true)
-        .WithTools(toolsBuilder => toolsBuilder.WithScoutTools());
+    .ConfigureAgent(KnownAgents.Clerk, roleOnly: true)
+        .WithTools(toolsBuilder => toolsBuilder.WithClerkTools());
 
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

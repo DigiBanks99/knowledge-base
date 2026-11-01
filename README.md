@@ -23,6 +23,7 @@ note ──► FactFinder ──► facts ──► ThreadWeaver ──► wiki 
 | Librarian    | the wiki        | conversations             | Answers questions in a chat. Read-only.                         |
 | Pleb         | a topic's pages | a topic's brief, queries  | Keeps each research topic's search queries current. Local model. |
 | Keeper       | one fetched web page | keep or discard      | Judges a result against the topic's brief; kept results become a research note. A local decision model, not an agent. |
+| Clerk        | one kept web page | a summary                | Summarises a kept result for the research note. No wiki or file tools. Local model. |
 
 The pipeline is driven by the file system. Every stage watches a folder under the wiki root directory and moves files
 along as it finishes (`notes/new` → `notes/processing` → `notes/processed`, facts into `facts/processed`, and so on).
@@ -83,7 +84,7 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `WikiBackupRemote`        |        | SSH URL of a private repository the wiki is pushed to (default empty: backup off). See [Wiki backup](#wiki-backup). |
 | `WikiBackupKeyDirectory`  |        | Folder holding the backup deploy key and pinned host keys (default empty: your own SSH setup). |
 
-`{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian`, `Pleb` and `Scout`. The Pleb and the Scout default to
+`{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian`, `Pleb` and `Clerk`. The Pleb and the Clerk default to
 the local model (`OpenAICompatible`, thinking off) and are instructed with their role only; their cycles are tuned
 with the API's `Research:*` settings (`ResearchSettings`). Those also tune the search cycle: every
 `Research:SearchCycleInterval` (6 hours after the last one finished) up to `Research:TopicsPerCycle` due topics are
@@ -238,8 +239,23 @@ paragraphs to quote. Code decides from the probabilities:
 - `kind` is stored and shown in the note but never gated on. Quotes are the three likeliest prose paragraphs above
   `Research:QuoteProbabilityFloor` (0.1); headings, fragments and image, badge or link-only lines are never offered.
 - A call that fails leaves the result for the next cycle; after `Research:KeeperMaxAttempts` (3) failures it is
-  discarded as failed. The cycle is skipped while the model server is unhealthy, and Keeper calls go before Pleb runs.
+  discarded as failed. The Keeper is skipped while its model server is unhealthy.
 - The Keeper can use a server of its own instead: set `Research:KeeperEndpoint` (and `Research:KeeperApiKey`).
+
+#### Research summaries with the Clerk
+
+Once the Keeper has judged a cycle's batches, the Clerk (an agent, `ClerkProvider`, local model by default) is run
+once for each kept result: never for a discarded one, so a page flagged as an injection never reaches a generative
+model. Its prompt is its role instructions and its one tool, `RecordSummary`, then the topic's brief, then the page
+between `<content>` delimiters, marked as data. The summary is made one line of at most 800 characters in code.
+
+- A run that ends without a summary, or a prompt over `Research:ClerkPromptTokenBudget` (6000 tokens), keeps the result
+  with its quotes alone and is recorded as failed. A timeout, an unreachable server or a prompt that cannot be counted
+  leaves the result for the next cycle; after `Research:ClerkMaxAttempts` (3) of those it too keeps its quotes alone.
+- At most `Research:ClerkRunsPerCycle` (10) runs per cycle. They share the model gate: Keeper calls first, then Clerk
+  runs, then Pleb runs. The Clerk is skipped while its model server is unhealthy.
+- A batch becomes a research note once every result is judged and every kept one has a summary or a failed Clerk run.
+  The note holds each kept result's title, URL, kind, summary and quotes, never the page's text.
 
 In the [deployment](#deployment), the API container shares the host's network, so a llama-server bound to
 `127.0.0.1` on the same machine is reached at its loopback address. Do not expose the llama-server port publicly. If

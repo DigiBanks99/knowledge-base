@@ -435,7 +435,7 @@ public sealed class ResearchApiTests : IDisposable
         DateTimeOffset startedAt = DateTimeOffset.Parse("2026-10-24T10:00:00Z").AddMinutes(minutes);
         return new AgentRun(
             id,
-            KnownAgents.Scout,
+            KnownAgents.Clerk,
             new AgentRunTrigger(AgentRunTriggerKind.Triage, $"https://example.com/{id}"),
             AgentRunStatus.Succeeded,
             startedAt,

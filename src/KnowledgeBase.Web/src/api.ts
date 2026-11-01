@@ -13,7 +13,7 @@ export interface NoteDetail {
   content: string
 }
 
-export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb' | 'Scout'
+export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb' | 'Clerk'
 export type AgentRunStatus = 'Running' | 'Succeeded' | 'Failed'
 export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'Triage' | 'ReviewRequest' | 'Findings' | 'Search'
 export interface AgentToolCall {
@@ -29,9 +29,10 @@ export interface AgentRun {
   id: string
   /**
    * The agent that ran, or `Search` for a research topic's search and `Keeper` for a call to the research Keeper's
-   * decision model, which are recorded as runs without being agents.
+   * decision model, which are recorded as runs without being agents. `Scout` runs are history: the Scout triaged
+   * results before the Keeper and the Clerk replaced it.
    */
-  agent: AgentName | 'Search' | 'Keeper'
+  agent: AgentName | 'Search' | 'Keeper' | 'Scout'
   trigger: { kind: AgentRunTriggerKind; reference: string }
   status: AgentRunStatus
   startedAt: string

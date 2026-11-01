@@ -75,7 +75,6 @@ internal sealed class ModelServerHealthCheck(
     /// </summary>
     public static bool UsesSharedServerForKeeper(IConfiguration configuration) =>
         configuration.GetValue($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.TriageEnabled)}", true)
-        && configuration.GetValue($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.ScoutEnabled)}", true)
         && string.IsNullOrWhiteSpace(configuration[$"{ResearchSettings.SectionName}:{nameof(ResearchSettings.KeeperEndpoint)}"]);
 
     /// <summary>The server's health route: the endpoint with its <c>v1</c> version segment replaced by <c>health</c>.</summary>
