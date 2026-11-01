@@ -91,6 +91,48 @@ public sealed class SearxngSearchSourceTests : IDisposable
     }
 
     [Test]
+    public async Task EveryEngineBehindSearxngFailed()
+    {
+        _handler.Respond = _ => StubHttpHandler.Json("""
+            { "results": [], "unresponsive_engines": [ ["bing", "CAPTCHA"], ["duckduckgo", "timeout"] ] }
+            """);
+
+        Result<IReadOnlyList<SearchResult>, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
+
+        ItShouldFailNamingTheEnginesAndReasons();
+
+        void ItShouldFailNamingTheEnginesAndReasons() => results.Error.ShouldBeOfType<SearchSourceError>().ShouldSatisfyAllConditions(
+            error => error.Message.ShouldContain("bing (CAPTCHA)"),
+            error => error.Message.ShouldContain("duckduckgo (timeout)"));
+    }
+
+    [Test]
+    public async Task SomeEnginesFailedButOthersAnswered()
+    {
+        _handler.Respond = _ => StubHttpHandler.Json("""
+            { "results": [ { "url": "https://example.com/ok", "title": "Ok" } ], "unresponsive_engines": [ ["bing", "CAPTCHA"] ] }
+            """);
+
+        Result<IReadOnlyList<SearchResult>, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
+
+        ItShouldKeepWhatAnswered();
+
+        void ItShouldKeepWhatAnswered() => results.Value.ShouldHaveSingleItem().Url.ShouldBe("https://example.com/ok");
+    }
+
+    [Test]
+    public async Task SearxngHasNothingOnTheTopic()
+    {
+        _handler.Respond = _ => StubHttpHandler.Json("""{ "results": [], "unresponsive_engines": [] }""");
+
+        Result<IReadOnlyList<SearchResult>, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
+
+        ItShouldSucceedWithNothing();
+
+        void ItShouldSucceedWithNothing() => results.Value.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task SearxngIsUnreachable()
     {
         _handler.Respond = _ => throw new HttpRequestException("Connection refused");
