@@ -15,17 +15,20 @@ export interface NoteDetail {
 
 export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb' | 'Scout'
 export type AgentRunStatus = 'Running' | 'Succeeded' | 'Failed'
-export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'Triage' | 'ReviewRequest' | 'Findings'
+export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'Triage' | 'ReviewRequest' | 'Findings' | 'Search'
 export interface AgentToolCall {
   tool: string
   target: string | null
   at: string
   succeeded: boolean
   error: string | null
+  /** What the step found, such as a search's result count. */
+  detail?: string | null
 }
 export interface AgentRun {
   id: string
-  agent: AgentName
+  /** The agent that ran, or `Search` for a research topic's search, which is recorded as a run without being an agent. */
+  agent: AgentName | 'Search'
   trigger: { kind: AgentRunTriggerKind; reference: string }
   status: AgentRunStatus
   startedAt: string

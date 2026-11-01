@@ -57,6 +57,7 @@ export function RunCard({ run, defaultOpen = false }: { run: AgentRun; defaultOp
                   <span className="muted">{new Date(call.at).toLocaleTimeString()}</span>{' '}
                   <code className={writeTools.has(call.tool) ? 'tool-write' : ''}>{call.tool}</code>{' '}
                   {call.target && <WikiTarget target={call.target} tool={call.tool} />}
+                  {call.detail && <span className="muted"> — {call.detail}</span>}
                   {call.error && <span className="error"> — {call.error}</span>}
                 </li>
               ))}
@@ -68,8 +69,18 @@ export function RunCard({ run, defaultOpen = false }: { run: AgentRun; defaultOp
   )
 }
 
+// A search run's Note line names a research note in the notes inbox, not a wiki page.
+const nonWikiTools = new Set(['DeleteFile', 'Note'])
+
 function WikiTarget({ target, tool }: { target: string; tool: string }) {
-  const isWikiPage = !target.includes('→') && target.endsWith('.md') && tool !== 'DeleteFile'
+  if (/^https?:\/\//i.test(target)) {
+    return (
+      <a href={target} target="_blank" rel="noreferrer">
+        {target}
+      </a>
+    )
+  }
+  const isWikiPage = !target.includes('→') && target.endsWith('.md') && !nonWikiTools.has(tool)
   return isWikiPage ? <Link to={`/wiki?page=${encodeURIComponent(target)}`}>{target}</Link> : <span>{target}</span>
 }
 
