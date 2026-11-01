@@ -1,7 +1,9 @@
 using System.Text;
 
 using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Search;
+using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Runs.Models;
 using KnowledgeBase.Agent.Wiki;
@@ -36,7 +38,9 @@ internal sealed class TestWiki : IAsyncDisposable
         WebApplicationBuilder builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>())
         {
-            [$"{WikiConfigurationSettings.SectionName}:{nameof(WikiConfigurationSettings.RootDirectory)}"] = _root.Path
+            [$"{WikiConfigurationSettings.SectionName}:{nameof(WikiConfigurationSettings.RootDirectory)}"] = _root.Path,
+            // The Keeper is scripted. Naming a server of its own leaves the shared model server's status to the agents.
+            [$"{ResearchSettings.SectionName}:{nameof(ResearchSettings.KeeperEndpoint)}"] = "http://keeper.invalid/v1"
         });
         builder.Services.AddLogging(logging => logging.AddProvider(_problems));
         builder.Services.AddSingleton<IServer, NoServer>();
@@ -55,6 +59,9 @@ internal sealed class TestWiki : IAsyncDisposable
         // Searches go to a scripted source rather than SearXNG or Hacker News.
         builder.Services.RemoveAll<ISearchSource>();
         builder.Services.AddSingleton<ISearchSource>(Search);
+        // Triage asks a scripted Keeper rather than a decision model.
+        builder.Services.RemoveAll<IKeeper>();
+        builder.Services.AddSingleton<IKeeper>(Keeper);
 
         _app = builder.Build();
         Settings = _app.Services.GetRequiredService<IOptions<WikiConfigurationSettings>>().Value;
@@ -70,6 +77,9 @@ internal sealed class TestWiki : IAsyncDisposable
     public FakeAgent Pleb { get; } = new(KnownAgents.Pleb);
 
     public FakeAgent Scout { get; } = new(KnownAgents.Scout);
+
+    /// <summary>The research Keeper, which a test scripts.</summary>
+    public FakeKeeper Keeper { get; } = new();
 
     /// <summary>The only search source, which a test scripts.</summary>
     public FakeSearchSource Search { get; } = new();

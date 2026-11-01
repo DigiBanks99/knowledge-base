@@ -149,9 +149,9 @@ public sealed class SearchRunsTests
     {
         BatchResult[] results =
         [
-            Found("https://example.com/a", FetchedPage.Content(Started, "A", false), ScoutVerdict.Keep("A summary.", [], Completed)),
-            Found("https://example.com/b", FetchedPage.Failed(Started, "Refused."), ScoutVerdict.Discard("The page could not be fetched.", Completed)),
-            Found("https://example.com/c", FetchedPage.Content(Started, "C", false), ScoutVerdict.Failed("The Scout ended without a verdict.", Completed)),
+            Found("https://example.com/a", FetchedPage.Content(Started, "A", false), Verdict.Keep("A summary.", [], Completed)),
+            Found("https://example.com/b", FetchedPage.Failed(Started, "Refused."), Verdict.Discard("The page could not be fetched.", Completed)),
+            Found("https://example.com/c", FetchedPage.Content(Started, "C", false), Verdict.Failed("The Scout ended without a verdict.", Completed)),
             Found("https://example.com/d", null, null)
         ];
 
@@ -197,6 +197,6 @@ public sealed class SearchRunsTests
         alreadySeen,
         tooOld);
 
-    private static BatchResult Found(string url, FetchedPage? page, ScoutVerdict? verdict) =>
+    private static BatchResult Found(string url, FetchedPage? page, Verdict? verdict) =>
         new("atlas release", url, new SearchResult(url, "A result", null, "SearXNG", null), page, verdict);
 }

@@ -116,6 +116,12 @@ jobs:
           # would replace the API's default with no model at all.
           Parameters__AnthropicModel: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-5-5' }}
           Parameters__OpenAICompatibleModel: ${{ vars.OPENAI_COMPATIBLE_MODEL || 'Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL' }}
+          # The research Keeper's decision model (the preset's section name) and its thresholds and per-cycle cap. Unset
+          # variables would arrive as empty strings the API cannot read, so each falls back to the AppHost's default.
+          Parameters__KeeperModel: ${{ vars.KEEPER_MODEL || 'laya' }}
+          Parameters__ResearchKeepThreshold: ${{ vars.RESEARCH_KEEP_THRESHOLD || '0.6' }}
+          Parameters__ResearchInjectionThreshold: ${{ vars.RESEARCH_INJECTION_THRESHOLD || '0.9' }}
+          Parameters__KeeperCallsPerCycle: ${{ vars.KEEPER_CALLS_PER_CYCLE || '20' }}
           # The backup deploy key stays in this folder on the VM; only its location is passed, never the key.
           Parameters__WikiBackupRemote: ${{ vars.WIKI_BACKUP_REMOTE }}
           Parameters__WikiBackupKeyDirectory: ${{ vars.WIKI_BACKUP_KEY_DIRECTORY }}

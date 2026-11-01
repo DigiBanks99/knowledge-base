@@ -9,6 +9,7 @@ using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Fetch;
 using KnowledgeBase.Agent.Research.Search;
+using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Wiki;
 
 using Microsoft.Agents.AI;
@@ -56,6 +57,9 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
 
     public FakeAgent Agent(string name) => _agents[name];
 
+    /// <summary>The research Keeper, which a test scripts.</summary>
+    public FakeKeeper Keeper { get; } = new();
+
     public T Get<T>() where T : notnull => Services.GetRequiredService<T>();
 
     /// <summary>A client signed in as <paramref name="objectId"/>, or signed out when it is null.</summary>
@@ -96,6 +100,8 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
         builder.UseSetting(AgentInstructions.SharedInstructionsKey, "Shared instructions.");
         builder.UseSetting(AgentInstructions.WikiRulesKey, "Wiki rules.");
         builder.UseSetting($"{AnthropicOptions.SectionName}:{nameof(AnthropicOptions.ApiKey)}", "not-a-key");
+        // The Keeper is scripted. Naming a server of its own leaves the shared model server's status to the agents.
+        builder.UseSetting($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.KeeperEndpoint)}", "http://keeper.invalid/v1");
         foreach (string agent in KnownAgentNames)
         {
             builder.UseSetting($"{agent}:Instructions", $"You are the {agent}.");
@@ -135,6 +141,9 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
             {
                 services.AddKeyedSingleton<AIAgent>(agent.Name, agent);
             }
+
+            services.RemoveAll<IKeeper>();
+            services.AddSingleton<IKeeper>(Keeper);
 
             // The search sources (and their status signals) and the page fetcher answer from the fake web instead of
             // the internet, and every host it names resolves to a public address without asking DNS. The fetcher's

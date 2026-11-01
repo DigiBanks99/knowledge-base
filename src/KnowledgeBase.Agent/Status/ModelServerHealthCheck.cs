@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 
 using KnowledgeBase.Agent.Agents;
+using KnowledgeBase.Agent.Research;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -22,10 +23,10 @@ internal sealed class ModelServerHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        // The AppHost always passes an endpoint, so only a server some agent is configured to use is worth checking.
-        if (!KnownAgents.All.Any(UsesOpenAICompatibleProvider))
+        // The AppHost always passes an endpoint, so only a server some agent or the Keeper uses is worth checking.
+        if (!KnownAgents.All.Any(UsesOpenAICompatibleProvider) && !UsesSharedServerForKeeper(configuration))
         {
-            return HealthCheckResult.Healthy("Not used; no agent uses the OpenAI-compatible provider.");
+            return HealthCheckResult.Healthy("Not used; neither an agent nor the Keeper uses the OpenAI-compatible server.");
         }
 
         OpenAICompatibleOptions server = configuration
@@ -67,6 +68,15 @@ internal sealed class ModelServerHealthCheck(
         configuration[$"{agent}:{nameof(AgentModelOptions.Provider)}"],
         nameof(ModelProvider.OpenAICompatible),
         StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether the research Keeper uses the shared server: it does while triage is on, unless a server of its own is
+    /// configured. It is a decision model on <c>/v1/systemone</c>, not an agent, so no provider setting says so.
+    /// </summary>
+    public static bool UsesSharedServerForKeeper(IConfiguration configuration) =>
+        configuration.GetValue($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.TriageEnabled)}", true)
+        && configuration.GetValue($"{ResearchSettings.SectionName}:{nameof(ResearchSettings.ScoutEnabled)}", true)
+        && string.IsNullOrWhiteSpace(configuration[$"{ResearchSettings.SectionName}:{nameof(ResearchSettings.KeeperEndpoint)}"]);
 
     /// <summary>The server's health route: the endpoint with its <c>v1</c> version segment replaced by <c>health</c>.</summary>
     public static Uri HealthUri(Uri endpoint) => ServerUri(endpoint, "health");

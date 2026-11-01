@@ -36,7 +36,7 @@ UI, commits and conversation. When a term changes meaning, change it here first.
 | **Editor**       | open findings       | changed wiki pages    | Restructures and corrects; never adds new knowledge.            |
 | **Librarian**    | the wiki            | answers               | Outside the pipeline. Read-only.                                |
 | **Pleb**         | a curation request  | a topic's brief and queries | Research. No read tools: code gives it the topic's page. Never names people or organisations. |
-| **Scout**        | one fetched result  | a verdict             | Research. No read tools: code gives it the topic's brief and the page. Keeps or discards; never sees the wiki. |
+| **Scout**        | one fetched result  | a verdict             | Research. No longer run: the **Keeper** triages results. Still registered until the Clerk replaces it. |
 
 "Weaving" is what the ThreadWeaver does: filing facts into the pages they belong to, creating pages where needed and
 linking them.
@@ -77,10 +77,11 @@ ThreadWeaver fails on its facts.
 | **Curation request** | A file in `research/curation/requests` asking the Pleb to revisit a topic's brief and queries. One per topic: a new request merges into a waiting one. | `CurationRequest` |
 | **Brief** | A topic's short, de-identified description of what is worth finding, written by the Pleb for the web-facing agents. | `ResearchTopic.Brief` |
 | **Curation** | One Pleb run over a curation request: it either sets the topic's brief and up to three queries, or keeps them. Requests are drained a few per **research cycle**, oldest first, and skipped while the model server is unhealthy. A curation without a verdict moves to `research/curation/failed`. | `CurateTopicsCommandHandler`, `CurationJob` |
-| **Model gate** | Limits how many research agent runs use the model at once (one by default). A waiting Scout run goes before a waiting Pleb run. | `ModelGate` |
-| **Verdict** | The Scout's judgement of one result, recorded on the result in the pending batch: kept (with a summary and short quotes) or discarded (with a reason). A judged result is skipped after a restart. A run that ends without one counts as a discard and is recorded as failed. | `ScoutVerdict` |
-| **Triage** | The Scout judging a topic's fetched results, one run each. When all are judged, the kept ones are combined into one **research note** in `notes/new` and the batch moves to `research/batches/awaiting`; a batch with nothing kept moves to `batches/completed`. | `TriageResultsCommandHandler` |
-| **Research note** | The note triage writes for a topic: a research header (origin, topic, source URLs), then each result's length-capped search snippet and the Scout's summaries and length-capped quotes, never raw page text. | `ResearchNote` |
+| **Keeper** | The decision model that triages fetched results, served by llama-server's `/v1/systemone`. It answers questions with probabilities and never writes text, so it is not an **agent** and has no tools. Given the topic's brief and the page as numbered prose paragraphs, its first call asks `useful` and `injection`; only a kept result gets a second call for its `kind` and the paragraphs to quote. Each call is recorded as a run of `Keeper` (Triage trigger, no tool calls) whose summary holds the probabilities. Its injection signal is weak, so it is a filter, not the security boundary. | `IKeeper`, `LlamaServerKeeper`, `KeeperPolicy` |
+| **Model gate** | Limits how many research model calls run at once (one by default). A waiting Keeper call goes before a waiting Pleb run, since they share the CPU. | `ModelGate` |
+| **Verdict** | Triage's judgement of one result, recorded on the result in the pending batch: kept (with its kind and exact quotes) or discarded (with a reason written by code), plus the Keeper's probabilities. A judged result is skipped after a restart. A result whose Keeper calls fail waits for the next cycle; after a few failures it is discarded as failed. | `Verdict` |
+| **Triage** | The Keeper judging a topic's fetched results: kept when `useful` reaches `Research:KeepThreshold` and `injection` stays below `Research:InjectionThreshold`. A page that could not be fetched is discarded without a call. When all are judged, the kept ones are combined into one **research note** in `notes/new` and the batch moves to `research/batches/awaiting`; a batch with nothing kept moves to `batches/completed`. | `TriageResultsCommandHandler` |
+| **Research note** | The note triage writes for a topic: a research header (origin, topic, source URLs), then each kept result's title, source, length-capped search snippet, kind and length-capped quotes (and a summary once the Clerk writes them), never the page's text beyond those quotes. | `ResearchNote` |
 
 ## Review
 

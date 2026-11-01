@@ -3,7 +3,7 @@ using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Models;
 using KnowledgeBase.Agent.Research.Queries;
 using KnowledgeBase.Agent.Research.Search;
-using KnowledgeBase.Agent.Research.Tools;
+using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs.Models;
 
 namespace KnowledgeBase.Agent.IntegrationTests.Research;
@@ -35,26 +35,20 @@ public sealed class SearchHistoryTests : IAsyncDisposable
             new SearchResult(Beds, "Raised beds", null, FakeSearchSource.SourceName, null),
             new SearchResult(Spam, "Ten tricks", null, FakeSearchSource.SourceName, null)
         ];
-        _wiki.Scout.Behaviour = async (prompt, cancellationToken) =>
-        {
-            await (prompt.Contains(Beds)
-                ? _wiki.CallToolAsync(nameof(ScoutTools.KeepResult), null, () => _wiki.Get<ScoutTools>().KeepResult("Raised beds drain better.", ["Raised beds drain better."], cancellationToken))
-                : _wiki.CallToolAsync(nameof(ScoutTools.DiscardResult), null, () => _wiki.Get<ScoutTools>().DiscardResult("SEO spam.", cancellationToken)));
-            return "Judged.";
-        };
+        _wiki.Keeper.Screen = page => new Screening(page.Url == Beds ? 0.8 : 0.2, 0.1);
 
         await _wiki.Get<SearchTopicsCommandHandler>().Handle(new SearchTopicsCommand(), CancellationToken.None);
         TopicRunsPage afterSearch = await HistoryAsync();
         // Fetching would reach the web, so the pages are laid in the batch as the fetch step leaves them.
         await store.UpdatePendingBatchAsync(
             Topic,
-            batch => batch with { Results = [.. batch.Results.Select(result => result with { Page = FetchedPage.Content(Discovered, $"Page of {result.Result.Title}.", false) })] },
+            batch => batch with { Results = [.. batch.Results.Select(result => result with { Page = FetchedPage.Content(Discovered, $"{result.Result.Title}: a page long enough to be a paragraph.", false) })] },
             CancellationToken.None);
         await _wiki.Get<TriageResultsCommandHandler>().Handle(new TriageResultsCommand(), CancellationToken.None);
         TopicRunsPage afterTriage = await HistoryAsync();
 
         ItShouldShowTheSearchInTheTopicsHistory();
-        ItShouldShowTheSearchNextToTheScoutsRuns();
+        ItShouldShowTheSearchNextToTheKeepersCalls();
         ItShouldAddWhatBecameOfTheResultsToTheSearch();
 
         void ItShouldShowTheSearchInTheTopicsHistory() => afterSearch.Runs.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
@@ -65,8 +59,8 @@ public sealed class SearchHistoryTests : IAsyncDisposable
                 call => call.Target.ShouldBe("raised beds"),
                 call => call.Detail.ShouldBe($"{FakeSearchSource.SourceName}: 2 results")));
 
-        void ItShouldShowTheSearchNextToTheScoutsRuns() => afterTriage.Runs.Select(run => run.Agent).ShouldBe(
-            [KnownAgents.Scout, KnownAgents.Scout, SearchRuns.Agent],
+        void ItShouldShowTheSearchNextToTheKeepersCalls() => afterTriage.Runs.Select(run => run.Agent).ShouldBe(
+            ["Keeper", "Keeper", "Keeper", SearchRuns.Agent],
             ignoreOrder: true);
 
         void ItShouldAddWhatBecameOfTheResultsToTheSearch() => afterTriage.Runs

@@ -40,6 +40,17 @@ IResourceBuilder<ParameterResource> openAICompatibleApiKey = builder
 IResourceBuilder<ParameterResource> openAICompatibleModel = builder
     .AddParameter("OpenAICompatibleModel");
 
+// The research Keeper: a decision model on the same llama-server (in router mode, the preset's section name), the
+// probabilities it needs to keep a result or flag an injection, and how many calls one cycle may make.
+IResourceBuilder<ParameterResource> keeperModel = builder
+    .AddParameter("KeeperModel");
+IResourceBuilder<ParameterResource> keepThreshold = builder
+    .AddParameter("ResearchKeepThreshold");
+IResourceBuilder<ParameterResource> injectionThreshold = builder
+    .AddParameter("ResearchInjectionThreshold");
+IResourceBuilder<ParameterResource> keeperCallsPerCycle = builder
+    .AddParameter("KeeperCallsPerCycle");
+
 // An optional private repository the wiki's history is pushed to over SSH, and the folder on the host holding its
 // deploy key and pinned host keys. Neither is secret: the key itself never leaves that folder.
 IResourceBuilder<ParameterResource> wikiBackupRemote = builder
@@ -91,6 +102,10 @@ IResourceBuilder<ProjectResource> api = builder
     .WithEnvironment("OpenAICompatible__Endpoint", openAICompatibleEndpoint)
     .WithEnvironment("OpenAICompatible__ApiKey", openAICompatibleApiKey)
     .WithEnvironment("OpenAICompatible__Model", openAICompatibleModel)
+    .WithEnvironment("Research__KeeperModel", keeperModel)
+    .WithEnvironment("Research__KeepThreshold", keepThreshold)
+    .WithEnvironment("Research__InjectionThreshold", injectionThreshold)
+    .WithEnvironment("Research__KeeperCallsPerCycle", keeperCallsPerCycle)
     .WithEnvironment("Anthropic__ApiKey", apiKey)
     .WithEnvironment("Anthropic__Model", anthropicModel)
     .WithEnvironment("Wiki__Backup__Remote", wikiBackupRemote)

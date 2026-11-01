@@ -8,7 +8,7 @@ internal enum ModelPriority
     /// <summary>The Pleb: curation can wait for triage, which holds up a batch of fetched results.</summary>
     Normal,
 
-    /// <summary>The Scout.</summary>
+    /// <summary>The Keeper, which shares the CPU with the chat model.</summary>
     High
 }
 
