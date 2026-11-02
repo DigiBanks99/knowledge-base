@@ -1,6 +1,6 @@
 using System.Net;
 
-using KnowledgeBase.Agent.Logs;
+using KnowledgeBase.Agent.Diagnostics;
 
 using Microsoft.Extensions.Logging;
 
