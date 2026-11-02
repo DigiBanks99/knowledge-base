@@ -70,6 +70,8 @@ internal sealed class AgentRunTracker(
             topic,
             sourceNote));
         CurrentRecorder.Value = recorder;
+        AgentRun started = recorder.Snapshot();
+        logger.AgentRunStarted(agent, started.Id, trigger.Kind, trigger.Reference, topic);
         await SaveAsync(recorder);
 
         try
@@ -89,6 +91,7 @@ internal sealed class AgentRunTracker(
 
         await SaveCompletedAsync(recorder);
         AgentRun completed = recorder.Snapshot();
+        logger.AgentRunEnded(agent, completed.Id, completed.Status, completed.ToolCalls.Count, completed.Error ?? "none");
         await NotifyObserversAsync(completed, cancellationToken);
         return completed.Status == AgentRunStatus.Succeeded
             ? completed

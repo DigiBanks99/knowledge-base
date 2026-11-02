@@ -694,6 +694,29 @@ details.card summary {
   font-size: 0.9em;
 }
 
+.log-properties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+button.log-property {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+button.log-property:hover {
+  border-color: var(--muted);
+}
+
 .log-exception {
   overflow-x: auto;
   white-space: pre;

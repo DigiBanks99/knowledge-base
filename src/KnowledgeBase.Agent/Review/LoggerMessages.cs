@@ -5,7 +5,7 @@ public static partial class LoggerMessages
     [LoggerMessage(LogLevel.Debug, "Serializing review findings to file '{FilePath}'")]
     public static partial void SerializingReviewFindingsToFile(this ILogger logger, string filePath);
 
-    [LoggerMessage(LogLevel.Debug, Message = "New review request received at '{FilePath}'.")]
+    [LoggerMessage(LogLevel.Information, Message = "New review request received at '{FilePath}'.")]
     public static partial void NewReviewRequestRead(this ILogger logger, string filePath);
 
     [LoggerMessage(LogLevel.Error, "Failed to review the wiki for request '{FilePath}': {Error}")]

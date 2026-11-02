@@ -8,6 +8,9 @@ const RefreshMilliseconds = 5000
 
 const levelOptions: LogLevel[] = ['Information', 'Warning', 'Error']
 
+/** The parts of the app that log, named after their folders in the API. */
+const areaOptions = ['Research', 'Review', 'Runs', 'Notes', 'Facts', 'Wiki', 'Conversations', 'Agents', 'Files', 'App', 'Framework']
+
 function levelTone(level: LogLevel): string {
   switch (level) {
     case 'Critical':
@@ -31,7 +34,7 @@ function formatLogTime(value: string): string {
 function asText(entries: LogEntry[]): string {
   return entries
     .map((entry) => {
-      const header = `${entry.at} ${entry.level} ${entry.category}: ${entry.message}`
+      const header = `${entry.at} ${entry.level} ${entry.area} ${entry.category}: ${entry.message}`
       return entry.exception ? `${header}\n${entry.exception}` : header
     })
     .join('\n\n')
@@ -39,12 +42,13 @@ function asText(entries: LogEntry[]): string {
 
 export function LogsPage() {
   const [level, setLevel] = useState<LogLevel>('Information')
+  const [area, setArea] = useState('')
   const [search, setSearch] = useState('')
   const [copied, setCopied] = useState(false)
 
   const logs = useQuery({
-    queryKey: ['logs', level, search],
-    queryFn: () => api.logs({ level, search, limit: 300 }),
+    queryKey: ['logs', level, area, search],
+    queryFn: () => api.logs({ level, area: area || undefined, search, limit: 300 }),
     refetchInterval: RefreshMilliseconds,
   })
 
@@ -63,8 +67,9 @@ export function LogsPage() {
     <section className="page">
       <h1>Logs</h1>
       <p className="muted">
-        Recent messages from the API, newest first. They are kept in memory and refresh every few seconds; a restart
-        clears them. Searches and agent runs are kept on disk, and each research topic's page shows its history.
+        Recent messages from the API, newest first, kept for five days and refreshed every few seconds. Click a value
+        such as a topic or run id to see every message about it. Searches and agent runs are also kept in full, and each
+        research topic's page shows its history.
       </p>
 
       <div className="log-controls">
@@ -78,12 +83,23 @@ export function LogsPage() {
             ))}
           </select>
         </label>
+        <label className="small">
+          Area{' '}
+          <select value={area} onChange={(event) => setArea(event.target.value)}>
+            <option value="">All areas</option>
+            {areaOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="small log-search">
           Search{' '}
           <input
             type="search"
             value={search}
-            placeholder="Message, category or exception"
+            placeholder="Message, topic, run id or exception"
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
@@ -94,17 +110,35 @@ export function LogsPage() {
 
       {logs.isPending && <Loading what="logs" />}
       {logs.isError && <ErrorMessage error={logs.error} />}
-      {logs.data?.length === 0 && <Empty>No messages match. Try a lower level or a different search.</Empty>}
+      {logs.data?.length === 0 && <Empty>No messages match. Try a lower level, another area or a different search.</Empty>}
       {logs.data && logs.data.length > 0 && (
         <ul className="signals">
           {logs.data.map((entry) => (
             <li key={entry.sequence} className="card log-entry">
               <div className="item-title">
                 <Badge tone={levelTone(entry.level)}>{entry.level}</Badge>
+                <button type="button" className="link small" title={`Show only ${entry.area}`} onClick={() => setArea(entry.area)}>
+                  {entry.area}
+                </button>
                 <span className="muted small">{formatLogTime(entry.at)}</span>
-                <span className="small log-category">{entry.category}</span>
               </div>
               <p className="log-message">{entry.message}</p>
+              {Object.keys(entry.properties).length > 0 && (
+                <div className="log-properties">
+                  {Object.entries(entry.properties).map(([name, value]) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className="log-property"
+                      title={`Show every message mentioning this ${name}`}
+                      onClick={() => setSearch(value)}
+                    >
+                      <span className="muted">{name}</span> {value}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="muted small log-category">{entry.category}</div>
               {entry.exception && (
                 <details>
                   <summary className="small">Exception</summary>

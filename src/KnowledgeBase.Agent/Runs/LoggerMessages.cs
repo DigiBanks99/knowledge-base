@@ -1,7 +1,15 @@
+using KnowledgeBase.Agent.Runs.Models;
+
 namespace KnowledgeBase.Agent.Runs;
 
 public static partial class LoggerMessages
 {
+    [LoggerMessage(LogLevel.Information, "{Agent} run '{RunId}' started for {TriggerKind} '{Trigger}'; topic: {Topic}.")]
+    public static partial void AgentRunStarted(this ILogger logger, string agent, string runId, AgentRunTriggerKind triggerKind, string trigger, string? topic);
+
+    [LoggerMessage(LogLevel.Information, "{Agent} run '{RunId}' {Status} after {ToolCalls} tool calls; error: {Error}.")]
+    public static partial void AgentRunEnded(this ILogger logger, string agent, string runId, AgentRunStatus status, int toolCalls, string error);
+
     [LoggerMessage(LogLevel.Error, "{Agent} run failed.")]
     public static partial void AgentRunFailed(this ILogger logger, string agent, Exception exception);
 

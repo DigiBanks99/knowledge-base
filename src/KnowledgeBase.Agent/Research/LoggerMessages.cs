@@ -64,8 +64,8 @@ public static partial class LoggerMessages
     [LoggerMessage(LogLevel.Information, "Searching {Count} due research topics.")]
     public static partial void SearchingTopics(this ILogger logger, int count);
 
-    [LoggerMessage(LogLevel.Information, "Searched research topic '{Topic}': {Found} results found, {Kept} kept for triage.")]
-    public static partial void TopicSearched(this ILogger logger, string topic, int found, int kept);
+    [LoggerMessage(LogLevel.Information, "Searched research topic '{Topic}': {Found} results found ({Sources}); dropped {Blocked} blocked, {AlreadySeen} already seen and {TooOld} too old; {Kept} kept for triage.")]
+    public static partial void TopicSearched(this ILogger logger, string topic, int found, string sources, int blocked, int alreadySeen, int tooOld, int kept);
 
     [LoggerMessage(LogLevel.Warning, "A search source failed while searching research topic '{Topic}': {Error}")]
     public static partial void SearchSourceFailed(this ILogger logger, string topic, Error error);
