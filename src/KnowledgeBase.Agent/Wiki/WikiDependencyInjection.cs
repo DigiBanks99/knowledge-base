@@ -4,6 +4,7 @@ using KnowledgeBase.Agent.Facts;
 using KnowledgeBase.Agent.Facts.Watchers;
 using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Logs;
 using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Notes.Watchers;
 using KnowledgeBase.Agent.Research;
@@ -29,6 +30,7 @@ internal static class WikiDependencyInjection
             .AddFileOperations()
             .AddHandlers()
             .AddJobs()
+            .AddLogs()
             .AddNotes()
             .AddResearch()
             .AddRuns()
@@ -121,6 +123,7 @@ internal static class WikiDependencyInjection
             api
                 .MapConversationEndpoints()
                 .MapEventEndpoints()
+                .MapLogsEndpoints()
                 .MapNotesEndpoints()
                 .MapResearchEndpoints()
                 .MapReviewEndpoints()

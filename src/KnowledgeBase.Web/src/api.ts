@@ -13,7 +13,19 @@ export interface NoteDetail {
   content: string
 }
 
-export type AgentName = 'FactFinder' | 'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb' | 'Clerk'
+/** How serious a log message is, from least to most. */
+export type LogLevel = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical'
+/** One log message the API kept in memory; a restart empties them. */
+export interface LogEntry {
+  sequence: number
+  at: string
+  level: LogLevel
+  category: string
+  message: string
+  exception: string | null
+}
+
+export type AgentName = 'FactFinder' |'ThreadWeaver' | 'Reviewer' | 'Editor' | 'Librarian' | 'Pleb' | 'Clerk'
 export type AgentRunStatus = 'Running' | 'Succeeded' | 'Failed'
 export type AgentRunTriggerKind = 'Note' | 'Facts' | 'Curation' | 'Triage' | 'ReviewRequest' | 'Findings' | 'Search'
 export interface AgentToolCall {
@@ -279,6 +291,14 @@ export const api = {
   wikiPage: (path: string) => request<WikiPage>(`/api/wiki/page?path=${encodeURIComponent(path)}`),
 
   status: () => request<StatusReport>('/api/status'),
+
+  logs: (filter: { level?: LogLevel; search?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (filter.level) query.set('level', filter.level)
+    if (filter.search) query.set('search', filter.search)
+    if (filter.limit) query.set('limit', String(filter.limit))
+    return request<LogEntry[]>(`/api/logs?${query}`)
+  },
 
   agentProviders: () => request<AgentProviderSetting[]>('/api/agents/providers'),
   setAgentProvider: (agent: AgentName, provider: ModelProvider) =>
