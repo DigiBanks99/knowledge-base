@@ -670,3 +670,32 @@ details.card summary {
   min-height: 3rem;
   max-height: 12rem;
 }
+
+.log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.log-search input {
+  min-width: min(20rem, 100%);
+}
+
+.log-category {
+  overflow-wrap: anywhere;
+}
+
+.log-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.log-exception {
+  overflow-x: auto;
+  white-space: pre;
+  font-size: 0.8em;
+}

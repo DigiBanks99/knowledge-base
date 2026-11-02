@@ -9,6 +9,7 @@ import { EditsPage } from './pages/EditsPage'
 import { WikiPage } from './pages/WikiPage'
 import { AskPage } from './pages/AskPage'
 import { StatusPage } from './pages/StatusPage'
+import { LogsPage } from './pages/LogsPage'
 import { DenyListPage } from './pages/DenyListPage'
 import { ResearchPage } from './pages/ResearchPage'
 import { TopicsPage } from './pages/TopicsPage'
@@ -41,6 +42,7 @@ export function App() {
         ))}
         <span className="spacer" />
         <NavLink to="/settings">Settings</NavLink>
+        <NavLink to="/logs">Logs</NavLink>
         <NavLink to="/status" title={statusTitle(status.data?.isDegraded, status.isError)}>
           Status
           {status.data?.isDegraded && <span className="status-badge">!</span>}
@@ -77,6 +79,7 @@ export function App() {
           </Route>
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/status" element={<StatusPage />} />
+          <Route path="/logs" element={<LogsPage />} />
           <Route path="*" element={<Navigate to="/capture" replace />} />
         </Routes>
       </main>
