@@ -140,9 +140,23 @@ internal sealed class TopicSearch(
                     : Result.Failure<Maybe<ResearchTopic>, Error>(new TopicNotFoundError(topic.Path)),
                 cancellationToken)
             .Map(_ => outcome)
-            .Tap(result => logger.TopicSearched(result.Topic, result.Found, result.Kept));
+            .Tap(result => logger.TopicSearched(
+                result.Topic,
+                result.Found,
+                DescribeSources(calls),
+                filtered.Blocked,
+                filtered.AlreadySeen,
+                filtered.TooOld,
+                result.Kept));
         return new SearchAttempt(searched, filtered, filtered.Kept.Count > 0);
     }
+
+    /// <summary>What each source returned, so a search that kept nothing shows whether a source found nothing or its results were filtered.</summary>
+    private static string DescribeSources(IReadOnlyList<SourceCall> calls) =>
+        string.Join(
+            "; ",
+            calls.GroupBy(call => call.Source).Select(group =>
+                $"{group.Key}: {group.Sum(call => call.Answer.IsSuccess ? call.Answer.Value.Count : 0)} results from {group.Count(call => call.Answer.IsSuccess)} of {group.Count()} queries"));
 
     /// <summary>Every query goes to every configured source at once, in query order.</summary>
     private async Task<IReadOnlyList<SourceCall>> AskAsync(ResearchTopic topic, DateTimeOffset since, CancellationToken cancellationToken)

@@ -16,9 +16,16 @@ public sealed class LogsApiTests : IDisposable
     public void Dispose() => _api.Dispose();
 
     // The test host clears its logging providers so the console stays quiet, which also removes the one that feeds the
-    // buffer; so the buffer is written to directly here. The provider itself is covered by its own tests.
+    // buffer; so the buffer is written to directly here. The marker is only in a property value, as a topic would be.
     private void SeedWarning() =>
-        _api.Get<LogBuffer>().Add(At, LogLevel.Warning, "KnowledgeBase.Agent.IntegrationTests.Api.LogsApiTests", $"A search source failed: {_marker}", null);
+        _api.Get<LogBuffer>().Add(
+            At,
+            LogLevel.Warning,
+            "Research",
+            "KnowledgeBase.Agent.Research.Search.TopicSearch",
+            "A search source failed.",
+            new Dictionary<string, string> { ["Topic"] = _marker },
+            null);
 
     [Test]
     public async Task ASearchForAWarningIsFound()
@@ -33,7 +40,20 @@ public sealed class LogsApiTests : IDisposable
 
         void ItShouldSucceed() => response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        void ItShouldReturnTheWarning() => entries.Select(entry => entry.Message).ShouldBe([$"A search source failed: {_marker}"]);
+        void ItShouldReturnTheWarning() => entries.Select(entry => entry.Message).ShouldBe(["A search source failed."]);
+    }
+
+    [Test]
+    public async Task AnotherAreaIsAsked()
+    {
+        SeedWarning();
+
+        HttpResponseMessage response = await _api.Client().GetAsync($"/api/logs?area=Review&search={_marker}");
+        LogEntry[] entries = await TestApi.ReadAsync<LogEntry[]>(response);
+
+        ItShouldReturnNothing(entries);
+
+        static void ItShouldReturnNothing(LogEntry[] matched) => matched.ShouldBeEmpty();
     }
 
     [Test]

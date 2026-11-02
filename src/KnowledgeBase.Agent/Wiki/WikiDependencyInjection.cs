@@ -75,6 +75,9 @@ internal static class WikiDependencyInjection
                 .GetAwaiter()
                 .GetResult();
 
+            // Once the logs directory exists, so the history of earlier runs is on the Logs page from the start.
+            app.UseLogs();
+
             // Before the watchers start, so notes are processed with the people already in the wiki denied. A failure is
             // logged and retried on the next start.
             app.Services

@@ -15,13 +15,17 @@ export interface NoteDetail {
 
 /** How serious a log message is, from least to most. */
 export type LogLevel = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical'
-/** One log message the API kept in memory; a restart empties them. */
+/** One log message the API kept; the latest are held in memory and the last five days are on disk. */
 export interface LogEntry {
   sequence: number
   at: string
   level: LogLevel
+  /** The part of the app that logged it, such as Research or Review; Framework for libraries. */
+  area: string
   category: string
   message: string
+  /** The values the message was written with, such as Topic or RunId, for finding related entries. */
+  properties: Record<string, string>
   exception: string | null
 }
 
@@ -292,9 +296,10 @@ export const api = {
 
   status: () => request<StatusReport>('/api/status'),
 
-  logs: (filter: { level?: LogLevel; search?: string; limit?: number } = {}) => {
+  logs: (filter: { level?: LogLevel; area?: string; search?: string; limit?: number } = {}) => {
     const query = new URLSearchParams()
     if (filter.level) query.set('level', filter.level)
+    if (filter.area) query.set('area', filter.area)
     if (filter.search) query.set('search', filter.search)
     if (filter.limit) query.set('limit', String(filter.limit))
     return request<LogEntry[]>(`/api/logs?${query}`)
