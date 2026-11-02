@@ -1,10 +1,10 @@
 using KnowledgeBase.Agent.Conversations;
+using KnowledgeBase.Agent.Diagnostics;
 using KnowledgeBase.Agent.Events;
 using KnowledgeBase.Agent.Facts;
 using KnowledgeBase.Agent.Facts.Watchers;
 using KnowledgeBase.Agent.Files;
 using KnowledgeBase.Agent.Health;
-using KnowledgeBase.Agent.Logs;
 using KnowledgeBase.Agent.Notes;
 using KnowledgeBase.Agent.Notes.Watchers;
 using KnowledgeBase.Agent.Research;
