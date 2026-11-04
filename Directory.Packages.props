@@ -5,6 +5,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Aspire.Hosting.Browsers" Version="13.6.4-preview.1.26523.11" />
     <PackageVersion Include="Aspire.Hosting.Docker" Version="13.6.4" />
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.6.4" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.4" />
