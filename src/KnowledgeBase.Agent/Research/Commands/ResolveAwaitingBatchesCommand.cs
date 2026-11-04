@@ -120,6 +120,6 @@ internal sealed class ResolveAwaitingBatchesCommandHandler(
                 })),
                 cancellationToken)
             .Tap(updated => logger.BatchResolved(topic, outcome.ToString(), updated.HasValue && updated.Value.IsFailing))
-            .Bind(_ => store.CompleteAwaitingBatchAsync(topic, cancellationToken));
+            .Bind(_ => store.CompleteAwaitingBatchAsync(topic, outcome, now, cancellationToken));
     }
 }

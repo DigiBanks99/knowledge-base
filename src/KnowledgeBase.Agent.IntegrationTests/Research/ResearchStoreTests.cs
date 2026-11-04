@@ -399,11 +399,17 @@ public sealed class ResearchStoreTests : IDisposable
         await _store.AwaitBatchAsync("projects/garden", "research-projects--garden.md", Discovered, CancellationToken.None);
 
         Result<IReadOnlyList<AwaitingBatch>, Error> listed = await _store.ListAwaitingBatchesAsync(CancellationToken.None);
-        Result<Maybe<ResearchBatch>, Error> completed = await _store.CompleteAwaitingBatchAsync("projects/garden", CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> completed = await _store.CompleteAwaitingBatchAsync(
+            "projects/garden",
+            IngestionOutcome.Positive,
+            Discovered.AddHours(2),
+            CancellationToken.None);
         Result<IReadOnlySet<string>, Error> inFlight = await _store.ListTopicsInFlightAsync(CancellationToken.None);
+        Result<IReadOnlyList<ResearchBatch>, Error> stored = await _store.ListTopicBatchesAsync("projects/garden", CancellationToken.None);
 
         ItShouldListTheBatchWithItsNote();
         ItShouldMoveTheBatchToTheCompletedBatches();
+        ItShouldKeepTheOutcomeWithTheBatch();
         ItShouldFreeTheTopic();
 
         void ItShouldListTheBatchWithItsNote() => listed.Value.Select(batch => batch.NoteFile).ShouldBe(["research-projects--garden.md"]);
@@ -415,7 +421,97 @@ public sealed class ResearchStoreTests : IDisposable
             TestWiki.FileNames(_settings.AwaitingBatchesDirectory).ShouldBeEmpty();
         }
 
+        void ItShouldKeepTheOutcomeWithTheBatch() => stored.Value.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            batch => batch.Outcome.ShouldBe(IngestionOutcome.Positive),
+            batch => batch.ResolvedAt.ShouldBe(Discovered.AddHours(2)));
+
         void ItShouldFreeTheTopic() => inFlight.Value.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task TheAuthorMarksResultsWhereverTheirBatchesAre()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Judged(Batch("projects/garden")), CancellationToken.None);
+        await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        string completedFile = Directory.EnumerateFiles(_settings.CompletedBatchesDirectory).Single();
+        File.SetLastWriteTimeUtc(completedFile, Discovered.UtcDateTime.AddDays(1));
+        await _store.WritePendingBatchAsync(Judged(Batch("projects/garden") with { SearchedAt = Discovered.AddDays(2) }), CancellationToken.None);
+        string url = Batch("projects/garden").Results[0].Url;
+
+        Result<Maybe<BatchResult>, Error> markedCompleted = await _store.MarkResultAsync("projects/garden", Discovered, url, ResultMark.Noise, Allowed, CancellationToken.None);
+        Result<Maybe<BatchResult>, Error> markedPending = await _store.MarkResultAsync("projects/garden", Discovered.AddDays(2), url, ResultMark.Useful, Allowed, CancellationToken.None);
+        Result<Maybe<BatchResult>, Error> unknown = await _store.MarkResultAsync("projects/garden", Discovered.AddDays(5), url, ResultMark.Useful, Allowed, CancellationToken.None);
+        Result<Maybe<BatchResult>, Error> refused = await _store.MarkResultAsync(
+            "projects/garden",
+            Discovered.AddDays(2),
+            url,
+            ResultMark.Noise,
+            _ => new ValidationError("Refused", "Not this one."),
+            CancellationToken.None);
+        Result<IReadOnlyList<ResearchBatch>, Error> stored = await _store.ListTopicBatchesAsync("projects/garden", CancellationToken.None);
+
+        ItShouldMarkBothResults();
+        ItShouldStoreEachMarkWithItsBatch();
+        ItShouldNotFindASearchThatNeverRan();
+        ItShouldWriteNothingTheCheckRefuses();
+        ItShouldKeepTheCompletedBatchsAge();
+
+        void ItShouldMarkBothResults()
+        {
+            markedCompleted.Value.Value.Mark.ShouldBe(ResultMark.Noise);
+            markedPending.Value.Value.Mark.ShouldBe(ResultMark.Useful);
+        }
+
+        void ItShouldStoreEachMarkWithItsBatch() =>
+            stored.Value.Select(batch => batch.Results[0].Mark).ShouldBe([ResultMark.Useful, ResultMark.Noise]);
+
+        void ItShouldNotFindASearchThatNeverRan() => unknown.Value.HasNoValue.ShouldBeTrue();
+
+        // The refused mark came after the Useful one, which is still the one stored.
+        void ItShouldWriteNothingTheCheckRefuses() => refused.Error.Code.ShouldBe("Refused");
+
+        void ItShouldKeepTheCompletedBatchsAge() =>
+            File.GetLastWriteTimeUtc(completedFile).ShouldBe(Discovered.UtcDateTime.AddDays(1));
+
+        static ResearchBatch Judged(ResearchBatch batch) => batch with
+        {
+            Results = [.. batch.Results.Select(result => result with { Verdict = Verdict.Discard("Off topic.", batch.SearchedAt) })]
+        };
+
+        static UnitResult<Error> Allowed(BatchResult _) => UnitResult.Success<Error>();
+    }
+
+    [Test]
+    public async Task ACrashLeftABatchInTwoFolders()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+        await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+
+        Result<IReadOnlyList<ResearchBatch>, Error> listed = await _store.ListTopicBatchesAsync("projects/garden", CancellationToken.None);
+
+        ItShouldListTheBatchOnce();
+
+        void ItShouldListTheBatchOnce() => listed.Value.ShouldHaveSingleItem();
+    }
+
+    [Test]
+    public async Task OnlyRecentCompletedBatchesCount()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+        await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        File.SetLastWriteTimeUtc(Directory.EnumerateFiles(_settings.CompletedBatchesDirectory).Single(), Discovered.UtcDateTime);
+        await _store.WritePendingBatchAsync(Batch("projects/garden") with { SearchedAt = Discovered.AddDays(10) }, CancellationToken.None);
+
+        Result<IReadOnlyList<ResearchBatch>, Error> recent = await _store.ListRecentBatchesAsync(Discovered.AddDays(3), CancellationToken.None);
+
+        ItShouldListOnlyThePendingBatch();
+
+        void ItShouldListOnlyThePendingBatch() =>
+            recent.Value.Select(batch => batch.SearchedAt).ShouldBe([Discovered.AddDays(10)]);
     }
 
     [Test]

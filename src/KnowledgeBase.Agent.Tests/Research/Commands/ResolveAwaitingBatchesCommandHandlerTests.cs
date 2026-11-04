@@ -58,12 +58,16 @@ public sealed class ResolveAwaitingBatchesCommandHandlerTests
 
         ItShouldCheckTheTopicDailyAgain();
         ItShouldRecordWhenItPaidOff();
-        ItShouldCompleteTheBatch();
+        ItShouldCompleteTheBatchWithItsOutcome();
         ItShouldReportThePositiveTopic();
 
         void ItShouldCheckTheTopicDailyAgain() => _state.Topics[Atlas].Interval.ShouldBe(TimeSpan.FromHours(24));
         void ItShouldRecordWhenItPaidOff() => _state.Topics[Atlas].LastPositiveAt.ShouldBe(Now);
-        void ItShouldCompleteTheBatch() => _state.CompletedBatches.ShouldHaveSingleItem();
+
+        void ItShouldCompleteTheBatchWithItsOutcome() => _state.CompletedBatches.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            batch => batch.Outcome.ShouldBe(IngestionOutcome.Positive),
+            batch => batch.ResolvedAt.ShouldBe(Now));
+
         void ItShouldReportThePositiveTopic() => resolved.Value.Positive.ShouldBe([Atlas]);
     }
 
@@ -98,7 +102,13 @@ public sealed class ResolveAwaitingBatchesCommandHandlerTests
 
         void ItShouldLeaveTheIntervalAlone() => _state.Topics[Atlas].Interval.ShouldBe(TimeSpan.FromDays(4));
         void ItShouldFlagTheTopicAsFailing() => _state.Topics[Atlas].IsFailing.ShouldBeTrue();
-        void ItShouldCompleteTheBatchSoTheTopicCanBeSearchedAgain() => _state.AwaitingBatches.ShouldBeEmpty();
+
+        void ItShouldCompleteTheBatchSoTheTopicCanBeSearchedAgain()
+        {
+            _state.AwaitingBatches.ShouldBeEmpty();
+            _state.CompletedBatches.ShouldHaveSingleItem().Outcome.ShouldBe(IngestionOutcome.Failed);
+        }
+
         void ItShouldReportTheFailedTopic() => resolved.Value.Failed.ShouldBe([Atlas]);
     }
 

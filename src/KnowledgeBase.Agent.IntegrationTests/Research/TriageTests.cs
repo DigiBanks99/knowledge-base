@@ -95,6 +95,51 @@ public sealed class TriageTests : IAsyncDisposable
         }
     }
 
+    [Test]
+    public async Task TheAuthorMarkedADiscardBeforeTheRestWasTriaged()
+    {
+        await _wiki.InitialiseAsync();
+        IResearchStore store = _wiki.Get<IResearchStore>();
+        await store.UpdateTopicAsync(
+            Topic,
+            _ => Maybe.From(ResearchTopic.New(Topic, Searched) with { Brief = "News about raised-bed gardening.", Queries = ["raised beds"] }),
+            CancellationToken.None);
+        Verdict discarded = Verdict.Discard("Not useful enough for the brief.", Searched) with { Useful = 0.2, Injection = 0.1 };
+        await store.WritePendingBatchAsync(
+            new ResearchBatch(Topic, Searched, [Result(Beds, "Raised beds"), Result(Spam, "Ten tricks") with { Verdict = discarded }]),
+            CancellationToken.None);
+        await _wiki.Get<MarkResultCommandHandler>().Handle(
+            new MarkResultCommand("projects--garden", Searched, Spam, ResultMark.Useful),
+            CancellationToken.None);
+        _wiki.Keeper.Screen = _ => new Screening(0.85, 0.1);
+        _wiki.Clerk.Behaviour = async (_, cancellationToken) =>
+        {
+            await _wiki.CallToolAsync(
+                nameof(ClerkTools.RecordSummary),
+                null,
+                () => _wiki.Get<ClerkTools>().RecordSummary(Summary, cancellationToken));
+            return "Recorded the summary.";
+        };
+
+        await _wiki.Get<TriageResultsCommandHandler>().Handle(new TriageResultsCommand(), CancellationToken.None);
+        BatchResult spam = (await store.ListTopicBatchesAsync(Topic, CancellationToken.None)).Value.Single().Results.Single(result => result.Url == Spam);
+        string note = File.ReadAllText(Directory.EnumerateFiles(_wiki.Settings.NewNotesDirectory).Single());
+
+        ItShouldKeepTheMarkThroughTriage();
+        ItShouldLeaveTheDiscardAsItWas();
+        ItShouldNotPutTheMarkedDiscardInTheNote();
+
+        void ItShouldKeepTheMarkThroughTriage() => spam.Mark.ShouldBe(ResultMark.Useful);
+
+        void ItShouldLeaveTheDiscardAsItWas() => spam.Verdict.ShouldNotBeNull().ShouldSatisfyAllConditions(
+            verdict => verdict.Kept.ShouldBeFalse(),
+            verdict => verdict.Reason.ShouldBe(discarded.Reason),
+            verdict => verdict.Useful.ShouldBe(discarded.Useful),
+            verdict => verdict.JudgedAt.ShouldBe(discarded.JudgedAt));
+
+        void ItShouldNotPutTheMarkedDiscardInTheNote() => note.ShouldNotContain(Spam);
+    }
+
     private static BatchResult Result(string url, string title) =>
         new("raised beds", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, $"# {title}\n\n{Drainage}", false));
 }

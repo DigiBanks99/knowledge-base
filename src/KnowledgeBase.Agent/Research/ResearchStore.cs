@@ -279,8 +279,155 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
         await ReadAllAsync<AwaitingBatch>(_awaitingBatchesDirectory, cancellationToken)
             .Map(IReadOnlyList<AwaitingBatch> (awaiting) => [.. awaiting.Where(batch => batch.Batch is not null && batch.NoteFile is not null)]);
 
-    public Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(string topic, CancellationToken cancellationToken) =>
-        MoveToCompletedAsync(TopicFilePath(_awaitingBatchesDirectory, topic), topic, (AwaitingBatch awaiting) => awaiting.Batch, cancellationToken);
+    public Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(
+        string topic,
+        IngestionOutcome outcome,
+        DateTimeOffset resolvedAt,
+        CancellationToken cancellationToken) =>
+        MoveToCompletedAsync(
+            TopicFilePath(_awaitingBatchesDirectory, topic),
+            topic,
+            (AwaitingBatch awaiting) => awaiting.Batch with { Outcome = outcome, ResolvedAt = resolvedAt },
+            cancellationToken);
+
+    public async Task<Result<IReadOnlyList<ResearchBatch>, Error>> ListTopicBatchesAsync(string topic, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Another topic's slug can start with this one's, so the prefix only narrows the files; the topic decides.
+            string completedPrefix = $"{TopicPaths.Slug(topic)}-";
+            IEnumerable<string> completed = Directory.Exists(_completedBatchesDirectory)
+                ? Directory.EnumerateFiles(_completedBatchesDirectory, $"{completedPrefix}*.json")
+                : [];
+            IReadOnlyList<ResearchBatch> batches = await ReadBatchesAsync(
+                [TopicFilePath(_pendingBatchesDirectory, topic), TopicFilePath(_awaitingBatchesDirectory, topic), .. completed],
+                cancellationToken);
+            // A crash while a batch moves on leaves it in two folders; the first copy read is the one a mark goes to.
+            return Result.Success<IReadOnlyList<ResearchBatch>, Error>(
+            [
+                .. batches
+                    .Where(batch => batch.Topic == topic)
+                    .DistinctBy(batch => batch.SearchedAt)
+                    .OrderByDescending(batch => batch.SearchedAt)
+            ]);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(_completedBatchesDirectory, ex.Message);
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<ResearchBatch>, Error>> ListRecentBatchesAsync(
+        DateTimeOffset since,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            IEnumerable<string> inFlight = new[] { _pendingBatchesDirectory, _awaitingBatchesDirectory }
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(directory, "*.json"));
+            // The file's own age, as pruning judges it: a completed batch is written when it completes.
+            IEnumerable<string> completed = Directory.Exists(_completedBatchesDirectory)
+                ? Directory.EnumerateFiles(_completedBatchesDirectory, "*.json")
+                    .Where(filePath => File.GetLastWriteTimeUtc(filePath) >= since.UtcDateTime)
+                : [];
+            return Result.Success<IReadOnlyList<ResearchBatch>, Error>(await ReadBatchesAsync([.. inFlight, .. completed], cancellationToken));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(_completedBatchesDirectory, ex.Message);
+        }
+    }
+
+    public async Task<Result<Maybe<BatchResult>, Error>> MarkResultAsync(
+        string topic,
+        DateTimeOffset searchedAt,
+        string url,
+        ResultMark? mark,
+        Func<BatchResult, UnitResult<Error>> check,
+        CancellationToken cancellationToken)
+    {
+        // Under the topics lock, so a mark never races triage updating the batch or the batch moving on.
+        await _topicsLock.WaitAsync(cancellationToken);
+        try
+        {
+            string pendingPath = TopicFilePath(_pendingBatchesDirectory, topic);
+            Result<Maybe<ResearchBatch>, Error> pending = await ReadDocumentAsync<ResearchBatch>(pendingPath, cancellationToken);
+            if (pending.IsFailure)
+            {
+                return pending.Error;
+            }
+
+            if (pending.Value.HasValue && pending.Value.Value.SearchedAt == searchedAt)
+            {
+                return await MarkAsync(pendingPath, pending.Value.Value, batch => batch, (_, marked) => marked);
+            }
+
+            string awaitingPath = TopicFilePath(_awaitingBatchesDirectory, topic);
+            Result<Maybe<AwaitingBatch>, Error> awaiting = await ReadDocumentAsync<AwaitingBatch>(awaitingPath, cancellationToken);
+            if (awaiting.IsFailure)
+            {
+                return awaiting.Error;
+            }
+
+            if (awaiting.Value is { HasValue: true, Value.Batch: { } awaitingBatch } && awaitingBatch.SearchedAt == searchedAt)
+            {
+                return await MarkAsync(awaitingPath, awaiting.Value.Value, waiting => waiting.Batch, (waiting, marked) => waiting with { Batch = marked });
+            }
+
+            string completedPath = CompletedFilePath(topic, searchedAt);
+            Result<Maybe<ResearchBatch>, Error> completed = await ReadDocumentAsync<ResearchBatch>(completedPath, cancellationToken);
+            if (completed.IsFailure || completed.Value.HasNoValue || completed.Value.Value.Topic != topic)
+            {
+                return completed.IsFailure ? completed.Error : Maybe<BatchResult>.None;
+            }
+
+            DateTime writtenAt = File.GetLastWriteTimeUtc(completedPath);
+            Result<Maybe<BatchResult>, Error> marked = await MarkAsync(completedPath, completed.Value.Value, batch => batch, (_, batch) => batch);
+            if (marked.IsSuccess && marked.Value.HasValue)
+            {
+                KeepAge(completedPath, writtenAt);
+            }
+
+            return marked;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new ResearchStoreError(_completedBatchesDirectory, ex.Message);
+        }
+        finally
+        {
+            _topicsLock.Release();
+        }
+
+        async Task<Result<Maybe<BatchResult>, Error>> MarkAsync<TDocument>(
+            string filePath,
+            TDocument document,
+            Func<TDocument, ResearchBatch> batchOf,
+            Func<TDocument, ResearchBatch, TDocument> withBatch)
+        {
+            ResearchBatch batch = batchOf(document);
+            BatchResult? result = batch.Results.FirstOrDefault(candidate => candidate.Url == url);
+            if (result is null)
+            {
+                return Maybe<BatchResult>.None;
+            }
+
+            UnitResult<Error> allowed = check(result);
+            if (allowed.IsFailure)
+            {
+                return allowed.Error;
+            }
+
+            BatchResult marked = result with { Mark = mark };
+            ResearchBatch changed = batch with
+            {
+                Results = [.. batch.Results.Select(candidate => ReferenceEquals(candidate, result) ? marked : candidate)]
+            };
+            return await WriteDocumentAsync(filePath, withBatch(document, changed), cancellationToken)
+                .Map(_ => Maybe.From(marked));
+        }
+    }
 
     public async Task<Result<int, Error>> PruneCompletedBatchesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken)
     {
@@ -351,10 +498,7 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
             }
 
             ResearchBatch batch = batchOf(source.Value.Value);
-            string completedPath = Path.Combine(
-                _completedBatchesDirectory,
-                $"{TopicPaths.Slug(topic)}-{batch.SearchedAt.UtcDateTime:yyyyMMdd-HHmmss}.json");
-            return await WriteDocumentAsync(completedPath, batch, cancellationToken)
+            return await WriteDocumentAsync(CompletedFilePath(topic, batch.SearchedAt), batch, cancellationToken)
                 .Bind(written => Delete(sourcePath).Map(() => Maybe.From(written)));
         }
         finally
@@ -380,6 +524,56 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
 
     private static string TopicFilePath(string directory, string topic) =>
         Path.Combine(directory, $"{TopicPaths.Slug(topic)}.json");
+
+    /// <summary>
+    /// Pruning goes by a completed batch's file age, so a mark gives the file back the age it had. The mark is already
+    /// written, so failing to (a scanner holding the file) only delays pruning and is not worth failing the mark for.
+    /// </summary>
+    private static void KeepAge(string filePath, DateTime writtenAt)
+    {
+        try
+        {
+            File.SetLastWriteTimeUtc(filePath, writtenAt);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The batch is pruned a little later than it would have been.
+        }
+    }
+
+    private string CompletedFilePath(string topic, DateTimeOffset searchedAt) =>
+        Path.Combine(_completedBatchesDirectory, $"{TopicPaths.Slug(topic)}-{searchedAt.UtcDateTime:yyyyMMdd-HHmmss}.json");
+
+    /// <summary>
+    /// The batches in <paramref name="filePaths"/>, pending or completed ones as they are and awaiting ones unwrapped,
+    /// skipping any file that is missing, being replaced or corrupt.
+    /// </summary>
+    private static async Task<IReadOnlyList<ResearchBatch>> ReadBatchesAsync(
+        IEnumerable<string> filePaths,
+        CancellationToken cancellationToken)
+    {
+        List<ResearchBatch> batches = [];
+        foreach (string filePath in filePaths)
+        {
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(await File.ReadAllBytesAsync(filePath, cancellationToken));
+                ResearchBatch? batch = document.RootElement.TryGetProperty("batch", out JsonElement awaiting)
+                    ? awaiting.Deserialize<ResearchBatch>(JsonFileStore.Options)
+                    : document.RootElement.Deserialize<ResearchBatch>(JsonFileStore.Options);
+                if (batch is { Topic: not null, Results: not null })
+                {
+                    batches.Add(batch);
+                }
+            }
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+            {
+                // A batch that is gone, being replaced or corrupt is skipped rather than failing the whole listing.
+            }
+        }
+
+        return batches;
+    }
 
     /// <summary>
     /// A corrupt deny-list is an error rather than an empty list: reading it as empty would let denied names into

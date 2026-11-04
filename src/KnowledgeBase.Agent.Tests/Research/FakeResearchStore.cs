@@ -158,7 +158,7 @@ internal static class FakeResearchStore
             });
         store.ListAwaitingBatchesAsync(Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success<IReadOnlyList<AwaitingBatch>, Error>([.. topics.AwaitingBatches.Values]));
-        store.CompleteAwaitingBatchAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        store.CompleteAwaitingBatchAsync(Arg.Any<string>(), Arg.Any<IngestionOutcome>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 if (!topics.AwaitingBatches.Remove(call.Arg<string>(), out AwaitingBatch? awaiting))
@@ -166,8 +166,66 @@ internal static class FakeResearchStore
                     return Result.Success<Maybe<ResearchBatch>, Error>(Maybe<ResearchBatch>.None);
                 }
 
-                topics.CompletedBatches.Add(awaiting.Batch);
-                return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(awaiting.Batch));
+                ResearchBatch completed = awaiting.Batch with { Outcome = call.Arg<IngestionOutcome>(), ResolvedAt = call.Arg<DateTimeOffset>() };
+                topics.CompletedBatches.Add(completed);
+                return Result.Success<Maybe<ResearchBatch>, Error>(Maybe.From(completed));
+            });
+        store.ListTopicBatchesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => Result.Success<IReadOnlyList<ResearchBatch>, Error>(
+                [.. topics.AllBatches().Where(batch => batch.Topic == call.Arg<string>()).OrderByDescending(batch => batch.SearchedAt)]));
+        // The fake has no file ages, so a completed batch counts as written when it was resolved, or else searched.
+        store.ListRecentBatchesAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(call => Result.Success<IReadOnlyList<ResearchBatch>, Error>(
+            [
+                .. topics.PendingBatches.Values,
+                .. topics.AwaitingBatches.Values.Select(awaiting => awaiting.Batch),
+                .. topics.CompletedBatches.Where(batch => (batch.ResolvedAt ?? batch.SearchedAt) >= call.Arg<DateTimeOffset>())
+            ]));
+        store.MarkResultAsync(
+                Arg.Any<string>(),
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<string>(),
+                Arg.Any<ResultMark?>(),
+                Arg.Any<Func<BatchResult, UnitResult<Error>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                (string topic, DateTimeOffset searchedAt, string url) = ((string)call.Args()[0], (DateTimeOffset)call.Args()[1], (string)call.Args()[2]);
+                ResultMark? mark = (ResultMark?)call.Args()[3];
+                Func<BatchResult, UnitResult<Error>> check = call.Arg<Func<BatchResult, UnitResult<Error>>>();
+                if (topics.PendingBatches.TryGetValue(topic, out ResearchBatch? pending) && pending.SearchedAt == searchedAt)
+                {
+                    return Marked(pending, changed => topics.PendingBatches[topic] = changed);
+                }
+
+                if (topics.AwaitingBatches.TryGetValue(topic, out AwaitingBatch? awaiting) && awaiting.Batch.SearchedAt == searchedAt)
+                {
+                    return Marked(awaiting.Batch, changed => topics.AwaitingBatches[topic] = awaiting with { Batch = changed });
+                }
+
+                int index = topics.CompletedBatches.FindIndex(batch => batch.Topic == topic && batch.SearchedAt == searchedAt);
+                return index < 0
+                    ? Result.Success<Maybe<BatchResult>, Error>(Maybe<BatchResult>.None)
+                    : Marked(topics.CompletedBatches[index], changed => topics.CompletedBatches[index] = changed);
+
+                Result<Maybe<BatchResult>, Error> Marked(ResearchBatch batch, Action<ResearchBatch> write)
+                {
+                    BatchResult? result = batch.Results.FirstOrDefault(candidate => candidate.Url == url);
+                    if (result is null)
+                    {
+                        return Maybe<BatchResult>.None;
+                    }
+
+                    UnitResult<Error> allowed = check(result);
+                    if (allowed.IsFailure)
+                    {
+                        return allowed.Error;
+                    }
+
+                    BatchResult marked = result with { Mark = mark };
+                    write(batch with { Results = [.. batch.Results.Select(candidate => ReferenceEquals(candidate, result) ? marked : candidate)] });
+                    return Maybe.From(marked);
+                }
             });
         store.PruneCompletedBatchesAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success<int, Error>(0));
@@ -200,4 +258,7 @@ internal sealed class ResearchTopics
     public Dictionary<string, AwaitingBatch> AwaitingBatches { get; } = [];
     public List<ResearchBatch> CompletedBatches { get; } = [];
     public BlockedDomains BlockedDomains { get; set; } = BlockedDomains.None;
+
+    public IEnumerable<ResearchBatch> AllBatches() =>
+        [.. PendingBatches.Values, .. AwaitingBatches.Values.Select(awaiting => awaiting.Batch), .. CompletedBatches];
 }

@@ -110,10 +110,40 @@ internal interface IResearchStore
     Task<Result<IReadOnlyList<AwaitingBatch>, Error>> ListAwaitingBatchesAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Moves the topic's awaiting batch to completed, once its outcome is known. None, with nothing moved, when the topic
-    /// has no awaiting batch.
+    /// Moves the topic's awaiting batch to completed with its outcome, so the filing rate can be read later. None, with
+    /// nothing moved, when the topic has no awaiting batch.
     /// </summary>
-    Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(string topic, CancellationToken cancellationToken);
+    Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(
+        string topic,
+        IngestionOutcome outcome,
+        DateTimeOffset resolvedAt,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The topic's batches, pending, awaiting and completed (until pruned), newest search first, skipping any that
+    /// cannot be read.
+    /// </summary>
+    Task<Result<IReadOnlyList<ResearchBatch>, Error>> ListTopicBatchesAsync(string topic, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every topic's pending and awaiting batch, and the completed batches written since <paramref name="since"/>,
+    /// skipping any that cannot be read.
+    /// </summary>
+    Task<Result<IReadOnlyList<ResearchBatch>, Error>> ListRecentBatchesAsync(DateTimeOffset since, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sets or clears the author's mark on one result of the topic's batch searched at <paramref name="searchedAt"/>,
+    /// wherever the batch now is, and nothing else. A completed batch keeps its age, so marking it never delays its
+    /// pruning. None, with nothing written, when there is no such batch or result; <paramref name="check"/>'s error, with
+    /// nothing written, when it refuses the result as it is when marked.
+    /// </summary>
+    Task<Result<Maybe<BatchResult>, Error>> MarkResultAsync(
+        string topic,
+        DateTimeOffset searchedAt,
+        string url,
+        ResultMark? mark,
+        Func<BatchResult, UnitResult<Error>> check,
+        CancellationToken cancellationToken);
 
     /// <summary>Deletes the completed batches written before <paramref name="olderThan"/>, and says how many.</summary>
     Task<Result<int, Error>> PruneCompletedBatchesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
