@@ -199,6 +199,48 @@ export interface ResearchBatch {
   searchedAt: string
   results: BatchResult[]
 }
+/** The author's own judgement of a result the Keeper judged; it only feeds the Keeper's agreement figures. */
+export type ResultMark = 'Useful' | 'Noise'
+export interface JudgedResult {
+  /** When the search that found it ran; names its batch when marking it. */
+  searchedAt: string
+  query: string
+  url: string
+  title: string
+  source: string
+  kept: boolean
+  reason: string | null
+  /** Why there is no real verdict. */
+  failure: string | null
+  useful: number | null
+  injection: number | null
+  kind: string | null
+  judgedAt: string
+  mark: ResultMark | null
+  /** Whether the Keeper itself gave the verdict, which only then can be agreed with. */
+  markable: boolean
+}
+export interface JudgedResults {
+  results: JudgedResult[]
+  keepThreshold: number
+  injectionThreshold: number
+  /** How long a batch is kept once its outcome is known. */
+  retentionDays: number
+  /** How recently a result must have been judged for its mark to count on the Status page. */
+  agreementWindowDays: number
+}
+/** How the research loop did over the recent window, labelled with the Keeper's configured model. */
+export interface ResearchQuality {
+  keeperModel: string
+  windowDays: number
+  marked: number
+  agreed: number
+  noiseKept: number
+  usefulDiscarded: number
+  notesFiled: number
+  notesEmpty: number
+  notesFailed: number
+}
 export interface TopicSearchOutcome {
   topic: string
   found: number
@@ -329,6 +371,11 @@ export const api = {
     put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/curation`, { brief, queries }),
   topicResults: (slug: string) =>
     request<ResearchBatch>(`/api/research/topics/${encodeURIComponent(slug)}/results`),
+  judgedResults: (slug: string) =>
+    request<JudgedResults>(`/api/research/topics/${encodeURIComponent(slug)}/judged`),
+  markResult: (slug: string, searchedAt: string, url: string, mark: ResultMark | null) =>
+    put<unknown>(`/api/research/topics/${encodeURIComponent(slug)}/results/mark`, { searchedAt, url, mark }),
+  researchQuality: () => request<ResearchQuality>('/api/research/quality'),
   topicRuns: (slug: string, page: number) =>
     request<TopicRunsPage>(`/api/research/topics/${encodeURIComponent(slug)}/runs?page=${page}`),
 
