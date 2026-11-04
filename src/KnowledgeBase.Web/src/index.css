@@ -279,6 +279,7 @@ details.card summary {
 }
 
 .badge-succeeded,
+.badge-kept,
 .badge-processed,
 .badge-low,
 .badge-healthy,
@@ -310,6 +311,7 @@ details.card summary {
 }
 
 .badge-muted,
+.badge-discarded,
 .badge-pinned,
 .badge-approved {
   background: transparent;
@@ -365,8 +367,35 @@ details.card summary {
 
 .deny-list .item-title .actions,
 .topics .item-title .actions,
-.agent-providers .item-title .actions {
+.agent-providers .item-title .actions,
+.judged-results .item-title .actions {
   margin-left: auto;
+}
+
+.judged-results ul,
+.research-quality dl {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.judged-results .item-title .actions {
+  margin-top: 0;
+  gap: 0.5rem;
+}
+
+.judged-results a {
+  overflow-wrap: anywhere;
+}
+
+.research-quality dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 1rem;
+}
+
+.research-quality dd {
+  margin: 0;
 }
 
 .deny-list .item-title .actions,

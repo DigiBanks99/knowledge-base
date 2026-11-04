@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { api } from '../api'
-import { Empty, ErrorMessage, Loading, RunCard } from '../components'
+import { api, type JudgedResult, type ResultMark } from '../api'
+import { Badge, Empty, ErrorMessage, Loading, RunCard } from '../components'
+import { formatDate } from '../format'
 import { TopicCard } from './TopicsPage'
 
 /** One topic: its curation and actions, then the runs research has made for it, newest first. */
@@ -23,10 +24,96 @@ export function TopicPage() {
           <TopicCard topic={topic} />
         </ul>
       )}
-      {/* Not waiting for the topic: its runs load alongside it and stay readable after the topic is pruned. */}
+      {/* Not waiting for the topic: these load alongside it and stay readable after the topic is pruned. */}
+      <JudgedResults slug={slug} />
       <TopicRuns slug={slug} />
     </>
   )
+}
+
+/**
+ * The results the Keeper judged, for the author to mark as useful or noise. Marks only feed the agreement figures on
+ * the Status page: they never change a verdict or bring a discarded result back.
+ */
+function JudgedResults({ slug }: { slug: string }) {
+  const queryClient = useQueryClient()
+  const judged = useQuery({ queryKey: ['topic-judged', slug], queryFn: () => api.judgedResults(slug) })
+  const mark = useMutation({
+    mutationFn: ({ result, value }: { result: JudgedResult; value: ResultMark | null }) =>
+      api.markResult(slug, result.searchedAt, result.url, value),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['topic-judged', slug] }),
+        queryClient.invalidateQueries({ queryKey: ['research-quality'] }),
+      ]),
+  })
+
+  return (
+    <section className="judged-results">
+      <h2>Judged results</h2>
+      <p className="muted small">
+        Mark what the Keeper judged as useful or noise; the Status page shows how often it agrees. Marks never change a
+        verdict.
+        {judged.data &&
+          ` Marks count for results judged in the last ${judged.data.agreementWindowDays} days; results stay listed for ${judged.data.retentionDays} days after their note is filed. A result is kept at useful ≥ ${percent(judged.data.keepThreshold)} and discarded as an injection at ≥ ${percent(judged.data.injectionThreshold)}.`}
+      </p>
+      {judged.isPending && <Loading what="the judged results" />}
+      {judged.isError && <ErrorMessage error={judged.error} />}
+      {mark.isError && <ErrorMessage error={mark.error} />}
+      {judged.data?.results.length === 0 && <Empty>The Keeper has not judged any results for this topic yet.</Empty>}
+      {judged.data && judged.data.results.length > 0 && (
+        <ul>
+          {judged.data.results.map((result) => (
+            <li key={`${result.searchedAt} ${result.url}`} className="card">
+              <div className="item-title">
+                <Badge tone={result.kept ? 'Kept' : 'Discarded'}>{result.kept ? 'Kept' : 'Discarded'}</Badge>
+                <a href={result.url} target="_blank" rel="noreferrer noopener">
+                  {result.title}
+                </a>
+                {result.markable && (
+                  <div className="actions">
+                    {(['Useful', 'Noise'] as const).map((value) => (
+                      <button
+                        key={value}
+                        className={result.mark === value ? undefined : 'secondary'}
+                        aria-pressed={result.mark === value}
+                        disabled={mark.isPending}
+                        onClick={() => mark.mutate({ result, value: result.mark === value ? null : value })}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="muted small">
+                {result.source} · for <code>{result.query}</code> · judged {formatDate(result.judgedAt)}
+              </div>
+              <div className="small">
+                {result.markable ? (
+                  <>
+                    Useful {probability(result.useful)} · injection {probability(result.injection)}
+                    {result.kind && ` · ${result.kind}`}
+                    {result.reason && ` · ${result.reason}`}
+                  </>
+                ) : (
+                  `${result.failure ?? result.reason ?? 'No verdict'} The Keeper gave no verdict here, so there is nothing to mark.`
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function percent(value: number): string {
+  return `${Math.round(value * 100)}%`
+}
+
+function probability(value: number | null): string {
+  return value === null ? 'n/a' : percent(value)
 }
 
 /** The topic's runs a page at a time; the page is kept in the URL so the browser's back button returns to it. */
