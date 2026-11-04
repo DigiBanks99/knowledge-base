@@ -37,7 +37,8 @@ internal sealed class FactTools(
                      """)] string collectionName,
         CancellationToken cancellationToken)
     {
-        string factFilePath = Path.Combine(_settings.FactsDirectory, $"{collectionName}.json");
+        string factFileName = UniqueFactFileName(collectionName);
+        string factFilePath = Path.Combine(_settings.FactsDirectory, factFileName);
 
         AgentRun? run = runTracker.Current;
         string? sourceNote = run?.Trigger.Kind == AgentRunTriggerKind.Note ? run.Trigger.Reference : null;
@@ -61,7 +62,24 @@ internal sealed class FactTools(
             .TapError(logger.ErrorOccurred);
         return result.IsFailure
             ? throw new InvalidOperationException($"Failed to write facts to {factFilePath}. Error: {result.Error}")
-            : $"Wrote {facts.Length} facts to {collectionName}.";
+            : $"Wrote {facts.Length} facts to {Path.GetFileNameWithoutExtension(factFileName)}.";
+    }
+
+    /// <summary>
+    /// A fact file keeps its name when it moves to <c>processed</c> or <c>failed</c>, and a move onto an existing file
+    /// fails, which would leave the note stuck in processing. Collection names repeat for the same subject, so a name
+    /// already used in any of the three folders gets a numeric suffix.
+    /// </summary>
+    private string UniqueFactFileName(string collectionName)
+    {
+        string[] directories = [_settings.FactsDirectory, _settings.ProcessedFactsDirectory, _settings.FailedFactsDirectory];
+        string fileName = $"{collectionName}.json";
+        for (int attempt = 2; directories.Any(directory => File.Exists(Path.Combine(directory, fileName))); attempt++)
+        {
+            fileName = $"{collectionName}-{attempt}.json";
+        }
+
+        return fileName;
     }
 
     /// <summary>
