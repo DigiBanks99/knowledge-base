@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace KnowledgeBase.Agent.Research.Models;
 
 /// <summary>A result kept by a topic's search, with the query that found it.</summary>
@@ -11,6 +13,10 @@ namespace KnowledgeBase.Agent.Research.Models;
 /// <param name="SummaryAttempts">
 /// How many Clerk runs for a kept result timed out. It is given up on after a few, keeping its quotes alone.
 /// </param>
+/// <param name="Mark">
+/// The author's own judgement of a judged result, which only feeds the Keeper's agreement figures: it never changes the
+/// verdict or what becomes of the result.
+/// </param>
 public sealed record BatchResult(
     string Query,
     string Url,
@@ -18,7 +24,8 @@ public sealed record BatchResult(
     FetchedPage? Page = null,
     Verdict? Verdict = null,
     int Attempts = 0,
-    int SummaryAttempts = 0)
+    int SummaryAttempts = 0,
+    ResultMark? Mark = null)
 {
     /// <summary>
     /// Kept, and waiting for the Clerk: it has neither a summary nor a failed Clerk run. A discarded result, including
@@ -55,6 +62,13 @@ public sealed record Verdict(
     double? KindProbability = null,
     string? SummaryFailure = null)
 {
+    /// <summary>
+    /// Whether the Keeper itself judged the result, so the author can agree or disagree with it. A discard made before
+    /// the Keeper was asked (an unfetchable page, a page with no prose) or for lack of an answer has no probabilities.
+    /// </summary>
+    [JsonIgnore]
+    public bool ByKeeper => Failure is null && Useful is not null;
+
     public static Verdict Keep(string? summary, IReadOnlyList<string> quotes, DateTimeOffset judgedAt) =>
         new(true, summary, quotes, null, judgedAt);
 
@@ -88,11 +102,28 @@ public sealed record FetchedPage(DateTimeOffset FetchedAt, string? Markdown, boo
 /// The run recording the search that found these results, to which fetching and triage add what became of them. Null
 /// for a batch written before searches were recorded.
 /// </param>
+/// <param name="Outcome">
+/// What the ThreadWeaver made of the batch's research note, once known. Null while it waits, for a batch with nothing
+/// kept (it had no note) and for one completed before outcomes were recorded.
+/// </param>
+/// <param name="ResolvedAt">When <paramref name="Outcome"/> became known.</param>
 public sealed record ResearchBatch(
     string Topic,
     DateTimeOffset SearchedAt,
     IReadOnlyList<BatchResult> Results,
-    string? SearchRunId = null);
+    string? SearchRunId = null,
+    IngestionOutcome? Outcome = null,
+    DateTimeOffset? ResolvedAt = null);
+
+/// <summary>The author's judgement of a result the Keeper judged.</summary>
+public enum ResultMark
+{
+    /// <summary>Worth passing on for the topic's brief.</summary>
+    Useful,
+
+    /// <summary>Noise the pipeline should not have spent anything on.</summary>
+    Noise
+}
 
 /// <summary>
 /// A batch whose kept results were written to a research note, waiting for the ThreadWeaver to file it. The topic stays

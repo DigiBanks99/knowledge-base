@@ -141,4 +141,7 @@ public static partial class LoggerMessages
 
     [LoggerMessage(LogLevel.Warning, "Failed to add what became of its results to search run '{RunId}'.")]
     public static partial void FailedToAppendToSearchRun(this ILogger logger, string runId, Exception exception);
+
+    [LoggerMessage(LogLevel.Information, "The author marked result '{Url}' of research topic '{Topic}' as {Mark}.")]
+    public static partial void ResultMarked(this ILogger logger, string topic, string url, string mark);
 }

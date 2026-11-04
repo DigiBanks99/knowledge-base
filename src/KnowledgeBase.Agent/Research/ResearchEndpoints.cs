@@ -22,6 +22,9 @@ internal static class ResearchEndpoints
                 .MapRecurateTopic()
                 .MapEditTopicCuration()
                 .MapGetTopicResults()
+                .MapListJudgedResults()
+                .MapMarkResult()
+                .MapGetResearchQuality()
                 .MapListTopicRuns();
 
             return endpoints;

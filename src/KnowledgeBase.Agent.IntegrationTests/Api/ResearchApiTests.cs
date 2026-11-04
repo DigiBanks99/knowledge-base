@@ -8,6 +8,7 @@ using KnowledgeBase.Agent.Research.Commands;
 using KnowledgeBase.Agent.Research.Models;
 using KnowledgeBase.Agent.Research.Queries;
 using KnowledgeBase.Agent.Research.Search;
+using KnowledgeBase.Agent.Research.Triage;
 using KnowledgeBase.Agent.Runs;
 using KnowledgeBase.Agent.Runs.Models;
 
@@ -445,6 +446,58 @@ public sealed class ResearchApiTests : IDisposable
             [],
             FactOrigin.Research,
             topic);
+    }
+
+    [Test]
+    public async Task TheAuthorMarksAJudgedResult()
+    {
+        DateTimeOffset searched = DateTimeOffset.UtcNow.AddHours(-1);
+        await DiscoverAsync("projects/garden");
+        await _api.Get<IResearchStore>().WritePendingBatchAsync(
+            new ResearchBatch("projects/garden", searched,
+            [
+                new BatchResult("raised beds", "https://example.com/beds", new SearchResult("https://example.com/beds", "Raised beds", null, "SearXNG", null))
+                {
+                    Verdict = Verdict.Keep("A summary.", [], searched) with { Useful = 0.85 }
+                }
+            ]),
+            CancellationToken.None);
+
+        HttpResponseMessage marked = await _api.Client().PutAsJsonAsync(
+            "/api/research/topics/projects--garden/results/mark",
+            new { searchedAt = searched, url = "https://example.com/beds", mark = "Noise" },
+            TestApi.Json);
+        JudgedResults judged = await TestApi.ReadAsync<JudgedResults>(await _api.Client().GetAsync("/api/research/topics/projects--garden/judged"));
+        ResearchQuality quality = await TestApi.ReadAsync<ResearchQuality>(await _api.Client().GetAsync("/api/research/quality"));
+
+        ItShouldSucceed();
+        ItShouldListTheResultWithItsMarkAndProbability();
+        ItShouldCountTheKeptNoise();
+
+        void ItShouldSucceed() => marked.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        void ItShouldListTheResultWithItsMarkAndProbability() => judged.Results.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            result => result.Mark.ShouldBe(ResultMark.Noise),
+            result => result.Useful.ShouldBe(0.85));
+
+        void ItShouldCountTheKeptNoise() => quality.ShouldSatisfyAllConditions(
+            figures => figures.Marked.ShouldBe(1),
+            figures => figures.NoiseKept.ShouldBe(1),
+            figures => figures.Agreed.ShouldBe(0));
+    }
+
+    [Test]
+    public async Task AResultIsMarkedWithoutTheCsrfHeader()
+    {
+        HttpResponseMessage response = await _api.Client(sendsCsrfHeader: false).PutAsJsonAsync(
+            "/api/research/topics/projects--garden/results/mark",
+            new { searchedAt = DateTimeOffset.UnixEpoch, url = "https://example.com/beds", mark = "Noise" },
+            TestApi.Json);
+
+        ItShouldBeRefused();
+
+        // Without the header the request is refused before it reaches the handler, which would answer 404 here.
+        void ItShouldBeRefused() => response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     private async Task CurateAsync(string topic, string query) =>
