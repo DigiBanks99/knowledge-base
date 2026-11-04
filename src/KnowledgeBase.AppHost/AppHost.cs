@@ -175,12 +175,16 @@ api.PublishAsDockerComposeService((resource, service) =>
 });
 
 // A fixed port, so the local sign-in redirect address (http://localhost:5173/signin-oidc) can be registered in Entra.
+// Browser logs (a preview API) let the UI's console and network calls be read from the dashboard and by agents.
+#pragma warning disable ASPIREBROWSERLOGS001
 IResourceBuilder<ViteAppResource> web = builder
     .AddViteApp("knowledgebase-web", "../KnowledgeBase.Web")
     .WithPnpm()
     .WithEndpoint("http", endpoint => endpoint.Port = 5173)
     .WithReference(api)
-    .WaitFor(api);
+    .WaitFor(api)
+    .WithBrowserLogs();
+#pragma warning restore ASPIREBROWSERLOGS001
 
 api.PublishWithContainerFiles(web, "wwwroot");
 
