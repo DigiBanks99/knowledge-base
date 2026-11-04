@@ -144,4 +144,6 @@ pnpm run build   # tsc -b && vite build
 ## Git
 
 - Conventional Commits with a scope where it helps: `feat(api): ...`, `refactor(web): ...`, `ci: ...`, `style: ...`.
+- Every change has a GitHub issue, always. Log one before opening a pull request if none exists, and link it from the
+  commit body and the pull request description (`Fixes #123`).
 - Do not commit secrets, `.env` files or anything from the wiki root directory.
