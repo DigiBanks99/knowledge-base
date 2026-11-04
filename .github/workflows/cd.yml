@@ -100,7 +100,9 @@ jobs:
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
       # Builds the images on the VM and runs them with Docker Compose. Every AppHost parameter comes from the
-      # production environment; keys are kept in secrets so they never show in the public logs.
+      # production environment; keys are kept in secrets so they never show in the public logs. --clear-cache stops
+      # aspire deploy loading the parameter values it saved on an earlier deploy, which override these variables, so a
+      # changed variable would never reach the app; it also deletes that file, which holds the secrets in plain text.
       - name: Deploy
         working-directory: src/KnowledgeBase.AppHost
         env:
@@ -144,7 +146,7 @@ jobs:
           # So does the Clerk.
           Parameters__ClerkProvider: ${{ vars.CLERK_PROVIDER || 'OpenAICompatible' }}
           Parameters__ClerkEnableThinking: ${{ vars.CLERK_ENABLE_THINKING || 'false' }}
-        run: aspire deploy --environment production --non-interactive
+        run: aspire deploy --environment production --non-interactive --clear-cache
 
       - name: Check health
         run: >-
