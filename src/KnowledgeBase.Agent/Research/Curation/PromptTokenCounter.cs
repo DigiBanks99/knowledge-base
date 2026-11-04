@@ -53,7 +53,11 @@ internal sealed class LlamaServerTokenCounter(IHttpClientFactory httpClientFacto
                 .SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                return new TokenCountUnavailableError($"{tokenizeUri} answered {(int)response.StatusCode} {response.ReasonPhrase}.");
+                // llama-server says why it refused (an unknown model name in router mode, say) only in the body.
+                string reason = (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
+                string detail = reason.Length == 0 ? "" : $": {reason[..Math.Min(reason.Length, 500)]}";
+                return new TokenCountUnavailableError(
+                    $"{tokenizeUri} answered {(int)response.StatusCode} {response.ReasonPhrase}{detail}.");
             }
 
             using JsonDocument body = await JsonDocument.ParseAsync(
