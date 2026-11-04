@@ -82,6 +82,22 @@ public sealed class LlamaServerTokenCounterTests : IDisposable
     }
 
     [Test]
+    public async Task TheServerRefusesTheModel()
+    {
+        _handler.Respond = _ => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("""{"error":{"message":"model not found"}}""")
+        };
+
+        Result<int, Error> result = await _counter.CountAsync("Curate the topic.", CancellationToken.None);
+
+        ItShouldSayWhy();
+
+        void ItShouldSayWhy() => result.Error.ShouldBeOfType<TokenCountUnavailableError>()
+            .Message.ShouldContain("""answered 400 Bad Request: {"error":{"message":"model not found"}}""");
+    }
+
+    [Test]
     public async Task TheServerAnswersWithoutTokens()
     {
         _handler.Respond = _ => Json("""{"error":"nope"}""");
