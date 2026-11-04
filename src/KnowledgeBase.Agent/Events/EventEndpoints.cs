@@ -31,35 +31,58 @@ internal static class EventEndpoints
     /// </summary>
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
-    private static async IAsyncEnumerable<SseItem<ChangeEvent>> Stream(
+    internal static async IAsyncEnumerable<SseItem<ChangeEvent>> Stream(
         ChangeNotifier notifier,
         TimeProvider timeProvider,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await using IAsyncEnumerator<ChangeEvent> changes = notifier
-            .SubscribeAsync(cancellationToken)
-            .GetAsyncEnumerator(cancellationToken);
+        // The subscription has its own token so it can be stopped before it is disposed, whyever the stream ends.
+        using CancellationTokenSource subscription = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IAsyncEnumerator<ChangeEvent> changes = notifier
+            .SubscribeAsync(subscription.Token)
+            .GetAsyncEnumerator(subscription.Token);
         Task<bool> nextChange = changes.MoveNextAsync().AsTask();
-
-        // Sent straight away so the response starts and the browser knows the stream is open.
-        yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", timeProvider.GetUtcNow()), "ping");
-
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            Task completed = await Task.WhenAny(nextChange, Task.Delay(HeartbeatInterval, timeProvider, cancellationToken));
-            if (completed != nextChange)
-            {
-                yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", timeProvider.GetUtcNow()), "ping");
-                continue;
-            }
+            // Sent straight away so the response starts and the browser knows the stream is open.
+            yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", timeProvider.GetUtcNow()), "ping");
 
-            if (!await nextChange)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                yield break;
-            }
+                Task completed = await Task.WhenAny(nextChange, Task.Delay(HeartbeatInterval, timeProvider, cancellationToken));
+                if (completed != nextChange)
+                {
+                    yield return new SseItem<ChangeEvent>(new ChangeEvent("ping", timeProvider.GetUtcNow()), "ping");
+                    continue;
+                }
 
-            yield return new SseItem<ChangeEvent>(changes.Current, "change");
-            nextChange = changes.MoveNextAsync().AsTask();
+                if (!await nextChange)
+                {
+                    yield break;
+                }
+
+                yield return new SseItem<ChangeEvent>(changes.Current, "change");
+                nextChange = changes.MoveNextAsync().AsTask();
+            }
+        }
+        finally
+        {
+            // An async iterator throws NotSupportedException when disposed while a MoveNextAsync is still pending, as
+            // one is whenever the client disconnects between changes, so the pending read is cancelled and awaited first.
+            await subscription.CancelAsync();
+            await StopAsync(nextChange);
+            await changes.DisposeAsync();
+        }
+    }
+
+    private static async Task StopAsync(Task<bool> nextChange)
+    {
+        try
+        {
+            await nextChange;
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 }
