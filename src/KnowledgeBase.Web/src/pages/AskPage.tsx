@@ -75,7 +75,10 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
 
   useEffect(() => () => abort.current?.abort(), [])
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [conversation.data, pending, streaming])
+  // A block body: newer browsers return a Promise from scrollIntoView, and React would take it for a cleanup function.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [conversation.data, pending, streaming])
 
   const send = async () => {
     const text = question.trim()
