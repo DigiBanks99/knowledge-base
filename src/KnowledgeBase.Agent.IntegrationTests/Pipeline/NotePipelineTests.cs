@@ -93,6 +93,40 @@ public sealed class NotePipelineTests : IAsyncDisposable
     }
 
     [Test]
+    public async Task ACollectionNameWasUsedByAnEarlierNote()
+    {
+        const string earlierFacts = "{}";
+        _wiki.FactFinderWritesFacts(Collection);
+        await _wiki.InitialiseAsync();
+        _wiki.Write(_wiki.Settings.ProcessedFactsDirectory, $"{Collection}.json", earlierFacts);
+        _wiki.Start();
+
+        await CaptureAsync(NoteName, NoteContent);
+        bool settled = await Eventually.Until(async () =>
+            TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).Count == 1 && await _wiki.RunsFinishedAsync(2));
+        string pipeline = settled ? string.Empty : await _wiki.DescribeAsync();
+
+        ItShouldFinish();
+        ItShouldFileTheNoteAsProcessed();
+        ItShouldKeepBothFactFiles();
+
+        void ItShouldFinish() => settled.ShouldBeTrue(pipeline);
+
+        void ItShouldFileTheNoteAsProcessed()
+        {
+            TestWiki.FileNames(_wiki.Settings.ProcessedNotesDirectory).ShouldBe([NoteName]);
+            TestWiki.FileNames(_wiki.Settings.ProcessingNotesDirectory).ShouldBeEmpty();
+        }
+
+        void ItShouldKeepBothFactFiles()
+        {
+            TestWiki.FileNames(_wiki.Settings.ProcessedFactsDirectory).ShouldBe([$"{Collection}-2.json", $"{Collection}.json"]);
+            File.ReadAllText(Path.Combine(_wiki.Settings.ProcessedFactsDirectory, $"{Collection}.json")).ShouldBe(earlierFacts);
+            TestWiki.FileNames(_wiki.Settings.FactsDirectory).ShouldBeEmpty();
+        }
+    }
+
+    [Test]
     public async Task TheFactFinderFindsNoFacts()
     {
         await StartAsync();
