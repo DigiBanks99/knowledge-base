@@ -55,6 +55,19 @@ public sealed class ResearchSettings
     /// <summary>The self-hosted SearXNG instance; SearXNG is not searched when none is configured.</summary>
     public Uri? SearxngEndpoint { get; init; }
 
+    /// <summary>
+    /// The engines SearXNG is expected to run, as <c>keep_only</c> in its <c>settings.yml</c> lists them (a test keeps
+    /// the default in step). Its status signal names any of them that is not loaded, disabled or failing. Unset, the
+    /// default is used; it is not given as the initial value because the binder adds configured items to it.
+    /// </summary>
+    public IReadOnlyList<string>? SearxngEngines { get; init; }
+
+    /// <summary>The engines <see cref="SearxngEngines"/> defaults to.</summary>
+    public static IReadOnlyList<string> DefaultSearxngEngines { get; } = ["duckduckgo", "bing", "mojeek", "wikipedia", "github"];
+
+    /// <summary><see cref="SearxngEngines"/>, or the default when it is not set.</summary>
+    public IReadOnlyList<string> ExpectedSearxngEngines => SearxngEngines is { Count: > 0 } engines ? engines : DefaultSearxngEngines;
+
     /// <summary>The Hacker News Algolia search API.</summary>
     public Uri HackerNewsEndpoint { get; init; } = new("https://hn.algolia.com/api/v1/");
 

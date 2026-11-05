@@ -22,7 +22,7 @@ internal sealed class HackerNewsSearchSource(IHttpClientFactory httpClientFactor
 
     public bool IsConfigured => true;
 
-    public async Task<Result<IReadOnlyList<SearchResult>, Error>> SearchAsync(
+    public async Task<Result<SearchAnswer, Error>> SearchAsync(
         string query,
         DateTimeOffset since,
         CancellationToken cancellationToken)
@@ -48,7 +48,7 @@ internal sealed class HackerNewsSearchSource(IHttpClientFactory httpClientFactor
             return new SearchSourceError(Name, "the answer has no `hits` array.");
         }
 
-        return Result.Success<IReadOnlyList<SearchResult>, Error>([.. hits.EnumerateArray().Select(ToResult).Choose()]);
+        return SearchAnswer.Of([.. hits.EnumerateArray().Select(ToResult).Choose()]);
     }
 
     public async Task<UnitResult<Error>> ProbeAsync(CancellationToken cancellationToken)

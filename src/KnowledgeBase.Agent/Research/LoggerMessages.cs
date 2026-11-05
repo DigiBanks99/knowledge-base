@@ -70,6 +70,9 @@ public static partial class LoggerMessages
     [LoggerMessage(LogLevel.Warning, "A search source failed while searching research topic '{Topic}': {Error}")]
     public static partial void SearchSourceFailed(this ILogger logger, string topic, Error error);
 
+    [LoggerMessage(LogLevel.Warning, "Some engines behind {Source} did not answer queries of research topic '{Topic}', which still counts as searched: {Engines}")]
+    public static partial void SearchEnginesUnanswered(this ILogger logger, string topic, string source, string engines);
+
     [LoggerMessage(LogLevel.Warning, "The search of research topic '{Topic}' failed; it stays due: {Error}")]
     public static partial void TopicSearchFailed(this ILogger logger, string topic, Error error);
 

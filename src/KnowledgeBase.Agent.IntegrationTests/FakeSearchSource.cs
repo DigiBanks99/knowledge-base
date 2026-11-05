@@ -18,11 +18,11 @@ internal sealed class FakeSearchSource : ISearchSource
     /// <summary>The results every query finds.</summary>
     public IReadOnlyList<SearchResult> Results { get; set; } = [];
 
-    public Task<Result<IReadOnlyList<SearchResult>, Error>> SearchAsync(
+    public Task<Result<SearchAnswer, Error>> SearchAsync(
         string query,
         DateTimeOffset since,
         CancellationToken cancellationToken) =>
-        Task.FromResult(Result.Success<IReadOnlyList<SearchResult>, Error>(Results));
+        Task.FromResult(Result.Success<SearchAnswer, Error>(SearchAnswer.Of(Results)));
 
     public Task<UnitResult<Error>> ProbeAsync(CancellationToken cancellationToken) =>
         Task.FromResult(UnitResult.Success<Error>());

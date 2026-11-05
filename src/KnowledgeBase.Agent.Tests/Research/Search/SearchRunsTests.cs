@@ -78,6 +78,30 @@ public sealed class SearchRunsTests
     }
 
     [Test]
+    public void SomeEnginesBehindASourceDoNotAnswer()
+    {
+        SourceCall[] calls =
+        [
+            Answered("atlas release", "SearXNG", 2, unanswered: [new EngineFailure("bing", "CAPTCHA"), new EngineFailure("github", "timeout")])
+        ];
+
+        AgentRun run = SearchRuns.Searched(RunId, Atlas, SearchStart.Scheduled, Started, Completed, calls, Filtered(kept: 2));
+
+        ItShouldStillSucceed();
+        ItShouldNameTheEnginesThatDidNotAnswer();
+        ItShouldNotCountItAsAFailedCall();
+
+        void ItShouldStillSucceed() => run.Status.ShouldBe(AgentRunStatus.Succeeded);
+
+        void ItShouldNameTheEnginesThatDidNotAnswer() => run.ToolCalls.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            call => call.Succeeded.ShouldBeTrue(),
+            call => call.Detail.ShouldBe("SearXNG: 2 results; did not answer: bing (CAPTCHA), github (timeout)"));
+
+        void ItShouldNotCountItAsAFailedCall() =>
+            run.Summary.ShouldBe("Found 2 results: 0 blocked, 0 already seen, 0 too old, 2 kept. Wrote a batch of 2 for triage.");
+    }
+
+    [Test]
     public void NothingIsKept()
     {
         AgentRun run = SearchRuns.Searched(RunId, Atlas, SearchStart.Scheduled, Started, Completed, [Answered("atlas release", "SearXNG", 1)], Filtered(kept: 0, alreadySeen: 1));
@@ -180,15 +204,21 @@ public sealed class SearchRunsTests
             ]);
     }
 
-    private static SourceCall Answered(string query, string source, int count, DateTimeOffset? answeredAt = null) => new(
+    private static SourceCall Answered(
+        string query,
+        string source,
+        int count,
+        DateTimeOffset? answeredAt = null,
+        IReadOnlyList<EngineFailure>? unanswered = null) => new(
         query,
         source,
-        Result.Success<IReadOnlyList<SearchResult>, Error>(
-            [.. Enumerable.Range(1, count).Select(index => new SearchResult($"https://example.com/{source}/{index}", "A result", null, source, null))]),
+        Result.Success<SearchAnswer, Error>(new SearchAnswer(
+            [.. Enumerable.Range(1, count).Select(index => new SearchResult($"https://example.com/{source}/{index}", "A result", null, source, null))],
+            unanswered ?? [])),
         answeredAt ?? Started);
 
     private static SourceCall Failed(string query, string source, string reason) =>
-        new(query, source, Result.Failure<IReadOnlyList<SearchResult>, Error>(new SearchSourceError(source, reason)), Started);
+        new(query, source, Result.Failure<SearchAnswer, Error>(new SearchSourceError(source, reason)), Started);
 
     private static FilteredResults Filtered(int kept, int blocked = 0, int alreadySeen = 0, int tooOld = 0) => new(
         [.. Enumerable.Range(1, kept).Select(index => Found($"https://example.com/kept/{index}", null, null))],

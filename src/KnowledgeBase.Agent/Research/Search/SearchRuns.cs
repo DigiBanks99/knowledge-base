@@ -18,7 +18,7 @@ public enum SearchStart
 internal sealed record SourceCall(
     string Query,
     string Source,
-    Result<IReadOnlyList<SearchResult>, Error> Answer,
+    Result<SearchAnswer, Error> Answer,
     DateTimeOffset AnsweredAt);
 
 /// <summary>
@@ -128,12 +128,16 @@ internal static class SearchRuns
     };
 
     private static AgentToolCall Line(SourceCall call) => call.Answer.IsSuccess
-        ? new AgentToolCall(SearchStep, call.Query, call.AnsweredAt, true, null, $"{call.Source}: {Results(call.Answer.Value.Count)}")
+        ? new AgentToolCall(SearchStep, call.Query, call.AnsweredAt, true, null, $"{call.Source}: {Results(call.Answer.Value.Results.Count)}{Unanswered(call.Answer.Value)}")
         : new AgentToolCall(SearchStep, call.Query, call.AnsweredAt, false, call.Answer.Error.Message);
+
+    /// <summary>The engines behind the source that did not answer, so the topic's history shows the gap.</summary>
+    private static string Unanswered(SearchAnswer answer) =>
+        answer.Unanswered.Count > 0 ? $"; did not answer: {string.Join(", ", answer.Unanswered)}" : string.Empty;
 
     private static string Counts(IReadOnlyList<SourceCall> calls, FilteredResults filtered)
     {
-        int found = calls.Where(call => call.Answer.IsSuccess).Sum(call => call.Answer.Value.Count);
+        int found = calls.Where(call => call.Answer.IsSuccess).Sum(call => call.Answer.Value.Results.Count);
         return $"Found {Results(found)}: {filtered.Blocked} blocked, {filtered.AlreadySeen} already seen, {filtered.TooOld} too old, {filtered.Kept.Count} kept.";
     }
 

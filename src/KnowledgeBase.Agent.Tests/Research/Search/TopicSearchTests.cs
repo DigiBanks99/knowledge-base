@@ -153,14 +153,33 @@ public sealed class TopicSearchTests
     }
 
     [Test]
+    public async Task AnEngineBehindASourceDoesNotAnswer()
+    {
+        _searxng.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success<SearchAnswer, Error>(new SearchAnswer([], [new EngineFailure("bing", "CAPTCHA")])));
+
+        await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
+
+        ItShouldCountAsSearched();
+        ItShouldRecordTheEngineOnTheRun();
+
+        void ItShouldCountAsSearched() => _state.Topics[Atlas].LastSearchedAt.ShouldBe(Now);
+
+        void ItShouldRecordTheEngineOnTheRun() => _recorded[^1].ToolCalls
+            .Select(call => call.Detail)
+            .Where(detail => detail!.StartsWith("SearXNG", StringComparison.Ordinal))
+            .ShouldBe(["SearXNG: 0 results; did not answer: bing (CAPTCHA)", "SearXNG: 0 results; did not answer: bing (CAPTCHA)"]);
+    }
+
+    [Test]
     public async Task ATopicIsAlreadyBeingSearched()
     {
-        TaskCompletionSource<Result<IReadOnlyList<SearchResult>, Error>> slowAnswer = new();
+        TaskCompletionSource<Result<SearchAnswer, Error>> slowAnswer = new();
         _searxng.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(slowAnswer.Task);
 
         Task<Result<TopicSearchOutcome, Error>> first = _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
         Result<TopicSearchOutcome, Error> second = await _search.SearchAsync(Atlas, SearchStart.Scheduled, CancellationToken.None);
-        slowAnswer.SetResult(Result.Success<IReadOnlyList<SearchResult>, Error>([]));
+        slowAnswer.SetResult(Result.Success<SearchAnswer, Error>(SearchAnswer.Of([])));
         Result<TopicSearchOutcome, Error> firstOutcome = await first;
 
         ItShouldRefuseTheSecondSearch();
@@ -288,7 +307,7 @@ public sealed class TopicSearchTests
         source.Name.Returns(name);
         source.IsConfigured.Returns(true);
         source.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Success<IReadOnlyList<SearchResult>, Error>([]));
+            .Returns(Result.Success<SearchAnswer, Error>(SearchAnswer.Of([])));
         return source;
     }
 
@@ -297,14 +316,14 @@ public sealed class TopicSearchTests
     {
         SearchResult[] found = [.. results.Select(result => result with { Source = source.Name })];
         source.SearchAsync(query, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Success<IReadOnlyList<SearchResult>, Error>(found));
+            .Returns(Result.Success<SearchAnswer, Error>(SearchAnswer.Of(found)));
     }
 
     private static void Fail(ISearchSource source)
     {
         SearchSourceError error = new(source.Name, "unreachable.");
         source.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Failure<IReadOnlyList<SearchResult>, Error>(error));
+            .Returns(Result.Failure<SearchAnswer, Error>(error));
     }
 
     private static SearchResult Found(string url, DateTimeOffset? publishedAt) => new(url, "A result", null, "", publishedAt);

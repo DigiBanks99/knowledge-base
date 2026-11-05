@@ -22,8 +22,8 @@ public sealed class SearchTopicsCommandHandlerTests
         _source.Name.Returns("SearXNG");
         _source.IsConfigured.Returns(true);
         _source.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(call => Result.Success<IReadOnlyList<SearchResult>, Error>(
-                [new SearchResult($"https://example.com/{Uri.EscapeDataString(call.Arg<string>())}", "A result", null, "SearXNG", null)]));
+            .Returns(call => Result.Success<SearchAnswer, Error>(SearchAnswer.Of(
+                [new SearchResult($"https://example.com/{Uri.EscapeDataString(call.Arg<string>())}", "A result", null, "SearXNG", null)])));
 
         TimeProvider timeProvider = Substitute.For<TimeProvider>();
         timeProvider.GetUtcNow().Returns(Now);
@@ -67,7 +67,7 @@ public sealed class SearchTopicsCommandHandlerTests
         Add("projects/broken", lastSearched: Now.AddDays(-3), query: "broken");
         Add("projects/working", lastSearched: Now.AddDays(-2), query: "working");
         _source.SearchAsync("broken", Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Failure<IReadOnlyList<SearchResult>, Error>(new SearchSourceError("SearXNG", "unreachable.")));
+            .Returns(Result.Failure<SearchAnswer, Error>(new SearchSourceError("SearXNG", "unreachable.")));
 
         Result<SearchCycle, Error> cycle = await _handler.Handle(new SearchTopicsCommand(), CancellationToken.None);
 

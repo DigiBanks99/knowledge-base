@@ -106,7 +106,7 @@ internal sealed class TopicSearch(
         [
             .. calls
                 .Where(call => call.Answer.IsSuccess)
-                .SelectMany(call => call.Answer.Value.Select(result => (call.Query, result)))
+                .SelectMany(call => call.Answer.Value.Results.Select(result => (call.Query, result)))
         ];
         FilteredResults filtered = ResultFilter.Apply(found, topic, blockedDomains, now);
         TopicSearchOutcome outcome = new(topic.Path, found.Length, filtered.Kept.Count);
@@ -156,7 +156,7 @@ internal sealed class TopicSearch(
         string.Join(
             "; ",
             calls.GroupBy(call => call.Source).Select(group =>
-                $"{group.Key}: {group.Sum(call => call.Answer.IsSuccess ? call.Answer.Value.Count : 0)} results from {group.Count(call => call.Answer.IsSuccess)} of {group.Count()} queries"));
+                $"{group.Key}: {group.Sum(call => call.Answer.IsSuccess ? call.Answer.Value.Results.Count : 0)} results from {group.Count(call => call.Answer.IsSuccess)} of {group.Count()} queries"));
 
     /// <summary>Every query goes to every configured source at once, in query order.</summary>
     private async Task<IReadOnlyList<SourceCall>> AskAsync(ResearchTopic topic, DateTimeOffset since, CancellationToken cancellationToken)
@@ -164,7 +164,7 @@ internal sealed class TopicSearch(
         ISearchSource[] configured = [.. sources.Where(source => source.IsConfigured)];
         return await Task.WhenAll(topic.Queries.SelectMany(query => configured.Select(async source =>
         {
-            Result<IReadOnlyList<SearchResult>, Error> answer = await source.SearchAsync(query, since, cancellationToken);
+            Result<SearchAnswer, Error> answer = await source.SearchAsync(query, since, cancellationToken);
             return new SourceCall(query, source.Name, answer, timeProvider.GetUtcNow());
         })));
     }
@@ -184,6 +184,15 @@ internal sealed class TopicSearch(
         foreach (Error error in errors)
         {
             logger.SearchSourceFailed(topic.Path, error);
+        }
+
+        // One line per source for the whole topic; each query's gaps are on the run.
+        foreach (IGrouping<string, EngineFailure> gaps in calls
+            .Where(call => call.Answer.IsSuccess)
+            .SelectMany(call => call.Answer.Value.Unanswered.Select(failure => (call.Source, failure)))
+            .GroupBy(gap => gap.Source, gap => gap.failure))
+        {
+            logger.SearchEnginesUnanswered(topic.Path, gaps.Key, string.Join(", ", gaps.Distinct()));
         }
 
         if (errors.Length == calls.Count)
