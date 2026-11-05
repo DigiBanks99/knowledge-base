@@ -132,7 +132,7 @@ internal sealed class PendingResultFetch(
         BlockedDomains blockedDomains,
         CancellationToken cancellationToken)
     {
-        Result<FittedContent, Error> content;
+        Result<PageContent, Error> content;
         try
         {
             content = await fetcher.FetchAsync(url, blockedDomains, cancellationToken);
@@ -146,7 +146,7 @@ internal sealed class PendingResultFetch(
         DateTimeOffset now = timeProvider.GetUtcNow();
         if (content.IsSuccess)
         {
-            return FetchedPage.Content(now, content.Value.Text, content.Value.Truncated);
+            return FetchedPage.Content(now, content.Value.Text, content.Value.Truncated, content.Value.Title);
         }
 
         logger.PageNotFetched(topic, url, content.Error);

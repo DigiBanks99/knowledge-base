@@ -478,8 +478,9 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
                 : Result.Success<BlockedDomains, Error>(read.GetValueOrDefault(BlockedDomains.None)));
 
     /// <summary>
-    /// Writes a pending or awaiting batch to the completed folder and removes it from where it was. The completed file is
-    /// written before the source is removed, so a crash between them leaves the batch in both places rather than neither.
+    /// Writes a pending or awaiting batch, without its search engines' text, to the completed folder and removes it from
+    /// where it was. The completed file is written before the source is removed, so a crash between them leaves the batch
+    /// in both places rather than neither.
     /// </summary>
     private async Task<Result<Maybe<ResearchBatch>, Error>> MoveToCompletedAsync<TSource>(
         string sourcePath,
@@ -497,7 +498,8 @@ internal sealed class ResearchStore(IOptions<WikiConfigurationSettings> settings
                 return source.IsFailure ? source.Error : Maybe<ResearchBatch>.None;
             }
 
-            ResearchBatch batch = batchOf(source.Value.Value);
+            // Search engines' text is stripped at the move itself, so no completed batch ever holds it.
+            ResearchBatch batch = batchOf(source.Value.Value).WithoutSearchText();
             return await WriteDocumentAsync(CompletedFilePath(topic, batch.SearchedAt), batch, cancellationToken)
                 .Bind(written => Delete(sourcePath).Map(() => Maybe.From(written)));
         }

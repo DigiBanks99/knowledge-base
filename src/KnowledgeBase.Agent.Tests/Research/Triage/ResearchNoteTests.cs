@@ -53,39 +53,47 @@ public sealed class ResearchNoteTests
     }
 
     [Test]
-    public void AKeptResultHasASnippet()
+    public void AKeptResultHasASearchSnippetAndTitle()
     {
         ResearchBatch batch = new("projects/atlas", Searched, []);
         BatchResult kept = Result("https://example.com/a", "Atlas 2", Verdict.Keep("Atlas 2 ships.", [], Searched)) with
         {
-            Result = new SearchResult("https://example.com/a", "Atlas 2", "# Atlas 2\n\nis   out today.", "SearXNG", null)
+            Result = new SearchResult("https://example.com/a", "The engine's title", "The engine's snippet.", "SearXNG", null)
         };
 
         string content = ResearchNote.Build(batch, [kept]).Content.ReplaceLineEndings("\n");
 
-        ItShouldGiveTheSnippetOneLabelledLineBeforeTheSummary();
+        ItShouldBeHeadedByThePagesTitle();
+        ItShouldKeepNothingTheSearchEngineWrote();
 
-        void ItShouldGiveTheSnippetOneLabelledLineBeforeTheSummary() =>
-            content.ShouldContain("Source: https://example.com/a\n\nSearch snippet: # Atlas 2 is out today.\n\nAtlas 2 ships.");
+        void ItShouldBeHeadedByThePagesTitle() => content.ShouldContain("## Atlas 2\n\nSource: https://example.com/a\n\nAtlas 2 ships.");
+
+        void ItShouldKeepNothingTheSearchEngineWrote() => content.ShouldSatisfyAllConditions(
+            () => content.ShouldNotContain("Search snippet"),
+            () => content.ShouldNotContain("The engine's snippet."),
+            () => content.ShouldNotContain("The engine's title"));
     }
 
     [Test]
-    public void AKeptResultHasALongSnippet()
+    [Arguments(null)]
+    [Arguments("")]
+    public void AKeptResultsPageHasNoTitle(string? pageTitle)
     {
         ResearchBatch batch = new("projects/atlas", Searched, []);
-        BatchResult kept = Result("https://example.com/a", "Atlas 2", Verdict.Keep("Atlas 2 ships.", [], Searched)) with
-        {
-            Result = new SearchResult("https://example.com/a", "Atlas 2", new string('a', 1000), "SearXNG", null)
-        };
+        BatchResult kept = Result("https://example.com/blog/atlas-2/?ref=feed", pageTitle, Verdict.Keep("Atlas 2 ships.", [], Searched));
 
         string content = ResearchNote.Build(batch, [kept]).Content.ReplaceLineEndings("\n");
 
-        ItShouldCutTheSnippetToItsLimit();
+        ItShouldBeHeadedByTheHostAndPath();
 
-        void ItShouldCutTheSnippetToItsLimit() =>
-            content.ShouldContain($"Search snippet: {new string('a', ResearchNote.MaxSnippetLength - 1)}…\n");
+        void ItShouldBeHeadedByTheHostAndPath() => content.ShouldContain("## example.com/blog/atlas-2\n\nSource: https://example.com/blog/atlas-2/?ref=feed");
     }
 
-    private static BatchResult Result(string url, string title, Verdict verdict) =>
-        new("a query", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, "Page text that must not appear.", false), verdict);
+    private static BatchResult Result(string url, string? pageTitle, Verdict verdict) =>
+        new(
+            "a query",
+            url,
+            new SearchResult(url, "A search engine's title", null, "SearXNG", null),
+            FetchedPage.Content(Searched, "Page text that must not appear.", false, pageTitle),
+            verdict);
 }

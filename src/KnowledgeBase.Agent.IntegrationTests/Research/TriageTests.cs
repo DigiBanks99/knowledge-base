@@ -69,7 +69,7 @@ public sealed class TriageTests : IAsyncDisposable
             Result<NoteProvenance, Error> provenance = ResearchNoteHeader.Parse(content);
             provenance.Value.Topic.ShouldBe(Topic);
             provenance.Value.Sources.ShouldBe([Beds]);
-            content.ShouldContain("## Raised beds");
+            content.ShouldContain("## The page's own Raised beds");
             content.ShouldContain($"Source: {Beds}");
             content.ShouldContain("Kind: release");
             content.ShouldContain(Summary);
@@ -141,5 +141,5 @@ public sealed class TriageTests : IAsyncDisposable
     }
 
     private static BatchResult Result(string url, string title) =>
-        new("raised beds", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, $"# {title}\n\n{Drainage}", false));
+        new("raised beds", url, new SearchResult(url, title, null, "SearXNG", null), FetchedPage.Content(Searched, $"# {title}\n\n{Drainage}", false, $"The page's own {title}"));
 }

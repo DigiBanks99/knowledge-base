@@ -392,6 +392,69 @@ public sealed class ResearchStoreTests : IDisposable
     }
 
     [Test]
+    public async Task ABatchWithSearchEngineTextIsCompleted()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        ResearchBatch batch = Batch("projects/garden");
+        await _store.WritePendingBatchAsync(
+            batch with
+            {
+                Results =
+                [
+                    batch.Results[0] with { Page = FetchedPage.Content(Discovered, "Beds drain well.", false, "Building raised beds") },
+                    new BatchResult(
+                        "raised beds",
+                        "https://example.com/blog/soil/",
+                        new SearchResult("https://example.com/blog/soil/", "Soil", "Which soil to use.", "SearXNG", null),
+                        FetchedPage.Failed(Discovered, "it answered 500."))
+                ]
+            },
+            CancellationToken.None);
+
+        Result<Maybe<ResearchBatch>, Error> pending = await _store.ReadPendingBatchAsync("projects/garden", CancellationToken.None);
+        Result<Maybe<ResearchBatch>, Error> completed = await _store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+        string stored = await File.ReadAllTextAsync(Directory.EnumerateFiles(_settings.CompletedBatchesDirectory).Single());
+
+        ItShouldKeepTheSnippetsWhileItIsPending();
+        ItShouldTitleEachResultByItsPageOrElseItsHostAndPath();
+        ItShouldStoreNothingTheSearchEngineWrote();
+        ItShouldRemoveThePendingCopy();
+
+        void ItShouldKeepTheSnippetsWhileItIsPending() =>
+            pending.Value.Value.Results.Select(result => result.Result.Snippet).ShouldBe(["How to build them.", "Which soil to use."]);
+
+        void ItShouldTitleEachResultByItsPageOrElseItsHostAndPath() => completed.Value.Value.Results.Select(result => result.Result.Title)
+            .ShouldBe(["Building raised beds", "example.com/blog/soil"]);
+
+        void ItShouldStoreNothingTheSearchEngineWrote() => stored.ShouldSatisfyAllConditions(
+            () => completed.Value.Value.Results.ShouldAllBe(result => result.Result.Snippet == null),
+            () => stored.ShouldNotContain("How to build them."),
+            () => stored.ShouldNotContain("Which soil to use."));
+
+        void ItShouldRemoveThePendingCopy() => TestWiki.FileNames(_settings.PendingBatchesDirectory).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task AnAwaitingBatchWithSearchEngineTextIsCompleted()
+    {
+        await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
+        await _store.WritePendingBatchAsync(Batch("projects/garden"), CancellationToken.None);
+        await _store.AwaitBatchAsync("projects/garden", "research-projects--garden.md", Discovered, CancellationToken.None);
+
+        await _store.CompleteAwaitingBatchAsync("projects/garden", IngestionOutcome.Positive, Discovered.AddHours(2), CancellationToken.None);
+        Result<IReadOnlyList<ResearchBatch>, Error> stored = await _store.ListTopicBatchesAsync("projects/garden", CancellationToken.None);
+
+        ItShouldStoreNoSnippetOrSearchTitle();
+        ItShouldRemoveTheAwaitingCopy();
+
+        void ItShouldStoreNoSnippetOrSearchTitle() => stored.Value.ShouldHaveSingleItem().Results.ShouldHaveSingleItem().Result.ShouldSatisfyAllConditions(
+            result => result.Snippet.ShouldBeNull(),
+            result => result.Title.ShouldBe("example.com/beds"));
+
+        void ItShouldRemoveTheAwaitingCopy() => TestWiki.FileNames(_settings.AwaitingBatchesDirectory).ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task AnAwaitingBatchHasItsOutcome()
     {
         await _store.UpdateTopicAsync("projects/garden", _ => Maybe.From(ResearchTopic.New("projects/garden", Discovered)), CancellationToken.None);
