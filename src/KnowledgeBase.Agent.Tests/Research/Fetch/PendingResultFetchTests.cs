@@ -25,7 +25,7 @@ public sealed class PendingResultFetchTests
     {
         _state.Topics[Atlas] = ResearchTopic.New(Atlas, Discovered);
         _fetcher.FetchAsync(Arg.Any<string>(), Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
-            .Returns(call => Result.Success<FittedContent, Error>(new FittedContent($"Content of {call.Arg<string>()}", false)));
+            .Returns(call => Result.Success<PageContent, Error>(new PageContent($"Content of {call.Arg<string>()}", false, $"Title of {call.Arg<string>()}")));
 
         TimeProvider timeProvider = Substitute.For<TimeProvider>();
         timeProvider.GetUtcNow().Returns(Now);
@@ -45,13 +45,13 @@ public sealed class PendingResultFetchTests
 
         Result<TopicFetchOutcome, Error> outcome = await _fetch.FetchAsync(Atlas, CancellationToken.None);
 
-        ItShouldKeepEachPageWithItsResult();
+        ItShouldKeepEachPageAndItsTitleWithItsResult();
         ItShouldReportWhatItFetched();
 
-        void ItShouldKeepEachPageWithItsResult() => _state.PendingBatches[Atlas].Results.Select(result => result.Page).ShouldBe(
+        void ItShouldKeepEachPageAndItsTitleWithItsResult() => _state.PendingBatches[Atlas].Results.Select(result => result.Page).ShouldBe(
         [
-            FetchedPage.Content(Now, "Content of https://example.com/a", truncated: false),
-            FetchedPage.Content(Now, "Content of https://example.com/b", truncated: false)
+            FetchedPage.Content(Now, "Content of https://example.com/a", truncated: false, "Title of https://example.com/a"),
+            FetchedPage.Content(Now, "Content of https://example.com/b", truncated: false, "Title of https://example.com/b")
         ]);
 
         void ItShouldReportWhatItFetched() => outcome.Value.ShouldBe(new TopicFetchOutcome(Atlas, 2, 0));
@@ -63,7 +63,7 @@ public sealed class PendingResultFetchTests
         _state.PendingBatches[Atlas] = Batch(Found("https://example.com/a"), Found("https://example.com/private"));
         PageFetchRefusedError refused = new("https://example.com/private", "the site's robots.txt disallows it.");
         _fetcher.FetchAsync("https://example.com/private", Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Failure<FittedContent, Error>(refused));
+            .Returns(Result.Failure<PageContent, Error>(refused));
 
         Result<TopicFetchOutcome, Error> outcome = await _fetch.FetchAsync(Atlas, CancellationToken.None);
 
@@ -84,7 +84,7 @@ public sealed class PendingResultFetchTests
     {
         _state.PendingBatches[Atlas] = Batch(Found("https://example.com/a"), Found("https://example.com/private")) with { SearchRunId = "search-run" };
         _fetcher.FetchAsync("https://example.com/private", Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Failure<FittedContent, Error>(new PageFetchRefusedError("https://example.com/private", "the site's robots.txt disallows it.")));
+            .Returns(Result.Failure<PageContent, Error>(new PageFetchRefusedError("https://example.com/private", "the site's robots.txt disallows it.")));
         List<AgentToolCall> appended = [];
         _searchRunLog
             .AppendAsync("search-run", Arg.Do<IReadOnlyList<AgentToolCall>>(appended.AddRange), Arg.Any<CancellationToken>())
@@ -120,7 +120,7 @@ public sealed class PendingResultFetchTests
     {
         _state.PendingBatches[Atlas] = Batch(Found("https://example.com/hostile"), Found("https://example.com/b"));
         _fetcher.FetchAsync("https://example.com/hostile", Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
-            .Returns<Result<FittedContent, Error>>(_ => throw new InvalidOperationException("The parser gave up."));
+            .Returns<Result<PageContent, Error>>(_ => throw new InvalidOperationException("The parser gave up."));
 
         Result<TopicFetchOutcome, Error> outcome = await _fetch.FetchAsync(Atlas, CancellationToken.None);
 
@@ -177,7 +177,7 @@ public sealed class PendingResultFetchTests
         _fetcher.FetchAsync("https://example.com/a", Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>()).Returns(_ =>
         {
             _state.PendingBatches.Remove(Atlas);
-            return Result.Success<FittedContent, Error>(new FittedContent("Content", false));
+            return Result.Success<PageContent, Error>(new PageContent("Content", false, null));
         });
 
         Result<TopicFetchOutcome, Error> outcome = await _fetch.FetchAsync(Atlas, CancellationToken.None);

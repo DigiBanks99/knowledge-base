@@ -45,7 +45,7 @@ public sealed class ResearchTopicNowCommandHandlerTests
         _fetcher.FetchAsync(Arg.Any<string>(), Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             _fetched.TrySetResult(call.Arg<string>());
-            return Result.Success<FittedContent, Error>(new FittedContent("Atlas 2 is out.", false));
+            return Result.Success<PageContent, Error>(new PageContent("Atlas 2 is out.", false, null));
         });
 
         WikiPaths wikiPaths = new(Options.Create(new WikiConfigurationSettings { RootDirectory = "/data/kb" }));

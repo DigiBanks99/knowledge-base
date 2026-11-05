@@ -2,17 +2,24 @@ using System.Text.RegularExpressions;
 
 using AngleSharp.Html.Parser;
 
+using KnowledgeBase.Agent.Research.Models;
+using KnowledgeBase.Agent.Research.Triage;
+
 using ReverseMarkdown;
 
 using SmartReader;
 
 namespace KnowledgeBase.Agent.Research.Fetch;
 
-/// <summary>Reduces a fetched HTML page to its main content as markdown.</summary>
+/// <summary>A fetched page's main content as markdown, and its own title.</summary>
+/// <param name="Markdown">The main content; empty when the page has none.</param>
+/// <param name="Title">The page's title tidied to one bounded line, or null when it has none.</param>
+internal sealed record ExtractedPage(string Markdown, string? Title);
+
+/// <summary>Reduces a fetched HTML page to its main content as markdown, and its title.</summary>
 internal interface IContentExtractor
 {
-    /// <summary>The page's main content as markdown; empty when it has none.</summary>
-    string ToMarkdown(Uri uri, string html);
+    ExtractedPage Extract(Uri uri, string html);
 }
 
 /// <summary>
@@ -28,7 +35,7 @@ internal sealed partial class ReadabilityExtractor : IContentExtractor
     // the Topics page shows the content.
     private static readonly string[] Media = ["img", "picture", "source", "video", "audio", "svg", "iframe", "object", "embed"];
 
-    public string ToMarkdown(Uri uri, string html)
+    public ExtractedPage Extract(Uri uri, string html)
     {
         Article article = new Reader(uri.ToString(), html).GetArticle();
         string content = !string.IsNullOrWhiteSpace(article.Content)
@@ -43,7 +50,11 @@ internal sealed partial class ReadabilityExtractor : IContentExtractor
             Tags = { Unknown = Config.UnknownTagsOption.Bypass }
         });
 
-        return BlankLines().Replace(converter.Convert(content), "\n\n").Trim();
+        // The title is third-party text that becomes a note's heading, so it is made one bounded line like a quote.
+        string title = ModelText.Tidy(article.Title, FetchedPage.MaxTitleLength);
+        return new ExtractedPage(
+            BlankLines().Replace(converter.Convert(content), "\n\n").Trim(),
+            title.Length > 0 ? title : null);
     }
 
     /// <summary>The body of <paramref name="html"/> with every element matching <paramref name="tags"/> removed.</summary>

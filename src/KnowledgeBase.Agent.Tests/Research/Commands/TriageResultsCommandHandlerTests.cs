@@ -151,7 +151,7 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
             ResearchNote note = _notes.ShouldHaveSingleItem();
             note.FileName.ShouldBe(NoteFile);
             note.Content.ReplaceLineEndings("\n").ShouldStartWith("---\norigin: research\ntopic: projects/atlas\nsources:\n  - https://example.com/atlas-2\n---");
-            note.Content.ShouldContain($"## Title of {Release}");
+            note.Content.ShouldContain($"## Page title of {Release}");
             note.Content.ShouldContain($"Source: {Release}");
             note.Content.ShouldContain("Kind: release");
             note.Content.ShouldContain(Summary);
@@ -800,6 +800,6 @@ public sealed class TriageResultsCommandHandlerTests : IDisposable
                     "a query",
                     url,
                     new SearchResult(url, $"Title of {url}", null, "SearXNG", null),
-                    FetchedPage.Content(Searched, $"# Heading\n\n{string.Join("\n\n", Paragraphs(url))}", false)))
+                    FetchedPage.Content(Searched, $"# Heading\n\n{string.Join("\n\n", Paragraphs(url))}", false, $"Page title of {url}")))
             ]);
 }

@@ -10,14 +10,20 @@ using Microsoft.Extensions.Options;
 
 namespace KnowledgeBase.Agent.Research.Fetch;
 
+/// <summary>A fetched page: its main content within the triage token budget, and its own title.</summary>
+/// <param name="Truncated">Whether the content was cut to fit the budget.</param>
+/// <param name="Title">The page's title as one bounded line, or null when it has none (as plain text has not).</param>
+public sealed record PageContent(string Text, bool Truncated, string? Title);
+
 /// <summary>Fetches a search result's page and reduces it to the main content triage reads.</summary>
 internal interface IPageFetcher
 {
     /// <summary>
-    /// The page's main content as markdown, within the triage token budget, or why it could not be fetched.
+    /// The page's main content as markdown, within the triage token budget, and its title, or why it could not be
+    /// fetched.
     /// </summary>
     /// <param name="blockedDomains">Domains never fetched, checked again on every redirect.</param>
-    Task<Result<FittedContent, Error>> FetchAsync(string url, BlockedDomains blockedDomains, CancellationToken cancellationToken);
+    Task<Result<PageContent, Error>> FetchAsync(string url, BlockedDomains blockedDomains, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -60,7 +66,7 @@ internal sealed partial class PageFetcher(
         // Pages still come in windows-1252, Shift_JIS and the like, which .NET only decodes with this provider.
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-    public async Task<Result<FittedContent, Error>> FetchAsync(
+    public async Task<Result<PageContent, Error>> FetchAsync(
         string url,
         BlockedDomains blockedDomains,
         CancellationToken cancellationToken)
@@ -79,10 +85,14 @@ internal sealed partial class PageFetcher(
             }
 
             using Answer answer = answered.Value;
-            Result<string, Error> markdown = await ReadMarkdownAsync(answer);
-            return markdown.IsSuccess
-                ? await budget.FitAsync(markdown.Value, _settings.TriageContentTokenBudget, cancellationToken)
-                : markdown.Error;
+            Result<ExtractedPage, Error> page = await ReadPageAsync(answer);
+            if (page.IsFailure)
+            {
+                return page.Error;
+            }
+
+            FittedContent fitted = await budget.FitAsync(page.Value.Markdown, _settings.TriageContentTokenBudget, cancellationToken);
+            return new PageContent(fitted.Text, fitted.Truncated, page.Value.Title);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UriFormatException
             || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
@@ -219,7 +229,7 @@ internal sealed partial class PageFetcher(
         return rules;
     }
 
-    private async Task<Result<string, Error>> ReadMarkdownAsync(Answer answer)
+    private async Task<Result<ExtractedPage, Error>> ReadPageAsync(Answer answer)
     {
         HttpResponseMessage response = answer.Response;
         if (!response.IsSuccessStatusCode)
@@ -237,13 +247,13 @@ internal sealed partial class PageFetcher(
         Result<string, Error> text = await ReadTextAsync(answer, _settings.FetchMaxBytes, cutToSize: false, sniffCharset: isHtml);
         if (text.IsFailure)
         {
-            return text;
+            return text.Error;
         }
 
-        string markdown = isHtml ? extractor.ToMarkdown(answer.Uri, text.Value) : text.Value.Trim();
-        return string.IsNullOrWhiteSpace(markdown)
+        ExtractedPage page = isHtml ? extractor.Extract(answer.Uri, text.Value) : new ExtractedPage(text.Value.Trim(), null);
+        return string.IsNullOrWhiteSpace(page.Markdown)
             ? new PageFetchFailedError(answer.Uri.ToString(), "it has no readable content.")
-            : markdown;
+            : page;
     }
 
     /// <summary>

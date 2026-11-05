@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 
+using KnowledgeBase.Agent.Research.Triage;
+
 namespace KnowledgeBase.Agent.Research.Models;
 
 /// <summary>A result kept by a topic's search, with the query that found it.</summary>
@@ -35,6 +37,21 @@ public sealed record BatchResult(
 
     /// <summary>Whether triage is done with the result: it is judged and, if kept, summarised or given up on.</summary>
     public bool Triaged => Verdict is not null && !NeedsSummary;
+
+    /// <summary>
+    /// What the result is called wherever it is kept for good: the fetched page's own title, else the URL's host and
+    /// path. Never the search engine's title, whose terms may forbid storing it.
+    /// </summary>
+    [JsonIgnore]
+    public string DisplayTitle => Page?.Title is { Length: > 0 } title ? title : HostAndPath(Url);
+
+    /// <summary>The result with nothing a search engine wrote: no snippet, and the display title as its title.</summary>
+    public BatchResult WithoutSearchText() => this with { Result = Result with { Title = DisplayTitle, Snippet = null } };
+
+    private static string HostAndPath(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+            ? ModelText.Tidy($"{uri.Host}{uri.AbsolutePath.TrimEnd('/')}", FetchedPage.MaxTitleLength)
+            : ModelText.Tidy(url, FetchedPage.MaxTitleLength);
 }
 
 /// <summary>
@@ -86,10 +103,17 @@ public sealed record Verdict(
 /// </summary>
 /// <param name="Truncated">Whether the content was cut to fit the triage token budget.</param>
 /// <param name="Error">Why the page could not be fetched; null when <paramref name="Markdown"/> holds its content.</param>
-public sealed record FetchedPage(DateTimeOffset FetchedAt, string? Markdown, bool Truncated, string? Error)
+/// <param name="Title">
+/// The page's own title, tidied to one bounded line; null when it has none, and for pages fetched before titles were
+/// recorded.
+/// </param>
+public sealed record FetchedPage(DateTimeOffset FetchedAt, string? Markdown, bool Truncated, string? Error, string? Title = null)
 {
-    public static FetchedPage Content(DateTimeOffset fetchedAt, string markdown, bool truncated) =>
-        new(fetchedAt, markdown, truncated, null);
+    /// <summary>A page title is third-party text, so like snippets and quotes it is kept to one bounded line.</summary>
+    public const int MaxTitleLength = 200;
+
+    public static FetchedPage Content(DateTimeOffset fetchedAt, string markdown, bool truncated, string? title = null) =>
+        new(fetchedAt, markdown, truncated, null, title);
 
     public static FetchedPage Failed(DateTimeOffset fetchedAt, string error) => new(fetchedAt, null, false, error);
 }
@@ -113,7 +137,14 @@ public sealed record ResearchBatch(
     IReadOnlyList<BatchResult> Results,
     string? SearchRunId = null,
     IngestionOutcome? Outcome = null,
-    DateTimeOffset? ResolvedAt = null);
+    DateTimeOffset? ResolvedAt = null)
+{
+    /// <summary>
+    /// The batch as it is kept once complete. Search engines' snippets and titles are only ever held while a batch is
+    /// in flight, so nothing permanent carries text whose terms forbid storing it.
+    /// </summary>
+    public ResearchBatch WithoutSearchText() => this with { Results = [.. Results.Select(result => result.WithoutSearchText())] };
+}
 
 /// <summary>The author's judgement of a result the Keeper judged.</summary>
 public enum ResultMark

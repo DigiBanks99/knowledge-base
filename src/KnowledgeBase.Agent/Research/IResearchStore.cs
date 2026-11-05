@@ -102,7 +102,7 @@ internal interface IResearchStore
 
     /// <summary>
     /// Moves the topic's pending batch to completed, for a batch with nothing kept. None, with nothing moved, when the
-    /// topic has no pending batch.
+    /// topic has no pending batch. Like every completed batch, it keeps no search engine's snippet or title.
     /// </summary>
     Task<Result<Maybe<ResearchBatch>, Error>> CompleteBatchAsync(string topic, CancellationToken cancellationToken);
 
@@ -111,7 +111,8 @@ internal interface IResearchStore
 
     /// <summary>
     /// Moves the topic's awaiting batch to completed with its outcome, so the filing rate can be read later. None, with
-    /// nothing moved, when the topic has no awaiting batch.
+    /// nothing moved, when the topic has no awaiting batch. Like every completed batch, it keeps no search engine's
+    /// snippet or title.
     /// </summary>
     Task<Result<Maybe<ResearchBatch>, Error>> CompleteAwaitingBatchAsync(
         string topic,

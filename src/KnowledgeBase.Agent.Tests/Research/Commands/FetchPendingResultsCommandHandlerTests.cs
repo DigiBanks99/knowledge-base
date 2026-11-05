@@ -23,7 +23,7 @@ public sealed class FetchPendingResultsCommandHandlerTests
     public FetchPendingResultsCommandHandlerTests()
     {
         _fetcher.FetchAsync(Arg.Any<string>(), Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Success<FittedContent, Error>(new FittedContent("Content", false)));
+            .Returns(Result.Success<PageContent, Error>(new PageContent("Content", false, null)));
 
         TimeProvider timeProvider = Substitute.For<TimeProvider>();
         timeProvider.GetUtcNow().Returns(Now);
@@ -46,7 +46,7 @@ public sealed class FetchPendingResultsCommandHandlerTests
         Add("projects/atlas", "https://example.com/atlas", "https://example.com/broken");
         Add("learning/rust", "https://example.com/rust");
         _fetcher.FetchAsync("https://example.com/broken", Arg.Any<BlockedDomains>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Failure<FittedContent, Error>(new PageFetchFailedError("https://example.com/broken", "it answered 500.")));
+            .Returns(Result.Failure<PageContent, Error>(new PageFetchFailedError("https://example.com/broken", "it answered 500.")));
 
         Result<FetchCycle, Error> cycle = await _handler.Handle(new FetchPendingResultsCommand(), CancellationToken.None);
 

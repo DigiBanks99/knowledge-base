@@ -61,12 +61,13 @@ public sealed class PageFetcherTests
     {
         _pages[Article] = () => Html(ArticlePage(paragraphs: 6));
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldCheckRobotsTxtFirst();
         ItShouldIdentifyItself();
         ItShouldKeepTheArticleAsMarkdown();
         ItShouldLeaveOutThePageChrome();
+        ItShouldKeepThePagesTitle();
 
         void ItShouldCheckRobotsTxtFirst() => _handler.Requests.Select(request => request.RequestUri!.ToString())
             .ShouldBe(["https://example.com/robots.txt", Article]);
@@ -84,6 +85,8 @@ public sealed class PageFetcherTests
             text => text.ShouldNotContain("Subscribe to our newsletter"),
             text => text.ShouldNotContain("Copyright Example Corp"),
             text => text.ShouldNotContain("trackVisitor"));
+
+        void ItShouldKeepThePagesTitle() => fetched.Value.Title.ShouldBe("Atlas 2 released");
     }
 
     [Test]
@@ -91,7 +94,7 @@ public sealed class PageFetcherTests
     {
         _pages[Article] = () => Html(ArticlePage(paragraphs: 80));
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldCutItToTheBudget();
 
@@ -105,11 +108,14 @@ public sealed class PageFetcherTests
     {
         _pages[Article] = () => Content("Atlas 2 is out.\n", "text/plain");
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldKeepTheTextAsItIs();
+        ItShouldHaveNoTitle();
 
         void ItShouldKeepTheTextAsItIs() => fetched.Value.Text.ShouldBe("Atlas 2 is out.");
+
+        void ItShouldHaveNoTitle() => fetched.Value.Title.ShouldBeNull();
     }
 
     [Test]
@@ -125,7 +131,7 @@ public sealed class PageFetcherTests
     [Arguments("not a url")]
     public async Task AResultPointsSomewhereTheFetcherMayNotGo(string url)
     {
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(url, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(url, BlockedDomains.None, CancellationToken.None);
 
         ItShouldBeRefused();
         ItShouldSendNoRequest();
@@ -145,7 +151,7 @@ public sealed class PageFetcherTests
         _resolver.ResolveAsync("localhost.example.com", Arg.Any<CancellationToken>()).Returns([IPAddress.Loopback]);
         _pages[Article] = () => Redirect(location);
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldBeRefused();
         ItShouldNeverRequestTheRedirectTarget();
@@ -162,7 +168,7 @@ public sealed class PageFetcherTests
         _pages[Article] = () => Redirect("/blog/atlas-2-released");
         _pages["https://example.com/blog/atlas-2-released"] = () => Content("Atlas 2 is out.", "text/plain");
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldFetchTheNewAddress();
 
@@ -174,7 +180,7 @@ public sealed class PageFetcherTests
     {
         _pages[Article] = () => Redirect("https://www.content-farm.example/atlas");
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(
             Article,
             new BlockedDomains(["content-farm.example"]),
             CancellationToken.None);
@@ -201,7 +207,7 @@ public sealed class PageFetcherTests
             }
         };
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldDecodeItWithThatCharset();
 
@@ -216,7 +222,7 @@ public sealed class PageFetcherTests
             "<p><img src=\"https://tracker.example/p.png?x=(1)\" alt=\"a [chart]\"></p><h2>",
             StringComparison.Ordinal));
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldLeaveThemOut();
 
@@ -230,7 +236,7 @@ public sealed class PageFetcherTests
         _pages["https://example.com/a"] = () => Redirect("https://example.com/b");
         _pages["https://example.com/b"] = () => Redirect(Article);
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldGiveUp();
 
@@ -242,7 +248,7 @@ public sealed class PageFetcherTests
     {
         _pages[Article] = () => Html(new string('x', MaxBytes + 1));
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldNotBeRead();
 
@@ -260,7 +266,7 @@ public sealed class PageFetcherTests
             }
         };
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldStopReadingAtTheLimit();
 
@@ -275,7 +281,7 @@ public sealed class PageFetcherTests
     {
         _pages[Article] = () => Content("%PDF-1.7", contentType);
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldNotBeRead();
 
@@ -296,7 +302,7 @@ public sealed class PageFetcherTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         };
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldGiveUpAfterTheTimeout();
 
@@ -306,7 +312,7 @@ public sealed class PageFetcherTests
     [Test]
     public async Task ThePageIsGone()
     {
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldSayWhatTheSiteAnswered();
 
@@ -319,8 +325,8 @@ public sealed class PageFetcherTests
         _pages["https://example.com/robots.txt"] = () => Content("User-agent: *\nDisallow: /blog/", "text/plain");
         _pages[Article] = () => Html(ArticlePage(paragraphs: 6));
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
-        Result<FittedContent, Error> again = await _fetcher.FetchAsync("https://example.com/blog/other", BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> again = await _fetcher.FetchAsync("https://example.com/blog/other", BlockedDomains.None, CancellationToken.None);
 
         ItShouldBeRefused();
         ItShouldNotRequestThePage();
@@ -343,7 +349,7 @@ public sealed class PageFetcherTests
         _pages["https://example.com/robots.txt"] = () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         _pages[Article] = () => Html(ArticlePage(paragraphs: 6));
 
-        Result<FittedContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
+        Result<PageContent, Error> fetched = await _fetcher.FetchAsync(Article, BlockedDomains.None, CancellationToken.None);
 
         ItShouldBeRefused();
 

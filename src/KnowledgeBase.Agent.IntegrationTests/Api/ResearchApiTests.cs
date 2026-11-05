@@ -487,6 +487,32 @@ public sealed class ResearchApiTests : IDisposable
     }
 
     [Test]
+    public async Task TheAuthorViewsAJudgedResultOfACompletedBatch()
+    {
+        DateTimeOffset searched = DateTimeOffset.UtcNow.AddHours(-1);
+        await DiscoverAsync("projects/garden");
+        IResearchStore store = _api.Get<IResearchStore>();
+        await store.WritePendingBatchAsync(
+            new ResearchBatch("projects/garden", searched,
+            [
+                new BatchResult(
+                    "raised beds",
+                    "https://example.com/beds",
+                    new SearchResult("https://example.com/beds", "Raised beds", "How to build them.", "SearXNG", null),
+                    FetchedPage.Content(searched, "Beds drain well.", false, "Building raised beds"),
+                    Verdict.Discard("Off topic.", searched))
+            ]),
+            CancellationToken.None);
+        await store.CompleteBatchAsync("projects/garden", CancellationToken.None);
+
+        JudgedResults judged = await TestApi.ReadAsync<JudgedResults>(await _api.Client().GetAsync("/api/research/topics/projects--garden/judged"));
+
+        ItShouldShowThePagesTitle();
+
+        void ItShouldShowThePagesTitle() => judged.Results.ShouldHaveSingleItem().Title.ShouldBe("Building raised beds");
+    }
+
+    [Test]
     public async Task AResultIsMarkedWithoutTheCsrfHeader()
     {
         HttpResponseMessage response = await _api.Client(sendsCsrfHeader: false).PutAsJsonAsync(
