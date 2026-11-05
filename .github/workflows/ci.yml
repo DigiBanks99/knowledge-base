@@ -53,6 +53,46 @@ jobs:
       - name: Test
         run: dotnet test --solution KnowledgeBase.slnx --no-build --configuration Release
 
+  # Builds the research SearXNG image and starts it with dummy keys and with none. No real key or secret is used, so
+  # it is safe on pull requests from forks.
+  searxng:
+    name: SearXNG image smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: docker build --tag knowledge-base-searxng src/KnowledgeBase.AppHost/searxng
+
+      # Every engine loads and is enabled, which also proves the shortcuts are unique: SearXNG exits on a clash.
+      - name: Start with keys
+        run: |
+          docker run --detach --name searxng-keys --publish 127.0.0.1:8081:8080 \
+            --env SEARXNG_SECRET=smoke --env BRAVE_API_KEY=dummy --env MARGINALIA_API_KEY=dummy \
+            knowledge-base-searxng
+          curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:8081/config > config.json
+          jq --exit-status '[.engines[] | select(.enabled) | .name] | sort == ["braveapi", "marginalia", "mwmbl"]' config.json
+
+      # Without keys SearXNG still starts, and the keyed engines are not loaded.
+      - name: Start without keys
+        run: |
+          docker run --detach --name searxng-no-keys --publish 127.0.0.1:8082:8080 \
+            --env SEARXNG_SECRET=smoke knowledge-base-searxng
+          curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:8082/config > config.json
+          jq --exit-status '[.engines[].name] | sort == ["mwmbl"]' config.json
+
+      - name: Show logs
+        if: failure()
+        run: |
+          docker logs searxng-keys || true
+          docker logs searxng-no-keys || true
+
   web:
     name: UI (React)
     runs-on: ubuntu-latest

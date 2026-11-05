@@ -63,7 +63,7 @@ public sealed class ResearchSettings
     public IReadOnlyList<string>? SearxngEngines { get; init; }
 
     /// <summary>The engines <see cref="SearxngEngines"/> defaults to.</summary>
-    public static IReadOnlyList<string> DefaultSearxngEngines { get; } = ["duckduckgo", "bing", "mojeek", "wikipedia", "github"];
+    public static IReadOnlyList<string> DefaultSearxngEngines { get; } = ["braveapi", "mwmbl", "marginalia"];
 
     /// <summary><see cref="SearxngEngines"/>, or the default when it is not set.</summary>
     public IReadOnlyList<string> ExpectedSearxngEngines => SearxngEngines is { Count: > 0 } engines ? engines : DefaultSearxngEngines;

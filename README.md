@@ -83,6 +83,8 @@ dotnet user-secrets set "Parameters:AnthropicApiKey" "sk-ant-..."
 | `OpenAICompatibleApiKey`  |   ✓    | The server's API key, if it was started with one (default empty).                      |
 | `WikiBackupRemote`        |        | SSH URL of a private repository the wiki is pushed to (default empty: backup off). See [Wiki backup](#wiki-backup). |
 | `WikiBackupKeyDirectory`  |        | Folder holding the backup deploy key and pinned host keys (default empty: your own SSH setup). |
+| `BraveApiKey`             |   ✓    | Brave Search API key for research (default empty: Brave not searched). See [Research search engines](#research-search-engines). |
+| `MarginaliaApiKey`        |   ✓    | Marginalia Search API key for research (default empty: Marginalia not searched). |
 
 `{Agent}` is one of `FactFinder`, `ThreadWeaver`, `Reviewer`, `Editor`, `Librarian`, `Pleb` and `Clerk`. The Pleb and the Clerk default to
 the local model (`OpenAICompatible`, thinking off) and are instructed with their role only; their cycles are tuned
@@ -93,6 +95,19 @@ searched on a self-hosted SearXNG, which the AppHost runs from a pinned image (u
 OpenAI-compatible defaults live in the AppHost's `appsettings.json`; override them with user secrets or
 `Parameters__*` environment variables. `AnthropicApiKey` is still required by the AppHost, so set a placeholder
 when no agent uses Anthropic.
+
+#### Research search engines
+
+SearXNG searches through official APIs only, no scrapers: **Brave Search** (`braveapi`), with **mwmbl** and
+**Marginalia** as free backups. Both keys are optional and reach only the SearXNG container, which writes them into its
+settings when it starts. An engine without a key isn't loaded, the SearXNG status signal names it, and research
+carries on with whichever engines are left.
+
+- `BraveApiKey`: a key on Brave's prepaid Search plan. Its $5 monthly credit is about 1,000 calls. Spending it is the
+  only cap; once it's gone, Brave fails and the free engines carry on.
+- `MarginaliaApiKey`: a free non-commercial key, requested by emailing contact@marginalia-search.com. The shared key
+  `public` works for testing but is often rate-limited (a 503, which shows on the status signal).
+- mwmbl needs no key.
 
 ### Instructions
 

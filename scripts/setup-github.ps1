@@ -227,6 +227,8 @@ try {
         [pscustomobject]@{ Name = 'KeeperCallsPerCycle'; GitHub = 'KEEPER_CALLS_PER_CYCLE'; Secret = $false; Required = $true; OnVm = $true; Default = '20'; Help = 'The most Keeper calls in one research cycle (one or two per fetched result).' }
         [pscustomobject]@{ Name = 'WikiBackupRemote'; GitHub = 'WIKI_BACKUP_REMOTE'; Secret = $false; Required = $false; OnVm = $true; Default = $null; Help = 'SSH URL of the private wiki backup repository (git@github.com:<owner>/<repo>.git); skip to leave backup off. See "Wiki backup" in the README.' }
         [pscustomobject]@{ Name = 'WikiBackupKeyDirectory'; GitHub = 'WIKI_BACKUP_KEY_DIRECTORY'; Secret = $false; Required = $false; OnVm = $true; Default = $null; Help = 'Folder on the VM holding the backup deploy key (id_ed25519) and known_hosts, e.g. /srv/knowledge-base-backup-key. It must exist; skip to leave backup off.' }
+        [pscustomobject]@{ Name = 'BraveApiKey'; GitHub = 'BRAVE_API_KEY'; Secret = $true; Required = $false; OnVm = $false; Default = $null; Help = 'Brave Search API key (prepaid Search plan) for research; skip to search without Brave. See the research section of the README.' }
+        [pscustomobject]@{ Name = 'MarginaliaApiKey'; GitHub = 'MARGINALIA_API_KEY'; Secret = $true; Required = $false; OnVm = $false; Default = $null; Help = 'Marginalia Search API key for research, requested by email; skip to search without Marginalia. See the research section of the README.' }
     )
     foreach ($agent in $agents) {
         $upper = $agent.ToUpperInvariant()

@@ -127,6 +127,10 @@ jobs:
           # The backup deploy key stays in this folder on the VM; only its location is passed, never the key.
           Parameters__WikiBackupRemote: ${{ vars.WIKI_BACKUP_REMOTE }}
           Parameters__WikiBackupKeyDirectory: ${{ vars.WIKI_BACKUP_KEY_DIRECTORY }}
+          # SearXNG's engine keys, both optional: an unset secret arrives as an empty string, which leaves that engine
+          # unloaded (the status signal says so) while research carries on with the others.
+          Parameters__BraveApiKey: ${{ secrets.BRAVE_API_KEY }}
+          Parameters__MarginaliaApiKey: ${{ secrets.MARGINALIA_API_KEY }}
           # An unset variable arrives as an empty string, which the API cannot read as a boolean and fails to start, so
           # the EnableThinking parameters fall back to the AppHost's default. A provider is only the agent's default: the
           # settings page can switch it while the app runs.
