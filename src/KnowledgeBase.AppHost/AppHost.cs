@@ -58,6 +58,13 @@ IResourceBuilder<ParameterResource> wikiBackupRemote = builder
 IResourceBuilder<ParameterResource> wikiBackupKeyDirectory = builder
     .AddParameter("WikiBackupKeyDirectory");
 
+// Optional keys for SearXNG's API engines (Brave Search and Marginalia). They go to the searxng container only; an
+// empty key leaves its engine unloaded and research carries on with the others.
+IResourceBuilder<ParameterResource> braveApiKey = builder
+    .AddParameter("BraveApiKey", secret: true);
+IResourceBuilder<ParameterResource> marginaliaApiKey = builder
+    .AddParameter("MarginaliaApiKey", secret: true);
+
 // Deployed with Docker Compose to a single machine, where a Cloudflare tunnel forwards to the API on loopback. Nothing
 // is published beyond loopback; the dashboard is reached over an SSH tunnel.
 builder.AddDockerComposeEnvironment("compose")
@@ -77,13 +84,15 @@ IResourceBuilder<RedisResource> cache = builder
     });
 
 // The metasearch instance the research cycle queries, built from the pinned image and settings in ./searxng. Its secret
-// is generated like Redis's password, so there is nothing to configure.
+// is generated like Redis's password. The engines' keys are set when the container starts (see searxng/entrypoint.sh).
 ParameterResource searxngSecret = ParameterResourceBuilderExtensions
     .CreateDefaultPasswordParameter(builder, "searxng-secret", special: false);
 IResourceBuilder<ContainerResource> searxng = builder
     .AddDockerfile("searxng", "searxng")
     .WithHttpEndpoint(targetPort: 8080)
     .WithEnvironment(context => context.EnvironmentVariables["SEARXNG_SECRET"] = searxngSecret)
+    .WithEnvironment("BRAVE_API_KEY", braveApiKey)
+    .WithEnvironment("MARGINALIA_API_KEY", marginaliaApiKey)
     .PublishAsDockerComposeService((_, service) =>
     {
         service.Ports = [$"127.0.0.1:{SearxngPort}:8080"];

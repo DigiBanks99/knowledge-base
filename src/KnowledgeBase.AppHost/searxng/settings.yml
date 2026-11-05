@@ -2,13 +2,33 @@
 # image proxy) are off. The secret key comes from SEARXNG_SECRET, which the AppHost generates.
 use_default_settings:
   engines:
-    # Engines that tolerate being queried by a metasearch instance; Google and Startpage answer with captchas.
+    # Official search APIs only. Scraped engines break without warning: DuckDuckGo answers a metasearch instance with a
+    # CAPTCHA, Google and Startpage did the same, and Bing, Mojeek, Wikipedia and GitHub returned nothing useful. The
+    # API's Research:SearxngEngines default lists the same engines (a test keeps them in step).
     keep_only:
-      - duckduckgo
-      - bing
-      - mojeek
-      - wikipedia
-      - github
+      - braveapi
+      - mwmbl
+      - marginalia
+
+# Merged by name into the upstream definitions. The API keys are empty here and set at start by entrypoint.sh from
+# BRAVE_API_KEY and MARGINALIA_API_KEY; an engine whose key is empty fails its own setup and is not loaded, which the
+# status signal reports, while SearXNG keeps running on the others.
+engines:
+  # Brave's web index, the main source. Its prepaid credit is the only allowance guard: once spent, research carries on
+  # with the free engines.
+  - name: braveapi
+    inactive: false
+    # Upstream gives it no shortcut, so it would get the default "-", which clashes with any other engine without one.
+    shortcut: bra
+    api_key: ""
+  # A free, open index that needs no key.
+  - name: mwmbl
+    disabled: false
+  # A free index of the small, non-commercial web, with a key requested by email.
+  - name: marginalia
+    disabled: false
+    inactive: false
+    api_key: ""
 
 general:
   instance_name: knowledge-base
