@@ -34,7 +34,7 @@ public sealed class HackerNewsSearchSourceTests : IDisposable
             }
             """);
 
-        Result<IReadOnlyList<SearchResult>, Error> results = await _source.SearchAsync("atlas framework", Since, CancellationToken.None);
+        Result<SearchAnswer, Error> results = await _source.SearchAsync("atlas framework", Since, CancellationToken.None);
 
         ItShouldAskForStoriesNewerThanTheCutoff();
         ItShouldMapEachStory();
@@ -43,7 +43,7 @@ public sealed class HackerNewsSearchSourceTests : IDisposable
             _handler.Requests.ShouldHaveSingleItem().RequestUri!.AbsoluteUri.ShouldBe(
                 "https://hn.algolia.com/api/v1/search_by_date?query=atlas%20framework&tags=story&hitsPerPage=5&numericFilters=created_at_i%3E1790812800");
 
-        void ItShouldMapEachStory() => results.Value.ShouldBe(
+        void ItShouldMapEachStory() => results.Value.Results.ShouldBe(
         [
             new SearchResult("https://example.com/atlas-2", "Atlas 2 is out", null, "Hacker News", DateTimeOffset.FromUnixTimeSeconds(1761552000)),
             new SearchResult("https://news.ycombinator.com/item?id=41000002", "Ask HN: Is anyone using Atlas?", null, "Hacker News", DateTimeOffset.FromUnixTimeSeconds(1761465600))
@@ -70,7 +70,7 @@ public sealed class HackerNewsSearchSourceTests : IDisposable
     {
         _handler.Respond = _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { ReasonPhrase = "Service Unavailable" };
 
-        Result<IReadOnlyList<SearchResult>, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
+        Result<SearchAnswer, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
         UnitResult<Error> probe = await _source.ProbeAsync(CancellationToken.None);
 
         ItShouldFailTheSearch();
@@ -88,7 +88,7 @@ public sealed class HackerNewsSearchSourceTests : IDisposable
     {
         _handler.Respond = _ => StubHttpHandler.Json("not json");
 
-        Result<IReadOnlyList<SearchResult>, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
+        Result<SearchAnswer, Error> results = await _source.SearchAsync("atlas", Since, CancellationToken.None);
 
         ItShouldFail();
 

@@ -37,8 +37,8 @@ public sealed class ResearchTopicNowCommandHandlerTests
         _source.Name.Returns("SearXNG");
         _source.IsConfigured.Returns(true);
         _source.SearchAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Success<IReadOnlyList<SearchResult>, Error>(
-                [new SearchResult("https://example.com/atlas-2", "Atlas 2", null, "SearXNG", Now.AddMinutes(-10))]));
+            .Returns(Result.Success<SearchAnswer, Error>(SearchAnswer.Of(
+                [new SearchResult("https://example.com/atlas-2", "Atlas 2", null, "SearXNG", Now.AddMinutes(-10))])));
 
         TimeProvider timeProvider = Substitute.For<TimeProvider>();
         timeProvider.GetUtcNow().Returns(Now);

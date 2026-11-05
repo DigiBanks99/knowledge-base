@@ -12,10 +12,16 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit.Core" />
     <PackageReference Include="TUnit.Engine" />
+    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\KnowledgeBase.Agent\KnowledgeBase.Agent.csproj" />
+  </ItemGroup>
+
+  <!-- SearXNG's settings, so a test can check the engines the API expects against the ones it keeps. -->
+  <ItemGroup>
+    <None Include="..\KnowledgeBase.AppHost\searxng\settings.yml" Link="searxng\settings.yml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
