@@ -17,7 +17,6 @@ internal static class AuthDependencyInjection
 {
     private const string AllowedUserPolicy = "AllowedUser";
     private const string CsrfHeader = "X-Requested-With";
-    private const string ObjectIdClaim = "http://schemas.microsoft.com/identity/claims/objectidentifier";
 
     extension(WebApplicationBuilder builder)
     {
@@ -87,11 +86,7 @@ internal static class AuthDependencyInjection
             builder.Services.AddAuthorizationBuilder()
                 .AddPolicy(AllowedUserPolicy, policy => policy
                     .RequireAuthenticatedUser()
-                    .RequireAssertion(context =>
-                        settings.AllowedObjectIds.Length == 0
-                        || settings.AllowedObjectIds.Contains(
-                            context.User.FindFirstValue(ObjectIdClaim) ?? context.User.FindFirstValue("oid"),
-                            StringComparer.OrdinalIgnoreCase)));
+                    .RequireAssertion(context => settings.IsAllowed(context.User)));
 
             return builder;
         }

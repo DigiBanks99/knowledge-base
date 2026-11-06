@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 namespace KnowledgeBase.Agent.Auth;
 
 /// <summary>
@@ -22,6 +24,19 @@ public sealed class AuthSettings
     /// "Assignment required" is on; this is a second check inside the app.
     /// </summary>
     public string[] AllowedObjectIds { get; init; } = [];
+
+    /// <summary>
+    /// The delegated scope Claude asks for when it signs in for the connector, exposed by the app registration under
+    /// <c>api://{ClientId}/</c>.
+    /// </summary>
+    public string McpScope { get; init; } = "access_as_user";
+
+    /// <summary>Whether the signed-in user may use the app: anyone when no allow-list is set, otherwise only the listed object ids.</summary>
+    public bool IsAllowed(ClaimsPrincipal user) =>
+        AllowedObjectIds.Length == 0
+        || AllowedObjectIds.Contains(
+            user.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier") ?? user.FindFirstValue("oid"),
+            StringComparer.OrdinalIgnoreCase);
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(TenantId) && !string.IsNullOrWhiteSpace(ClientId) && !string.IsNullOrWhiteSpace(ClientSecret);

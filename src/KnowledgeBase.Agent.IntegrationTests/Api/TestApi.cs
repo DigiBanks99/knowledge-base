@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -14,6 +15,7 @@ using KnowledgeBase.Agent.Wiki;
 
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -23,8 +25,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
+
+using ModelContextProtocol.Client;
 
 namespace KnowledgeBase.Agent.IntegrationTests.Api;
 
@@ -38,6 +44,12 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
 {
     /// <summary>The object id of the one user the API lets in.</summary>
     public const string OwnerObjectId = "6f1c8f0e-7f4a-4a52-9a43-0b0d2c1a9e11";
+
+    private const string TenantId = "00000000-0000-0000-0000-000000000001";
+    private const string ClientId = "00000000-0000-0000-0000-000000000002";
+
+    /// <summary>Signs the bearer tokens Claude would get from Entra; the connector is set to trust it.</summary>
+    private static readonly SymmetricSecurityKey TokenKey = new(RandomNumberGenerator.GetBytes(32)) { KeyId = "test" };
 
     private static readonly string[] KnownAgentNames =
         [KnownAgents.FactFinder, KnownAgents.ThreadWeaver, KnownAgents.Reviewer, KnownAgents.Editor, KnownAgents.Librarian, KnownAgents.Pleb, KnownAgents.Clerk];
@@ -79,6 +91,26 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
         return client;
     }
 
+    /// <summary>An Entra-style access token for <paramref name="objectId"/>, as Claude sends it to the connector.</summary>
+    public static string BearerToken(string objectId, string audience = ClientId) =>
+        new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = $"https://login.microsoftonline.com/{TenantId}/v2.0",
+            Audience = audience,
+            Claims = new Dictionary<string, object> { ["oid"] = objectId, ["name"] = "Test User" },
+            Expires = DateTime.UtcNow.AddMinutes(10),
+            SigningCredentials = new SigningCredentials(TokenKey, SecurityAlgorithms.HmacSha256)
+        });
+
+    /// <summary>A client of the MCP connector, signed in with a bearer token.</summary>
+    public Task<McpClient> ConnectMcpAsync(string objectId = OwnerObjectId)
+    {
+        HttpClient http = CreateClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BearerToken(objectId));
+        HttpClientTransport transport = new(new HttpClientTransportOptions { Endpoint = new Uri(http.BaseAddress!, "/mcp") }, http, ownsHttpClient: true);
+        return McpClient.CreateAsync(transport);
+    }
+
     public static async Task<T> ReadAsync<T>(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<T>(Json))!;
 
@@ -91,8 +123,8 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
         builder.UseSetting(ConfigFiles.ConfigDirectoryKey, Path.Combine(_root.Path, "no-config"));
         builder.UseSetting($"{WikiConfigurationSettings.SectionName}:{nameof(WikiConfigurationSettings.RootDirectory)}", _root.Path);
         builder.UseSetting("ConnectionStrings:cache", "localhost:6379,abortConnect=false");
-        builder.UseSetting("Authentication:TenantId", "00000000-0000-0000-0000-000000000001");
-        builder.UseSetting("Authentication:ClientId", "00000000-0000-0000-0000-000000000002");
+        builder.UseSetting("Authentication:TenantId", TenantId);
+        builder.UseSetting("Authentication:ClientId", ClientId);
         builder.UseSetting("Authentication:ClientSecret", "not-a-secret");
         builder.UseSetting("Authentication:AllowedObjectIds:0", OwnerObjectId);
         // Requests to the fake web need no spacing.
@@ -135,6 +167,13 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
                 };
                 options.Configuration = configuration;
                 options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+            });
+
+            // The connector validates real bearer tokens, signed with a key of the test's own and without asking Entra.
+            services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                options.Configuration = new OpenIdConnectConfiguration();
+                options.TokenValidationParameters.IssuerSigningKey = TokenKey;
             });
 
             foreach (FakeAgent agent in _agents.Values)

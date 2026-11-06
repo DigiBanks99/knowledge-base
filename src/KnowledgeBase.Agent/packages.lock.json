@@ -57,6 +57,15 @@
           "System.ClientModel": "1.14.0"
         }
       },
+      "Microsoft.AspNetCore.Authentication.JwtBearer": {
+        "type": "Direct",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "VAcqS42zb9WJd9DjPdkVTS5YrQENmNzPNJuRu8VAW7x3TEWUipc4d4hHzVJdFB0h/KLdr4XcXZzRHcUOKVanMQ==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Protocols.OpenIdConnect": "8.19.2"
+        }
+      },
       "Microsoft.AspNetCore.Authentication.OpenIdConnect": {
         "type": "Direct",
         "requested": "[10.0.10, )",
@@ -99,6 +108,15 @@
         "requested": "[2.11.0, )",
         "resolved": "2.11.0",
         "contentHash": "/ignjfdeKT2SGLIR7QEv19KnI0rvoxRG/TYDOZdK9EsWLjKK9IK8i1Mo5NRm9PRV3i64DzlTqnIflWvoyfljLg=="
+      },
+      "ModelContextProtocol.AspNetCore": {
+        "type": "Direct",
+        "requested": "[2.3.1, )",
+        "resolved": "2.3.1",
+        "contentHash": "qlX2AkOg9QJ8iap9NXyOfkNW7abMrf6HU3o7kImIgsNjkPpZQd6ewGxkwRuI5GQNXdONCaROfKMlhPVcYoWQfw==",
+        "dependencies": {
+          "ModelContextProtocol": "[2.3.1]"
+        }
       },
       "OpenTelemetry.Exporter.OpenTelemetryProtocol": {
         "type": "Direct",
@@ -253,8 +271,8 @@
       },
       "Microsoft.Extensions.AI.Abstractions": {
         "type": "Transitive",
-        "resolved": "10.7.0",
-        "contentHash": "Lf822igMm8NkTYHZhTp7kjoNYkLLEvJnX3SkG/LVBvsZHC0Y9choogHz8YtITBoy0TOylM3kVUZ6iaHf0my0ug=="
+        "resolved": "10.11.0",
+        "contentHash": "h4DX/TdJU4fk1GGaf19n6Kujkj6VXbGeL4UEOsQ8+ZJC5fVApPauokCtvBP684BYbczUYZQNfo1mbmyHG4WVSg=="
       },
       "Microsoft.Extensions.AI.Evaluation": {
         "type": "Transitive",
@@ -396,6 +414,22 @@
         "contentHash": "+b8lT4cLLO/sBR2hjvE/qG6qrZG15h7/PBvnIrzTh4xDaAxdHUY6449rC+1pHzQUsBiCHZVbj+VMn+xS0sL7TA==",
         "dependencies": {
           "Google.Protobuf": "3.30.2"
+        }
+      },
+      "ModelContextProtocol": {
+        "type": "Transitive",
+        "resolved": "2.3.1",
+        "contentHash": "r93TE8VAvPIJrvoMPpWhKWcMLvKIPB72JozRye3hHeY7gCsMXYo/3fLVnzNEnjBcXmV8+EXcNMYzC/+0wRkidA==",
+        "dependencies": {
+          "ModelContextProtocol.Core": "[2.3.1]"
+        }
+      },
+      "ModelContextProtocol.Core": {
+        "type": "Transitive",
+        "resolved": "2.3.1",
+        "contentHash": "cuYIbAWWhVSY0PRaz0LiDoxxnpLdps1tKXjo2LN91CObgWBFcKg3Ebz4kF95O++2Do7GXI2Tl5KQOYM8UoAyZA==",
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "10.11.0"
         }
       },
       "OpenAI": {
