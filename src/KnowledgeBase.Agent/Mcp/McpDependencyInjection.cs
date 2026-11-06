@@ -44,12 +44,14 @@ internal static class McpDependencyInjection
                         context.ResourceMetadata = new ProtectedResourceMetadata
                         {
                             Resource = $"{request.Scheme}://{request.Host}{Path}",
-                            AuthorizationServers = [authority],
+                            AuthorizationServers = [McpOAuthProxy.BaseUrl(request)],
                             ScopesSupported = [scope],
                             BearerMethodsSupported = ["header"]
                         };
                         return Task.CompletedTask;
                     });
+
+            builder.Services.AddHttpClient(McpOAuthProxy.HttpClientName);
 
             builder.Services.AddAuthorizationBuilder()
                 .AddPolicy(McpUserPolicy, policy => policy
@@ -70,6 +72,7 @@ internal static class McpDependencyInjection
     {
         public WebApplication MapMcpConnector()
         {
+            app.MapMcpOAuthProxy();
             app.MapMcp(Path).RequireAuthorization(McpUserPolicy);
             return app;
         }

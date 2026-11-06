@@ -23,18 +23,18 @@ public sealed class McpConnectorTests : IDisposable
 
         ItShouldAskClaudeToSignIn();
         ItShouldSayWhereToFindTheSignInDetails();
-        ItShouldNameEntraAsTheAuthorizationServer();
+        ItShouldNameThisServerAsTheAuthorizationServer();
 
         void ItShouldAskClaudeToSignIn() => response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
         void ItShouldSayWhereToFindTheSignInDetails() =>
             response.Headers.WwwAuthenticate.ToString().ShouldContain("resource_metadata=");
 
-        void ItShouldNameEntraAsTheAuthorizationServer()
+        void ItShouldNameThisServerAsTheAuthorizationServer()
         {
             metadata.StatusCode.ShouldBe(HttpStatusCode.OK);
             document.GetProperty("authorization_servers")[0].GetString()
-                .ShouldBe("https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0");
+                .ShouldBe("http://localhost");
             document.GetProperty("scopes_supported")[0].GetString()
                 .ShouldBe("api://00000000-0000-0000-0000-000000000002/access_as_user");
         }

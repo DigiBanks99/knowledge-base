@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 
 using KnowledgeBase.Agent.Agents;
 using KnowledgeBase.Agent.Common;
+using KnowledgeBase.Agent.Mcp;
 using KnowledgeBase.Agent.Research;
 using KnowledgeBase.Agent.Research.Fetch;
 using KnowledgeBase.Agent.Research.Search;
@@ -187,7 +188,7 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
             // The search sources (and their status signals) and the page fetcher answer from the fake web instead of
             // the internet, and every host it names resolves to a public address without asking DNS. The fetcher's
             // own SSRF guard still checks each request.
-            foreach (string client in new[] { SearxngSearchSource.HttpClientName, HackerNewsSearchSource.HttpClientName, PageFetcher.HttpClientName })
+            foreach (string client in new[] { SearxngSearchSource.HttpClientName, HackerNewsSearchSource.HttpClientName, PageFetcher.HttpClientName, McpOAuthProxy.HttpClientName })
             {
                 services.AddHttpClient(client).ConfigurePrimaryHttpMessageHandler(() => new FakeWeb.Handler(Web));
             }
