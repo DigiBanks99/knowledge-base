@@ -70,6 +70,9 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
 
     public FakeAgent Agent(string name) => _agents[name];
 
+    /// <summary>The warnings and errors the API logged, for a test to explain a wait that ran out.</summary>
+    public CapturedLogs Logs { get; } = new();
+
     /// <summary>The research Keeper, which a test scripts.</summary>
     public FakeKeeper Keeper { get; } = new();
 
@@ -145,7 +148,7 @@ internal sealed class TestApi(IReadOnlyDictionary<string, string?>? settings = n
             builder.UseSetting(key, value);
         }
 
-        builder.ConfigureLogging(logging => logging.ClearProviders());
+        builder.ConfigureLogging(logging => logging.ClearProviders().AddProvider(Logs));
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IOutputCacheStore>();
