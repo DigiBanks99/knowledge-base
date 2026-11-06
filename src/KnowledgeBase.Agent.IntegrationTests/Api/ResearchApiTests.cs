@@ -233,7 +233,7 @@ public sealed class ResearchApiTests : IDisposable
 
         void ItShouldFetchTheirPagesInTheBackground()
         {
-            fetched.ShouldBeTrue();
+            fetched.ShouldBeTrue(_api.Logs.Describe());
             batch.Results.ShouldHaveSingleItem().Page!.Markdown.ShouldBe("Raised beds drain well.");
         }
 
