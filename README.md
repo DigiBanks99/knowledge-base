@@ -173,7 +173,11 @@ the same `Authentication:AllowedObjectIds` check as the UI. In the app registrat
 3. **Authentication**: add `https://claude.ai/api/mcp/auth_callback` as a **Web** redirect URI (Claude Code also
    needs `http://localhost` callbacks for its own flow).
 4. In Claude, add a custom connector with the URL `https://<your host>/mcp` and, under advanced settings, the app
-   registration's client id and secret (Entra does not offer dynamic client registration).
+   registration's client id and secret (Entra does not offer dynamic client registration). The client can be a separate registration from the API's: give it
+   the `access_as_user` API permission and list it under the API's authorized client applications.
+
+Claude's sign-in runs through the API's own `/oauth/authorize` and `/oauth/token` endpoints, which forward to Entra
+without the `resource` parameter Claude adds (Entra rejects it with AADSTS500011).
 
 ### Local models (llama.cpp)
 
