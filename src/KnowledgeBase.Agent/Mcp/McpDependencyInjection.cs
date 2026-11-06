@@ -22,7 +22,7 @@ internal static class McpDependencyInjection
         {
             AuthSettings settings = builder.Configuration.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
             string authority = $"https://login.microsoftonline.com/{settings.TenantId}/v2.0";
-            string scope = $"api://{settings.ClientId}/{settings.McpScope}";
+            string scope = settings.McpScopeUri;
 
             builder.Services
                 .AddAuthentication()
@@ -33,7 +33,7 @@ internal static class McpDependencyInjection
                     options.TokenValidationParameters.NameClaimType = "name";
                     // v2 tokens carry the client id as audience, v1 tokens the application id uri; the issuer
                     // differs the same way.
-                    options.TokenValidationParameters.ValidAudiences = [settings.ClientId!, $"api://{settings.ClientId}"];
+                    options.TokenValidationParameters.ValidAudiences = [settings.ClientId!, $"api://{settings.ClientId}", settings.ResolvedApplicationIdUri];
                     options.TokenValidationParameters.ValidIssuers =
                         [authority, $"https://sts.windows.net/{settings.TenantId}/"];
                 })
