@@ -7,6 +7,7 @@ using KnowledgeBase.Agent.Common;
 using KnowledgeBase.Agent.Facts.Tools;
 using KnowledgeBase.Agent.Files.Tools;
 using KnowledgeBase.Agent.Health;
+using KnowledgeBase.Agent.Mcp;
 using KnowledgeBase.Agent.Research.Tools;
 using KnowledgeBase.Agent.Review.Tools;
 using KnowledgeBase.Agent.Telemetry;
@@ -46,7 +47,7 @@ builder
     .AddHealthChecks()
     .AddTelemetry();
 
-builder.AddAuth();
+builder.AddAuth().AddMcpConnector();
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -62,6 +63,8 @@ RouteGroupBuilder api = app
     .UseWiki()
     .RequireSignedInUser();
 api.MapAgentsEndpoints();
+app.MapMcpConnector();
+
 api.MapFallback(() => Results.NotFound());
 
 if (app.Environment.IsDevelopment())

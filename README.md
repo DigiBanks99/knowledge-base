@@ -158,6 +158,23 @@ reach the browser. The app will not start without sign-in configured.
 In the app registration, add a **Web** platform redirect URI of `http://localhost:5173/signin-oidc` for local
 development (the UI runs on a fixed port for this reason), plus the equivalent for any deployed host.
 
+### Claude connector
+
+The API is also a remote [MCP](https://modelcontextprotocol.io) server at `/mcp`, so Claude (desktop, mobile and Claude
+Code) can capture notes and ask the wiki questions. Two tools: `capture_note` saves a note into `notes/new`, and
+`ask_wiki` asks the Librarian (pass the returned conversation id back for follow-ups).
+
+Claude signs you in with Entra itself and sends the access token as a bearer token; the API validates it and applies
+the same `Authentication:AllowedObjectIds` check as the UI. In the app registration:
+
+1. **Expose an API**: set the Application ID URI to `api://<client id>` and add a delegated scope `access_as_user`
+   (override the name with `Authentication:McpScope`).
+2. **Manifest**: set `requestedAccessTokenVersion` to `2` under `api`.
+3. **Authentication**: add `https://claude.ai/api/mcp/auth_callback` as a **Web** redirect URI (Claude Code also
+   needs `http://localhost` callbacks for its own flow).
+4. In Claude, add a custom connector with the URL `https://<your host>/mcp` and, under advanced settings, the app
+   registration's client id and secret (Entra does not offer dynamic client registration).
+
 ### Local models (llama.cpp)
 
 Any agent can run on a local model served by an OpenAI-compatible API, such as llama.cpp's `llama-server`, instead of
