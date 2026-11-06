@@ -168,7 +168,9 @@ Claude signs you in with Entra itself and sends the access token as a bearer tok
 the same `Authentication:AllowedObjectIds` check as the UI. In the app registration:
 
 1. **Expose an API**: set the Application ID URI to `api://<client id>` and add a delegated scope `access_as_user`
-   (override the name with `Authentication:McpScope`).
+   (override the name with `Authentication:McpScope`). If you use a different Application ID URI, such as
+   `api://knowledgebase.example.com`, set it as the `EntraApplicationIdUri` parameter (`ENTRA_APPLICATION_ID_URI` in
+   GitHub).
 2. **Manifest**: set `requestedAccessTokenVersion` to `2` under `api`.
 3. **Authentication**: add `https://claude.ai/api/mcp/auth_callback` as a **Web** redirect URI (Claude Code also
    needs `http://localhost` callbacks for its own flow).

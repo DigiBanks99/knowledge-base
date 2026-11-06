@@ -40,6 +40,26 @@ public sealed class McpConnectorTests : IDisposable
         }
     }
 
+
+    [Test]
+    public async Task TheApiHasACustomApplicationIdUri()
+    {
+        using TestApi api = new(new Dictionary<string, string?> { ["Authentication:ApplicationIdUri"] = "api://knowledgebase.example.com/" });
+
+        HttpResponseMessage metadata = await api.CreateClient().GetAsync("/.well-known/oauth-protected-resource");
+        JsonElement document = await metadata.Content.ReadFromJsonAsync<JsonElement>();
+        HttpClient http = api.CreateClient();
+        http.DefaultRequestHeaders.Authorization = new("Bearer", TestApi.BearerToken(TestApi.OwnerObjectId, audience: "api://knowledgebase.example.com"));
+        HttpResponseMessage response = await http.PostAsJsonAsync("/mcp", new { jsonrpc = "2.0", id = 1, method = "ping" });
+
+        ItShouldAskForAScopeUnderIt();
+        ItShouldAcceptTokensForIt();
+
+        void ItShouldAskForAScopeUnderIt() =>
+            document.GetProperty("scopes_supported")[0].GetString().ShouldBe("api://knowledgebase.example.com/access_as_user");
+
+        void ItShouldAcceptTokensForIt() => response.StatusCode.ShouldNotBe(HttpStatusCode.Unauthorized);
+    }
     [Test]
     public async Task SomeoneWhoIsNotAllowedInConnects()
     {

@@ -26,7 +26,7 @@ internal static class McpOAuthProxy
         {
             AuthSettings settings = app.Configuration.GetSection(AuthSettings.SectionName).Get<AuthSettings>() ?? new AuthSettings();
             string entra = $"https://login.microsoftonline.com/{settings.TenantId}/oauth2/v2.0";
-            string scope = $"api://{settings.ClientId}/{settings.McpScope}";
+            string scope = settings.McpScopeUri;
 
             app.MapGet("/.well-known/oauth-authorization-server", (HttpRequest request) =>
             {

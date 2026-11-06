@@ -29,6 +29,8 @@ IResourceBuilder<ParameterResource> entraTenantId = builder
     .AddParameter("EntraTenantId");
 IResourceBuilder<ParameterResource> entraClientId = builder
     .AddParameter("EntraClientId");
+IResourceBuilder<ParameterResource> entraApplicationIdUri = builder
+    .AddParameter("EntraApplicationIdUri");
 IResourceBuilder<ParameterResource> entraClientSecret = builder
     .AddParameter("EntraClientSecret", secret: true);
 
@@ -108,6 +110,7 @@ IResourceBuilder<ProjectResource> api = builder
     .WithEnvironment("Authentication__TenantId", entraTenantId)
     .WithEnvironment("Authentication__ClientId", entraClientId)
     .WithEnvironment("Authentication__ClientSecret", entraClientSecret)
+    .WithEnvironment("Authentication__ApplicationIdUri", entraApplicationIdUri)
     .WithEnvironment("OpenAICompatible__Endpoint", openAICompatibleEndpoint)
     .WithEnvironment("OpenAICompatible__ApiKey", openAICompatibleApiKey)
     .WithEnvironment("OpenAICompatible__Model", openAICompatibleModel)

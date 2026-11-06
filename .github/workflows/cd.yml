@@ -112,6 +112,7 @@ jobs:
           Parameters__EntraTenantId: ${{ vars.ENTRA_TENANT_ID }}
           Parameters__EntraClientId: ${{ vars.ENTRA_CLIENT_ID }}
           Parameters__EntraClientSecret: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          Parameters__EntraApplicationIdUri: ${{ vars.ENTRA_APPLICATION_ID_URI }}
           Parameters__OpenAICompatibleEndpoint: ${{ vars.OPENAI_COMPATIBLE_ENDPOINT }}
           Parameters__OpenAICompatibleApiKey: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
           # Each provider runs one model, whichever agents are on it. An unset variable arrives as an empty string, which
