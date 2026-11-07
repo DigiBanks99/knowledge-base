@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowUp, LoaderCircle, MessageSquarePlus, MessagesSquare, Plus, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, ArrowUp, LoaderCircle, MessageSquarePlus, MessagesSquare, Plus, Trash2 } from 'lucide-react'
 import { api, ask, type Conversation, type ConversationMessage } from '../api'
 import { AgentIcon, BackLink, Empty, ErrorMessage, Loading, Markdown } from '../components'
 import { formatDate } from '../format'
@@ -64,7 +64,13 @@ export function AskPage() {
       </aside>
       <div className="detail-pane chat-pane">
         {conversationId ? (
-          <Chat key={conversationId} id={conversationId} onDelete={() => remove.mutate(conversationId)} />
+          <Chat
+            key={conversationId}
+            id={conversationId}
+            onDelete={() => remove.mutate(conversationId)}
+            onNew={() => create.mutate()}
+            creating={create.isPending}
+          />
         ) : (
           <Empty icon={MessagesSquare} hero>
             Start a new conversation to ask the Librarian about anything in your wiki.
@@ -75,7 +81,17 @@ export function AskPage() {
   )
 }
 
-function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
+function Chat({
+  id,
+  onDelete,
+  onNew,
+  creating,
+}: {
+  id: string
+  onDelete: () => void
+  onNew: () => void
+  creating: boolean
+}) {
   const queryClient = useQueryClient()
   const queryKey = ['conversations', id]
   const conversation = useQuery({ queryKey, queryFn: () => api.conversation(id) })
@@ -159,9 +175,21 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
 
   return (
     <>
-      {back}
-      <header className="detail-header">
-        <h2>{conversation.data.title}</h2>
+      {/* One slim row, so a phone keeps its height for the answer. */}
+      <header className="detail-header chat-header">
+        <Link to="/ask" className="back icon-back mobile-only" title="All conversations" aria-label="All conversations">
+          <ArrowLeft aria-hidden />
+        </Link>
+        <h2 title={conversation.data.title}>{conversation.data.title}</h2>
+        <button
+          className="ghost icon mobile-only"
+          onClick={onNew}
+          disabled={streaming !== null || creating}
+          title="New conversation"
+          aria-label="New conversation"
+        >
+          <MessageSquarePlus aria-hidden />
+        </button>
         <button
           className="ghost icon"
           onClick={onDelete}
