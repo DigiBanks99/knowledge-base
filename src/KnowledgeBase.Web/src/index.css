@@ -2000,6 +2000,50 @@ kbd {
   margin-inline: auto;
 }
 
+/* Back, title, new and delete on one row; a long title is cut short rather than taking a second line. */
+.chat-header {
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  margin: -0.5rem 0 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-header h2 {
+  min-width: 0;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-header .back.icon-back {
+  margin: 0;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.chat-header button.icon {
+  flex-shrink: 0;
+}
+
+@media (min-width: 900px) {
+  .chat-header {
+    margin-top: 0;
+  }
+
+  .chat-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .split .mobile-only {
+    display: none;
+  }
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
