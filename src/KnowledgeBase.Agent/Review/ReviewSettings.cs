@@ -4,5 +4,5 @@ public sealed class ReviewSettings
 {
     public const string SectionName = "Review";
 
-    public TimeSpan Interval { get; init; } = TimeSpan.FromDays(1);
+    public TimeSpan Interval { get; init; } = TimeSpan.FromDays(7);
 }

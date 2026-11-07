@@ -146,7 +146,7 @@ wiki, starting with `SharedInstructions.md`.
 
 Optional API settings (set on the `knowledgebase-agent` project):
 
-- `Review:Interval`: how often a scheduled review runs (default `1.00:00:00`, one day).
+- `Review:Interval`: how often a scheduled review runs (default `7.00:00:00`, one week). Reviews can also be requested manually at any time.
 - `Authentication:AllowedObjectIds`: Entra object ids allowed in, as a second check after Entra's own assignment.
 - `ForwardedHeaders:KnownProxies`: proxy IPs to trust beyond localhost (for example behind Cloudflare).
 
