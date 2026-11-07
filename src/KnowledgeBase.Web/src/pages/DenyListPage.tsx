@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Ban, Building2, Check, CircleUser, ShieldBan, Star, Tag, type LucideIcon } from 'lucide-react'
 import { api, type DenyListEntry, type DenyListState, type SubjectKind } from '../api'
 import { Badge, Empty, ErrorMessage, Loading } from '../components'
+
+const kindIcons: Record<SubjectKind, LucideIcon> = {
+  Person: CircleUser,
+  PublicFigure: Star,
+  Organisation: Building2,
+  Other: Tag,
+}
 
 export function DenyListPage() {
   const queryClient = useQueryClient()
@@ -13,7 +21,7 @@ export function DenyListPage() {
 
   return (
     <>
-      <p className="muted">
+      <p className="page-description">
         Names that never go into a search query. People and organisations from your own notes are added automatically;
         allow one you do want researched. Public figures, the authors and experts behind what you read, are allowed
         automatically; someone who might be one is pending, and kept out of queries, until you decide. A choice you make
@@ -26,7 +34,7 @@ export function DenyListPage() {
       {setState.isError && <ErrorMessage error={setState.error} />}
       {denyList.isPending && <Loading what="the deny-list" />}
       {denyList.isError && <ErrorMessage error={denyList.error} />}
-      {denyList.data?.length === 0 && <Empty>The deny-list is empty.</Empty>}
+      {denyList.data?.length === 0 && <Empty icon={ShieldBan}>The deny-list is empty.</Empty>}
       {denyList.data && denyList.data.length > 0 && (
         <ul className="deny-list">
           {pendingFirst(denyList.data).map((entry) => (
@@ -72,9 +80,11 @@ function AddName() {
       </select>
       <span className="actions">
         <button className="secondary" disabled={disabled} onClick={() => add.mutate('Allowed')}>
+          <Check aria-hidden />
           Allow
         </button>
         <button className="secondary" disabled={disabled} onClick={() => add.mutate('Denied')}>
+          <Ban aria-hidden />
           Deny
         </button>
       </span>
@@ -92,14 +102,20 @@ function DenyListItem({
   busy: boolean
   onToggle: (state: DenyListState) => void
 }) {
+  const Icon = kindIcons[entry.kind] ?? Tag
   return (
     <li className="card">
-      <div className="item-title">
-        <Badge tone={entry.state}>{entry.state}</Badge>
-        <strong>{entry.name}</strong>
-        <span className="muted small">
-          {kindLabel(entry.kind)} · {entry.source === 'Manual' ? 'set by you' : 'automatic'}
+      <div className="person">
+        <span className="person-icon" aria-hidden>
+          <Icon />
         </span>
+        <span className="person-name">
+          <strong>{entry.name}</strong>
+          <span className="muted small">
+            {kindLabel(entry.kind)} · {entry.source === 'Manual' ? 'set by you' : 'automatic'}
+          </span>
+        </span>
+        <Badge tone={entry.state}>{entry.state}</Badge>
         <span className="actions">
           {entry.state === 'Pending' ? (
             <>
@@ -116,6 +132,7 @@ function DenyListItem({
               disabled={busy}
               onClick={() => onToggle(entry.state === 'Denied' ? 'Allowed' : 'Denied')}
             >
+              {entry.state === 'Denied' ? <Check aria-hidden /> : <Ban aria-hidden />}
               {entry.state === 'Denied' ? 'Allow' : 'Deny'}
             </button>
           )}

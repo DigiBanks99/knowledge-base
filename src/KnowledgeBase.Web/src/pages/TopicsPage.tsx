@@ -1,6 +1,22 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import {
+  Bell,
+  BellOff,
+  CalendarClock,
+  CircleX,
+  FileCheck,
+  Info,
+  MessageCircleQuestion,
+  Pencil,
+  RefreshCw,
+  Repeat,
+  Search,
+  Sparkles,
+  Tags,
+  ThumbsUp,
+} from 'lucide-react'
 import { api, type AuthorGuidance, type FetchedPage, type TopicState, type TopicSummary } from '../api'
 import { Badge, Empty, ErrorMessage, Loading, Markdown } from '../components'
 import { formatDate, formatInterval } from '../format'
@@ -20,20 +36,26 @@ export function TopicsPage() {
 
   return (
     <>
-      <p className="muted">
+      <p className="page-description">
         Every top-level folder or page under projects, learning and plans is a topic. Topics appear as the wiki grows
         and disappear when their page is deleted or moved. Mute one to stop researching it without moving it.
       </p>
-      <p className="muted">
-        Review each curation: approve a good one, mark a wrong one invalid with a reason, answer the Pleb when it asks
-        what a topic is about, or edit the brief and queries yourself. Your answers and reasons go into every later
-        curation of the topic. An edited topic stays as you set it until you recurate it. Open a topic to see the runs
-        research has made for it.
-      </p>
+      <details className="card">
+        <summary>
+          <Info size={16} aria-hidden />
+          How to review a curation
+        </summary>
+        <p className="muted small">
+          Approve a good one, mark a wrong one invalid with a reason, answer the Pleb when it asks what a topic is
+          about, or edit the brief and queries yourself. Your answers and reasons go into every later curation of the
+          topic. An edited topic stays as you set it until you recurate it. Open a topic to see the runs research has
+          made for it.
+        </p>
+      </details>
 
       {topics.isPending && <Loading what="the topics" />}
       {topics.isError && <ErrorMessage error={topics.error} />}
-      {topics.data?.length === 0 && <Empty>No topics yet.</Empty>}
+      {topics.data?.length === 0 && <Empty icon={Tags}>No topics yet.</Empty>}
       {topics.data && topics.data.length > 0 && (
         <ul className="topics">
           {topics.data.map((topic) => (
@@ -76,13 +98,10 @@ export function TopicCard({ topic, linked = false }: { topic: TopicSummary; link
 
   return (
     <li className="card">
-      <div className="item-title">
-        <Badge tone={topic.state}>{stateLabels[topic.state]}</Badge>
-        {topic.pinned && <Badge tone="pinned">Edited by you</Badge>}
-        {topic.approvedAt && <Badge tone="approved">Approved {formatDate(topic.approvedAt)}</Badge>}
-        <strong>
+      <div className="topic-head">
+        <span className="topic-title">
           {linked ? <Link to={`/research/topics/${encodeURIComponent(topic.slug)}`}>{topic.path}</Link> : topic.path}
-        </strong>
+        </span>
         <span className="actions">
           <button
             className="secondary"
@@ -90,37 +109,72 @@ export function TopicCard({ topic, linked = false }: { topic: TopicSummary; link
             title={canResearch ? undefined : researchUnavailableReason(topic)}
             onClick={() => researchNow.mutate()}
           >
+            <Search aria-hidden />
             Research now
           </button>
-          <button className="secondary" disabled={busy} onClick={() => setMuted.mutate(!topic.muted)}>
-            {topic.muted ? 'Unmute' : 'Mute'}
+          <button
+            className="secondary icon"
+            disabled={busy}
+            title={topic.muted ? 'Unmute' : 'Mute'}
+            aria-label={topic.muted ? 'Unmute' : 'Mute'}
+            onClick={() => setMuted.mutate(!topic.muted)}
+          >
+            {topic.muted ? <Bell aria-hidden /> : <BellOff aria-hidden />}
           </button>
         </span>
       </div>
+      <div className="topic-badges">
+        <Badge tone={topic.state}>{stateLabels[topic.state]}</Badge>
+        {topic.pinned && <Badge tone="pinned">Edited by you</Badge>}
+        {topic.approvedAt && <Badge tone="approved">Approved {formatDate(topic.approvedAt)}</Badge>}
+      </div>
       {setMuted.isError && <ErrorMessage error={setMuted.error} />}
       {researchNow.isError && <ErrorMessage error={researchNow.error} />}
-      {topic.brief && <p className="small">{topic.brief}</p>}
-      <p className="muted small">
-        {topic.lastCuratedAt ? `Last curated ${formatDate(topic.lastCuratedAt)}` : 'Not curated yet.'}
-        {topic.lastSearchedAt ? ` · Last searched ${formatDate(topic.lastSearchedAt)}` : ''}
-        {topic.nextSearchAt && !topic.muted && topic.pendingResults === 0
-          ? ` · Due ${formatDate(topic.nextSearchAt)}`
-          : ''}
-        {` · Checked every ${formatInterval(topic.interval)}`}
-        {topic.lastPositiveAt ? ` · Last positive ${formatDate(topic.lastPositiveAt)}` : ' · Nothing filed yet'}
+      {topic.brief && <p className="topic-brief">{topic.brief}</p>}
+      <p className="topic-meta">
+        <span>
+          <Sparkles aria-hidden />
+          {topic.lastCuratedAt ? `Curated ${formatDate(topic.lastCuratedAt)}` : 'Not curated yet'}
+        </span>
+        {topic.lastSearchedAt && (
+          <span>
+            <Search aria-hidden />
+            Searched {formatDate(topic.lastSearchedAt)}
+          </span>
+        )}
+        {topic.nextSearchAt && !topic.muted && topic.pendingResults === 0 && (
+          <span>
+            <CalendarClock aria-hidden />
+            Due {formatDate(topic.nextSearchAt)}
+          </span>
+        )}
+        <span>
+          <Repeat aria-hidden />
+          Every {formatInterval(topic.interval)}
+        </span>
+        <span>
+          <FileCheck aria-hidden />
+          {topic.lastPositiveAt ? `Last positive ${formatDate(topic.lastPositiveAt)}` : 'Nothing filed yet'}
+        </span>
       </p>
       {topic.queries.length > 0 && (
         <ul className="queries">
           {topic.queries.map((query) => (
             <li key={query}>
-              <code>{query}</code>
+              <code>
+                <Search aria-hidden />
+                {query}
+              </code>
             </li>
           ))}
         </ul>
       )}
       {topic.reviewQuestion && (
         <p className="question small">
-          <strong>The Pleb asks:</strong> {topic.reviewQuestion}
+          <MessageCircleQuestion aria-hidden />
+          <span>
+            <strong>The Pleb asks:</strong> {topic.reviewQuestion}
+          </span>
         </p>
       )}
       {topic.state === 'NeedsReview' && (
@@ -133,20 +187,23 @@ export function TopicCard({ topic, linked = false }: { topic: TopicSummary; link
           onSubmit={(answer) => review.mutate(() => api.clarifyTopic(topic.slug, answer))}
         />
       )}
-      <div className="actions">
+      <div className="topic-review">
         <button
           className="secondary"
           disabled={reviewBusy || !hasCuration || topic.reviewQuestion !== null || topic.approvedAt !== null}
           title={hasCuration ? undefined : 'There is no curation to approve yet.'}
           onClick={() => review.mutate(() => api.approveTopic(topic.slug))}
         >
+          <ThumbsUp aria-hidden />
           Good
         </button>
         <button
           className="secondary"
           disabled={reviewBusy || !hasCuration}
+          aria-pressed={form === 'reject'}
           onClick={() => setForm(form === 'reject' ? 'none' : 'reject')}
         >
+          <CircleX aria-hidden />
           Invalid
         </button>
         <button
@@ -155,9 +212,16 @@ export function TopicCard({ topic, linked = false }: { topic: TopicSummary; link
           title={topic.pinned ? 'Lets the Pleb replace your edit.' : undefined}
           onClick={() => review.mutate(() => api.recurateTopic(topic.slug))}
         >
+          <RefreshCw aria-hidden />
           Recurate
         </button>
-        <button className="secondary" disabled={reviewBusy} onClick={() => setForm(form === 'edit' ? 'none' : 'edit')}>
+        <button
+          className="secondary"
+          disabled={reviewBusy}
+          aria-pressed={form === 'edit'}
+          onClick={() => setForm(form === 'edit' ? 'none' : 'edit')}
+        >
+          <Pencil aria-hidden />
           Edit
         </button>
       </div>

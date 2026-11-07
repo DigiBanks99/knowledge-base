@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Check, Copy, ScrollText, Search, SearchX } from 'lucide-react'
 import { api, type LogEntry, type LogLevel } from '../api'
-import { Badge, Empty, ErrorMessage, Loading } from '../components'
+import { Badge, Empty, ErrorMessage, Loading, PageHeader } from '../components'
 
 /** How often the page asks again. Logs are not files the live updates stream watches, so the page polls. */
 const RefreshMilliseconds = 5000
@@ -65,90 +66,102 @@ export function LogsPage() {
 
   return (
     <section className="page">
-      <h1>Logs</h1>
-      <p className="muted">
-        Recent messages from the API, newest first, kept for five days and refreshed every few seconds. Click a value
-        such as a topic or run id to see every message about it. Searches and agent runs are also kept in full, and each
-        research topic's page shows its history.
-      </p>
+        <div>
+        <PageHeader
+          icon={ScrollText}
+          title="Logs"
+          description="Recent messages from the API, newest first, kept for five days and refreshed every few seconds. Tap a value such as a topic or run id to see every message about it. Searches and agent runs are also kept in full, and each research topic's page shows its history."
+        />
 
-      <div className="log-controls">
-        <label className="small">
-          Level{' '}
-          <select value={level} onChange={(event) => setLevel(event.target.value as LogLevel)}>
-            {levelOptions.map((option) => (
-              <option key={option} value={option}>
-                {option} and above
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="small">
-          Area{' '}
-          <select value={area} onChange={(event) => setArea(event.target.value)}>
-            <option value="">All areas</option>
-            {areaOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="small log-search">
-          Search{' '}
-          <input
-            type="search"
-            value={search}
-            placeholder="Message, topic, run id or exception"
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-        <button type="button" className="secondary" onClick={copy} disabled={!logs.data?.length}>
-          {copied ? 'Copied' : 'Copy shown'}
-        </button>
-      </div>
+        <div className="card log-controls">
+          <label>
+            Level
+            <select value={level} onChange={(event) => setLevel(event.target.value as LogLevel)}>
+              {levelOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option} and above
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Area
+            <select value={area} onChange={(event) => setArea(event.target.value)}>
+              <option value="">All areas</option>
+              {areaOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="log-search">
+            Search
+            <span className="search-field">
+              <Search aria-hidden />
+              <input
+                type="search"
+                value={search}
+                placeholder="Message, topic, run id or exception"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </span>
+          </label>
+          <button type="button" className="secondary" onClick={copy} disabled={!logs.data?.length}>
+            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+            {copied ? 'Copied' : 'Copy shown'}
+          </button>
+        </div>
 
-      {logs.isPending && <Loading what="logs" />}
-      {logs.isError && <ErrorMessage error={logs.error} />}
-      {logs.data?.length === 0 && <Empty>No messages match. Try a lower level, another area or a different search.</Empty>}
-      {logs.data && logs.data.length > 0 && (
-        <ul className="signals">
-          {logs.data.map((entry) => (
-            <li key={entry.sequence} className="card log-entry">
-              <div className="item-title">
-                <Badge tone={levelTone(entry.level)}>{entry.level}</Badge>
-                <button type="button" className="link small" title={`Show only ${entry.area}`} onClick={() => setArea(entry.area)}>
-                  {entry.area}
-                </button>
-                <span className="muted small">{formatLogTime(entry.at)}</span>
-              </div>
-              <p className="log-message">{entry.message}</p>
-              {Object.keys(entry.properties).length > 0 && (
-                <div className="log-properties">
-                  {Object.entries(entry.properties).map(([name, value]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      className="log-property"
-                      title={`Show every message mentioning this ${name}`}
-                      onClick={() => setSearch(value)}
-                    >
-                      <span className="muted">{name}</span> {value}
-                    </button>
-                  ))}
+        {logs.isPending && <Loading what="logs" />}
+        {logs.isError && <ErrorMessage error={logs.error} />}
+        {logs.data?.length === 0 && (
+          <Empty icon={SearchX}>No messages match. Try a lower level, another area or a different search.</Empty>
+        )}
+        {logs.data && logs.data.length > 0 && (
+          <ul className="log-list">
+            {logs.data.map((entry) => (
+              <li key={entry.sequence} className={`card log-entry level-${entry.level.toLowerCase()}`}>
+                <div className="item-title">
+                  <Badge tone={levelTone(entry.level)}>{entry.level}</Badge>
+                  <button
+                    type="button"
+                    className="link log-area"
+                    title={`Show only ${entry.area}`}
+                    onClick={() => setArea(entry.area)}
+                  >
+                    {entry.area}
+                  </button>
+                  <time>{formatLogTime(entry.at)}</time>
                 </div>
-              )}
-              <div className="muted small log-category">{entry.category}</div>
-              {entry.exception && (
-                <details>
-                  <summary className="small">Exception</summary>
-                  <pre className="log-exception">{entry.exception}</pre>
-                </details>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                <p className="log-message">{entry.message}</p>
+                {Object.keys(entry.properties).length > 0 && (
+                  <div className="log-properties">
+                    {Object.entries(entry.properties).map(([name, value]) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="log-property"
+                        title={`Show every message mentioning this ${name}`}
+                        onClick={() => setSearch(value)}
+                      >
+                        <span className="muted">{name}</span> {value}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="muted small log-category">{entry.category}</div>
+                {entry.exception && (
+                  <details>
+                    <summary className="small">Exception</summary>
+                    <pre className="log-exception">{entry.exception}</pre>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        </div>
     </section>
   )
 }

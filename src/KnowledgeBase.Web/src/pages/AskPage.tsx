@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ArrowUp, LoaderCircle, MessageSquarePlus, MessagesSquare, Plus, Trash2 } from 'lucide-react'
 import { api, ask, type Conversation, type ConversationMessage } from '../api'
-import { Empty, ErrorMessage, Loading, Markdown } from '../components'
+import { AgentIcon, BackLink, Empty, ErrorMessage, Loading, Markdown } from '../components'
 import { formatDate } from '../format'
+
+/** Starting points for an empty conversation; picking one fills the composer rather than sending it. */
+const suggestions = [
+  'What did I commit to this week?',
+  'Who have I met with most recently?',
+  'Which decisions are still open?',
+]
 
 export function AskPage() {
   const { conversationId } = useParams()
@@ -26,26 +34,30 @@ export function AskPage() {
   })
 
   return (
-    <section className="page split">
+    <section className={`page split${conversationId ? ' show-detail' : ''}`}>
       <aside className="list-pane">
-        <header className="page-header">
+        <header className="list-header">
+          <span className="page-icon" aria-hidden>
+            <MessagesSquare />
+          </span>
           <h1>Ask</h1>
           <button onClick={() => create.mutate()} disabled={create.isPending}>
+            <Plus aria-hidden />
             New
           </button>
         </header>
         {conversations.isPending && <Loading what="conversations" />}
         {conversations.isError && <ErrorMessage error={conversations.error} />}
-        {conversations.data?.length === 0 && <Empty>No conversations yet.</Empty>}
+        {conversations.data?.length === 0 && (
+          <Empty icon={MessageSquarePlus}>No conversations yet. Start one to ask the Librarian.</Empty>
+        )}
         <ul className="items">
           {conversations.data?.map((conversation) => (
-            <li
-              key={conversation.id}
-              className={conversation.id === conversationId ? 'selected' : ''}
-              onClick={() => navigate(`/ask/${conversation.id}`)}
-            >
-              <div className="item-title">{conversation.title}</div>
-              <span className="muted small">{formatDate(conversation.updatedAt)}</span>
+            <li key={conversation.id} className={conversation.id === conversationId ? 'selected' : ''}>
+              <button type="button" className="row" onClick={() => navigate(`/ask/${conversation.id}`)}>
+                <span className="row-title">{conversation.title}</span>
+                <span className="row-meta">{formatDate(conversation.updatedAt)}</span>
+              </button>
             </li>
           ))}
         </ul>
@@ -54,7 +66,9 @@ export function AskPage() {
         {conversationId ? (
           <Chat key={conversationId} id={conversationId} onDelete={() => remove.mutate(conversationId)} />
         ) : (
-          <Empty>Start a new conversation to ask the Librarian about anything in your wiki.</Empty>
+          <Empty icon={MessagesSquare} hero>
+            Start a new conversation to ask the Librarian about anything in your wiki.
+          </Empty>
         )}
       </div>
     </section>
@@ -72,6 +86,7 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const abort = useRef<AbortController | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => () => abort.current?.abort(), [])
 
@@ -79,6 +94,14 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth' })
   }, [conversation.data, pending, streaming])
+
+  // The composer grows with the question, up to the height its style allows.
+  useEffect(() => {
+    const element = input.current
+    if (!element) return
+    element.style.height = 'auto'
+    element.style.height = `${element.scrollHeight}px`
+  }, [question])
 
   const send = async () => {
     const text = question.trim()
@@ -116,38 +139,91 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
     }
   }
 
-  if (conversation.isPending) return <Loading what="conversation" />
-  if (conversation.isError) return <ErrorMessage error={conversation.error} />
+  const back = <BackLink to="/ask">Conversations</BackLink>
+  if (conversation.isPending)
+    return (
+      <>
+        {back}
+        <Loading what="conversation" />
+      </>
+    )
+  if (conversation.isError)
+    return (
+      <>
+        {back}
+        <ErrorMessage error={conversation.error} />
+      </>
+    )
 
   const messages = pending ? [...conversation.data.messages, pending] : conversation.data.messages
 
   return (
     <>
+      {back}
       <header className="detail-header">
         <h2>{conversation.data.title}</h2>
-        <button className="secondary" onClick={onDelete} disabled={streaming !== null}>
-          Delete
+        <button
+          className="ghost icon"
+          onClick={onDelete}
+          disabled={streaming !== null}
+          title="Delete this conversation"
+          aria-label="Delete this conversation"
+        >
+          <Trash2 aria-hidden />
         </button>
       </header>
       <div className="messages">
         {messages.length === 0 && streaming === null && (
-          <Empty>Ask about people, decisions, commitments, or patterns across your notes.</Empty>
+          <Empty icon={MessagesSquare} hero>
+            Ask about people, decisions, commitments, or patterns across your notes.
+            <div className="suggestions">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setQuestion(suggestion)
+                    input.current?.focus()
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </Empty>
         )}
         {messages.map((message, index) => (
           <div key={index} className={`message ${message.role.toLowerCase()}`}>
-            {message.role === 'User' ? <p>{message.text}</p> : <Markdown content={message.text} />}
+            {message.role !== 'User' && <AgentIcon agent="Librarian" />}
+            <div className="bubble">
+              {message.role === 'User' ? <p>{message.text}</p> : <Markdown content={message.text} />}
+            </div>
           </div>
         ))}
         {streaming !== null && (
           <div className="message assistant">
-            {streaming ? <Markdown content={streaming} /> : <p className="muted">Searching the wiki…</p>}
+            <AgentIcon agent="Librarian" />
+            <div className="bubble">
+              {streaming ? (
+                <Markdown content={streaming} />
+              ) : (
+                <p className="thinking">
+                  <LoaderCircle className="spin" aria-hidden />
+                  Searching the wiki…
+                </p>
+              )}
+            </div>
           </div>
         )}
-        {error && <p className="error">{error}</p>}
+        {error && <ErrorMessage error={new Error(error)} />}
         <div ref={bottom} />
       </div>
       <div className="composer">
         <textarea
+          ref={input}
+          rows={1}
+          aria-label="Question"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={(event) => {
@@ -156,11 +232,16 @@ function Chat({ id, onDelete }: { id: string; onDelete: () => void }) {
               void send()
             }
           }}
-          placeholder="Ask a question… (Enter to send, Shift+Enter for a new line)"
+          placeholder="Ask the Librarian…"
           disabled={streaming !== null}
         />
-        <button onClick={() => void send()} disabled={!question.trim() || streaming !== null}>
-          Ask
+        <button
+          onClick={() => void send()}
+          disabled={!question.trim() || streaming !== null}
+          title="Ask (Enter); Shift+Enter for a new line"
+          aria-label="Ask"
+        >
+          <ArrowUp aria-hidden />
         </button>
       </div>
     </>
