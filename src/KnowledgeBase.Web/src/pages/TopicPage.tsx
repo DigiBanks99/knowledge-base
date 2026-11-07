@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ChevronLeft, ChevronRight, Gavel, History, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { api, type JudgedResult, type ResultMark } from '../api'
-import { Badge, Empty, ErrorMessage, Loading, RunCard } from '../components'
+import { Badge, Empty, ErrorMessage, Loading, RunCard, SectionTitle } from '../components'
 import { formatDate } from '../format'
 import { TopicCard } from './TopicsPage'
 
@@ -13,9 +14,10 @@ export function TopicPage() {
 
   return (
     <>
-      <p>
-        <Link to="/research/topics">← All topics</Link>
-      </p>
+      <Link to="/research/topics" className="back">
+        <ArrowLeft aria-hidden />
+        All topics
+      </Link>
       {topics.isPending && <Loading what="the topic" />}
       {topics.isError && <ErrorMessage error={topics.error} />}
       {topics.data && !topic && <Empty>There is no research topic named {slug}.</Empty>}
@@ -50,7 +52,9 @@ function JudgedResults({ slug }: { slug: string }) {
 
   return (
     <section className="judged-results">
-      <h2>Judged results</h2>
+      <SectionTitle icon={Gavel} count={judged.data?.results.length}>
+        Judged results
+      </SectionTitle>
       <p className="muted small">
         Mark what the Keeper judged as useful or noise; the Status page shows how often it agrees. Marks never change a
         verdict.
@@ -75,11 +79,12 @@ function JudgedResults({ slug }: { slug: string }) {
                     {(['Useful', 'Noise'] as const).map((value) => (
                       <button
                         key={value}
-                        className={result.mark === value ? undefined : 'secondary'}
+                        className="secondary"
                         aria-pressed={result.mark === value}
                         disabled={mark.isPending}
                         onClick={() => mark.mutate({ result, value: result.mark === value ? null : value })}
                       >
+                        {value === 'Useful' ? <ThumbsUp aria-hidden /> : <ThumbsDown aria-hidden />}
                         {value}
                       </button>
                     ))}
@@ -89,17 +94,18 @@ function JudgedResults({ slug }: { slug: string }) {
               <div className="muted small">
                 {result.source} · for <code>{result.query}</code> · judged {formatDate(result.judgedAt)}
               </div>
-              <div className="small">
-                {result.markable ? (
-                  <>
-                    Useful {probability(result.useful)} · injection {probability(result.injection)}
-                    {result.kind && ` · ${result.kind}`}
-                    {result.reason && ` · ${result.reason}`}
-                  </>
-                ) : (
-                  `${result.failure ?? result.reason ?? 'No verdict'} The Keeper gave no verdict here, so there is nothing to mark.`
-                )}
-              </div>
+              {result.markable ? (
+                <div className="scores">
+                  <Score label="Useful" value={result.useful} tone="var(--success)" />
+                  <Score label="Injection" value={result.injection} tone="var(--danger)" />
+                  {result.kind && <span>{result.kind}</span>}
+                  {result.reason && <span>{result.reason}</span>}
+                </div>
+              ) : (
+                <div className="small">
+                  {`${result.failure ?? result.reason ?? 'No verdict'} The Keeper gave no verdict here, so there is nothing to mark.`}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -116,6 +122,21 @@ function probability(value: number | null): string {
   return value === null ? 'n/a' : percent(value)
 }
 
+/** One of the Keeper's probabilities as a small bar with its percentage. */
+function Score({ label, value, tone }: { label: string; value: number | null; tone: string }) {
+  return (
+    <span className="score">
+      {label}
+      {value !== null && (
+        <span className="meter" style={{ ['--tone' as string]: tone }} aria-hidden>
+          <span style={{ width: percent(value) }} />
+        </span>
+      )}
+      <strong>{probability(value)}</strong>
+    </span>
+  )
+}
+
 /** The topic's runs a page at a time; the page is kept in the URL so the browser's back button returns to it. */
 function TopicRuns({ slug }: { slug: string }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -128,7 +149,7 @@ function TopicRuns({ slug }: { slug: string }) {
 
   return (
     <section className="topic-runs">
-      <h2>Runs</h2>
+      <SectionTitle icon={History}>Runs</SectionTitle>
       <p className="muted small">
         The Pleb’s curations, the triage of each result and the ThreadWeaver filing the research notes, newest first.
       </p>
@@ -139,13 +160,15 @@ function TopicRuns({ slug }: { slug: string }) {
       )}
       {runs.data?.runs.map((run) => <RunCard key={run.id} run={run} defaultOpen={run.status === 'Running'} />)}
       {runs.data && (page > 1 || runs.data.hasOlder) && (
-        <div className="actions">
+        <div className="actions pager">
           <button className="secondary" disabled={page === 1} onClick={() => goTo(page - 1)}>
+            <ChevronLeft aria-hidden />
             Newer
           </button>
           <span className="muted small">Page {page}</span>
           <button className="secondary" disabled={!runs.data.hasOlder} onClick={() => goTo(page + 1)}>
             Older
+            <ChevronRight aria-hidden />
           </button>
         </div>
       )}

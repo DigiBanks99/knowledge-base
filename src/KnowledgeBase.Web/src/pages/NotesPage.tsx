@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
+import { CalendarClock, Clock, History, MousePointerClick, RotateCcw, StickyNote } from 'lucide-react'
 import { api, type AgentRun, type NoteState } from '../api'
-import { Badge, Empty, ErrorMessage, Loading, Markdown, RunCard } from '../components'
+import { BackLink, Badge, Empty, ErrorMessage, Loading, Markdown, RunCard, SectionTitle } from '../components'
 import { formatDate } from '../format'
 
 const states: NoteState[] = ['New', 'Processing', 'Failed', 'Processed']
@@ -12,32 +13,35 @@ export function NotesPage() {
   const notes = useQuery({ queryKey: ['notes'], queryFn: api.notes })
 
   return (
-    <section className="page split">
+    <section className={`page split${selected ? ' show-detail' : ''}`}>
       <aside className="list-pane">
-        <h1>Notes</h1>
+        <header className="list-header">
+          <span className="page-icon" aria-hidden>
+            <StickyNote />
+          </span>
+          <h1>Notes</h1>
+        </header>
         {notes.isPending && <Loading what="notes" />}
         {notes.isError && <ErrorMessage error={notes.error} />}
-        {notes.data?.length === 0 && <Empty>No notes yet. Capture one to get started.</Empty>}
+        {notes.data?.length === 0 && <Empty icon={StickyNote}>No notes yet. Capture one to get started.</Empty>}
         {states.map((state) => {
           const inState = notes.data?.filter((note) => note.state === state) ?? []
           if (inState.length === 0) return null
           return (
             <div key={state} className="group">
-              <h2>
-                {state} <span className="muted">({inState.length})</span>
+              <h2 className="group-label">
+                {state} <span>{inState.length}</span>
               </h2>
               <ul className="items">
                 {inState.map((note) => (
-                  <li
-                    key={note.name}
-                    className={note.name === selected ? 'selected' : ''}
-                    onClick={() => setParams({ note: note.name })}
-                  >
-                    <div className="item-title">
-                      <Badge tone={note.state}>{note.state}</Badge>
-                      <span className="muted small">{formatDate(note.capturedAt)}</span>
-                    </div>
-                    <p className="preview">{note.preview}</p>
+                  <li key={note.name} className={note.name === selected ? 'selected' : ''}>
+                    <button type="button" className="row" onClick={() => setParams({ note: note.name })}>
+                      <span className="row-meta">
+                        <Badge tone={note.state}>{note.state}</Badge>
+                        {formatDate(note.capturedAt)}
+                      </span>
+                      <p className="preview">{note.preview}</p>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -45,7 +49,15 @@ export function NotesPage() {
           )
         })}
       </aside>
-      <div className="detail-pane">{selected ? <NoteDetail name={selected} /> : <Empty>Select a note.</Empty>}</div>
+      <div className="detail-pane">
+        {selected ? (
+          <NoteDetail name={selected} />
+        ) : (
+          <Empty icon={MousePointerClick} hero>
+            Select a note to see what the agents made of it.
+          </Empty>
+        )}
+      </div>
     </section>
   )
 }
@@ -59,8 +71,21 @@ function NoteDetail({ name }: { name: string }) {
   })
   const retry = useMutation({ mutationFn: () => api.retryNote(name) })
 
-  if (note.isPending) return <Loading what="note" />
-  if (note.isError) return <ErrorMessage error={note.error} />
+  const back = <BackLink to="/notes">All notes</BackLink>
+  if (note.isPending)
+    return (
+      <>
+        {back}
+        <Loading what="note" />
+      </>
+    )
+  if (note.isError)
+    return (
+      <>
+        {back}
+        <ErrorMessage error={note.error} />
+      </>
+    )
 
   // Weaver runs are triggered by fact files, which are named after what the Fact Finder wrote for this note.
   const factFiles = new Set(
@@ -75,29 +100,40 @@ function NoteDetail({ name }: { name: string }) {
 
   const { summary, content } = note.data
   return (
-    <>
+    <div>
+      {back}
       <header className="detail-header">
         <h2>{summary.name}</h2>
         <Badge tone={summary.state}>{summary.state}</Badge>
         {summary.state === 'Failed' && (
           <button onClick={() => retry.mutate()} disabled={retry.isPending}>
+            <RotateCcw aria-hidden />
             Retry
           </button>
         )}
       </header>
-      <p className="muted small">
-        Captured {formatDate(summary.capturedAt)} · updated {formatDate(summary.updatedAt)}
+      <p className="meta">
+        <span>
+          <CalendarClock aria-hidden />
+          Captured {formatDate(summary.capturedAt)}
+        </span>
+        <span>
+          <Clock aria-hidden />
+          Updated {formatDate(summary.updatedAt)}
+        </span>
       </p>
       {retry.isError && <ErrorMessage error={retry.error} />}
       <div className="card">
         <Markdown content={content} />
       </div>
-      <h3>Processing</h3>
+      <SectionTitle icon={History} count={runs.length}>
+        Processing
+      </SectionTitle>
       {runs.length === 0 ? (
         <Empty>{summary.state === 'New' ? 'Waiting to be processed.' : 'No runs recorded for this note.'}</Empty>
       ) : (
         runs.map((run) => <RunCard key={run.id} run={run} defaultOpen={run.status === 'Running'} />)
       )}
-    </>
+    </div>
   )
 }

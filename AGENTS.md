@@ -119,6 +119,11 @@ pnpm run build   # tsc -b && vite build
 - Data fetching through TanStack Query; live updates come from the `/api/events` server-sent event stream
   (`useLiveUpdates.ts`), which invalidates queries by area.
 - All API calls go through `src/api.ts`, which sends the `X-Requested-With` header the API requires.
+- Dark only and mobile first. Colours, radii and fonts are tokens at the top of `src/index.css`; base rules are for a
+  phone and `min-width: 900px` queries add the sidebar and side-by-side panes. Split pages (`.page.split`) show the
+  list or the detail on a phone (`show-detail`), so give a detail a `BackLink`. Icons come from `lucide-react`; build
+  pages from `PageHeader`, `SectionTitle`, `Empty` and `Badge` in `components.tsx`. Fonts are self-hosted through
+  Fontsource; don't load anything from a third-party CDN.
 - The Vite dev server proxies `/api`, `/auth` and the OIDC callbacks to the API so the browser sees one origin.
   Keep new server routes under those prefixes.
 
