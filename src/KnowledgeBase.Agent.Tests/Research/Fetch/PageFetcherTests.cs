@@ -20,7 +20,7 @@ public sealed class PageFetcherTests
 
     private static readonly IPAddress Public = IPAddress.Parse("93.184.215.14");
 
-    private readonly Dictionary<string, Func<HttpResponseMessage>> _pages = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Func<HttpResponseMessage>> _pages = [with(StringComparer.Ordinal)];
     private readonly StubHttpHandler _handler = new();
     private readonly IHostResolver _resolver = Substitute.For<IHostResolver>();
     private readonly PageFetcher _fetcher;

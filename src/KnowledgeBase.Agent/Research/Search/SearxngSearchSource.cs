@@ -207,7 +207,7 @@ internal sealed class SearxngSearchSource(IHttpClientFactory httpClientFactory, 
             return null;
         }
 
-        Dictionary<string, bool> engines = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, bool> engines = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (JsonElement engine in list.EnumerateArray())
         {
             if (SearchHttp.String(engine, "name") is { Length: > 0 } name)

@@ -32,7 +32,7 @@ public static class ResultFilter
         DateTimeOffset cutoff = topic.LastSearchedAt ?? now - FirstSearchWindow;
         List<BatchResult> kept = [];
         List<string> seen = [];
-        HashSet<string> seenThisSearch = new(StringComparer.Ordinal);
+        HashSet<string> seenThisSearch = [with(StringComparer.Ordinal)];
         int blocked = 0;
         int alreadySeen = 0;
         int tooOld = 0;

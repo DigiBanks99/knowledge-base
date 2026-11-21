@@ -83,7 +83,7 @@ internal sealed class AgentProviderOverrides(string path, IReadOnlyDictionary<st
     {
         if (!File.Exists(path))
         {
-            return new Dictionary<string, ModelProvider>(StringComparer.OrdinalIgnoreCase);
+            return [with(StringComparer.OrdinalIgnoreCase)];
         }
 
         Dictionary<string, string>? stored;
@@ -96,7 +96,7 @@ internal sealed class AgentProviderOverrides(string path, IReadOnlyDictionary<st
             throw new InvalidOperationException($"The agent providers in {path} are not valid JSON. Fix or delete the file.", ex);
         }
 
-        Dictionary<string, ModelProvider> overrides = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ModelProvider> overrides = [with(StringComparer.OrdinalIgnoreCase)];
         foreach ((string name, string value) in stored ?? [])
         {
             string? agent = KnownAgents.All.FirstOrDefault(known => string.Equals(known, name, StringComparison.OrdinalIgnoreCase));
