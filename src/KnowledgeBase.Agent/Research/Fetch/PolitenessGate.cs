@@ -11,7 +11,7 @@ internal sealed class PolitenessGate(IOptions<ResearchSettings> settings, TimePr
     private const int PruneThreshold = 1000;
 
     private readonly Lock _lock = new();
-    private readonly Dictionary<string, DateTimeOffset> _nextFree = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DateTimeOffset> _nextFree = [with(StringComparer.OrdinalIgnoreCase)];
 
     public async Task WaitAsync(string host, CancellationToken cancellationToken)
     {

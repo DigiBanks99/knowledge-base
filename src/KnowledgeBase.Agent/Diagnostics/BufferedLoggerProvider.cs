@@ -78,7 +78,7 @@ internal sealed class BufferedLoggerProvider(LogBuffer buffer, LogFiles files, T
         /// </summary>
         private static Dictionary<string, string> PropertiesOf<TState>(TState state)
         {
-            Dictionary<string, string> properties = new(StringComparer.Ordinal);
+            Dictionary<string, string> properties = [with(StringComparer.Ordinal)];
             if (state is not IEnumerable<KeyValuePair<string, object?>> pairs)
             {
                 return properties;
