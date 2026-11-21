@@ -76,10 +76,10 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The CLI version follows the AppHost SDK, so the two never drift apart.
+      # The CLI version follows the AppHost package, so the two never drift apart.
       - name: Install Aspire CLI
         run: |
-          version=$(sed -n 's#.*Sdk="Aspire.AppHost.Sdk/\([^"]*\)".*#\1#p' src/KnowledgeBase.AppHost/KnowledgeBase.AppHost.csproj)
+          version=$(sed -n 's#.*Include="Aspire.Hosting.AppHost" Version="\([^"]*\)".*#\1#p' Directory.Packages.props)
           dotnet tool update Aspire.Cli --version "$version" --tool-path "$RUNNER_TOOL_CACHE/aspire-cli"
           echo "$RUNNER_TOOL_CACHE/aspire-cli" >> "$GITHUB_PATH"
 

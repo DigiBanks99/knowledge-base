@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 
 using Aspire.Hosting.Docker.Resources.ServiceNodes;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.JavaScript;
 using Aspire.Hosting.Publishing;
 
@@ -101,8 +102,11 @@ IResourceBuilder<ContainerResource> searxng = builder
         service.Restart = "unless-stopped";
     });
 
-IResourceBuilder<ProjectResource> api = builder
-    .AddProject<Projects.KnowledgeBase_Agent>("knowledgebase-agent")
+// Project resources v2 (built and launched like any other executable) are still experimental.
+#pragma warning disable ASPIREDOTNETPROJECT001
+IResourceBuilder<DotnetProjectResource> api = builder
+    .AddDotnetProject("knowledgebase-agent", "../KnowledgeBase.Agent/KnowledgeBase.Agent.csproj")
+#pragma warning restore ASPIREDOTNETPROJECT001
     .WithReference(cache)
     .WaitFor(cache)
     .WithEnvironment("Research__SearxngEndpoint", searxng.GetEndpoint("http"))
