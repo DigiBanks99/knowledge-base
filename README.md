@@ -50,7 +50,7 @@ In production the API serves the built UI from `wwwroot`.
 
 ## Prerequisites
 
-- [.NET SDK 10.0.302](https://dotnet.microsoft.com/download) (pinned in `global.json`)
+- [.NET SDK 10.0.404](https://dotnet.microsoft.com/download) (pinned in `global.json`)
 - [Node.js 24](https://nodejs.org/) and [pnpm](https://pnpm.io/installation) (the version pinned in `src/KnowledgeBase.Web/package.json`)
 - [Aspire CLI](https://aspire.dev/get-started/install-cli/)
 - A container runtime (Docker or Podman) for Redis
