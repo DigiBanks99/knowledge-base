@@ -58,7 +58,7 @@ pnpm run build   # tsc -b && vite build
 
 - Explicit types everywhere; `var` is an error. File-scoped namespaces, primary constructors, collection expressions.
 - LF line endings; `System` usings first, with using groups separated by a blank line.
-- Registration and endpoint mapping use C# 14 `extension(...)` blocks in `*DependencyInjection.cs` and
+- Registration and endpoint mapping use `extension(...)` blocks in `*DependencyInjection.cs` and
   `*Endpoints.cs` per feature, chained fluently (`builder.AddWiki()`, `api.MapNotesEndpoints()`).
 - Use cases are `XxxCommand`/`XxxQuery` records with an `XxxCommandHandler`/`XxxQueryHandler` registered as a
   singleton. Handlers return `Result<T, Error>` from CSharpFunctionalExtensions and compose with `Bind`, `Map`,

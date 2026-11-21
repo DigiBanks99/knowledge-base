@@ -94,7 +94,7 @@ jobs:
       - name: Build the API base image
         id: base-image
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/knowledge-base-api-base:10.0"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/knowledge-base-api-base:11.0"
           docker build --pull --tag "$image" --file docker/api-base.Dockerfile docker
           docker push "$image"
           echo "image=$image" >> "$GITHUB_OUTPUT"
