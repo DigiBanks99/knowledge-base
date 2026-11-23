@@ -47,6 +47,9 @@ pnpm run build   # tsc -b && vite build
   no `Version`.
 - Every project has a `packages.lock.json`. After adding or changing a package, run `dotnet restore` (without
   `--locked-mode`) and commit the updated lock files, or CI fails.
+- `nuget.config` makes `dotnet package add` and `dotnet package update` skip versions published less than 72 hours
+  ago. Don't remove the delay or add a `minPublishAgeExceptions` pattern to get a newer release; name the version
+  explicitly instead, and only when it is needed sooner.
 - The UI uses pnpm with a committed `pnpm-lock.yaml`; never add a `package-lock.json` or use npm to install. The pnpm
   version is pinned (with its hash) in `package.json`'s `packageManager` field, which CI and the deployed image
   both follow. `pnpm audit --audit-level high` must pass.
