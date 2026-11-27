@@ -9,7 +9,7 @@ prompts and the UI.
 - `src/KnowledgeBase.AppHost`: Aspire AppHost (`AppHost.cs`). All configuration enters here as parameters and is
   passed to the API as environment variables.
 - `src/KnowledgeBase.Agent`: the API and the agents, organised by feature folder (`Notes`, `Facts`, `Review`, `Wiki`,
-  `Conversations`, `Runs`, `Files`, `Auth`, ...). `Program.cs` registers the five agents and their tools.
+  `Conversations`, `Runs`, `Files`, `Auth`, ...). `Program.cs` registers the agents in `KnownAgents` and their tools.
 - `src/KnowledgeBase.Agent.Tests`: unit tests for the API, mirroring its feature folders.
 - `src/KnowledgeBase.Agent.IntegrationTests`: the API's services and pipeline against a temporary wiki root, with
   scripted agents.
