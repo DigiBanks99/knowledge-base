@@ -16,6 +16,7 @@ internal static class FileToolsExtensions
                 FileTools fileTools = sp.GetRequiredService<FileTools>();
                 tools.AddTool(AIFunctionFactory.Create(fileTools.CreateDirectory));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.CreateFile));
+                tools.AddTool(AIFunctionFactory.Create(fileTools.DeleteDirectory));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.DeleteFile));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ListFiles));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.MoveFile));

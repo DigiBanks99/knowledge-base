@@ -17,7 +17,8 @@ internal static class RunToolPolicy
     private static readonly string PersonalSectionList =
         string.Join(" and ", PersonalSections.Select(folder => $"`{folder}/`"));
 
-    private static readonly string[] RemovingTools = [nameof(FileTools.DeleteFile), nameof(FileTools.MoveFile)];
+    private static readonly string[] RemovingTools =
+        [nameof(FileTools.DeleteDirectory), nameof(FileTools.DeleteFile), nameof(FileTools.MoveFile)];
 
     private static readonly string[] WritingTools =
         [nameof(FileTools.CreateDirectory), nameof(FileTools.CreateFile), nameof(FileTools.PatchFile)];

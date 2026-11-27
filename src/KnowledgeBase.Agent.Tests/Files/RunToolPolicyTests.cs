@@ -8,6 +8,7 @@ public sealed class RunToolPolicyTests
     [Test]
     [Arguments(nameof(FileTools.DeleteFile), new[] { "projects/knowledge-base/index.md" })]
     [Arguments(nameof(FileTools.DeleteFile), new[] { "people/jane-doe/index.md" })]
+    [Arguments(nameof(FileTools.DeleteDirectory), new[] { "projects/knowledge-base/" })]
     [Arguments(nameof(FileTools.MoveFile), new[] { "projects/knowledge-base/index.md", "projects/archive/index.md" })]
     [Arguments(nameof(FileTools.MoveFile), new[] { "learning/agents.md", "people/jane-doe/agents.md" })]
     public void ARunOverResearchRemovesOrRestructuresAPage(string tool, string[] paths)
