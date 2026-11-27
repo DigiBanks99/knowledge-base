@@ -28,6 +28,7 @@ internal sealed class RecordTopicChangesCommandHandler(
         nameof(FileTools.CreateDirectory),
         nameof(FileTools.CreateFile),
         nameof(FileTools.PatchFile),
+        nameof(FileTools.DeleteDirectory),
         nameof(FileTools.DeleteFile),
         nameof(FileTools.MoveFile)
     ];

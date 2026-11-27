@@ -35,6 +35,7 @@ internal static class ReviewToolExtensions
                 ReviewTools reviewTools = sp.GetRequiredService<ReviewTools>();
                 tools.AddTool(AIFunctionFactory.Create(fileTools.CreateDirectory));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.CreateFile));
+                tools.AddTool(AIFunctionFactory.Create(fileTools.DeleteDirectory));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.DeleteFile));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.ListFiles));
                 tools.AddTool(AIFunctionFactory.Create(fileTools.MoveFile));

@@ -13,6 +13,7 @@ internal static class FileDependencyInjection
             builder.Services
                 .AddSingleton<CreateDirectoryHandler>()
                 .AddSingleton<CreateFileHandler>()
+                .AddSingleton<DeleteDirectoryHandler>()
                 .AddSingleton<DeleteFileHandler>()
                 .AddSingleton<ListFilesHandler>()
                 .AddSingleton<MoveFileHandler>()

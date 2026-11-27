@@ -133,7 +133,7 @@ export function BackLink({ to, children }: { to: string; children: ReactNode }) 
   )
 }
 
-const writeTools = new Set(['CreateFile', 'PatchFile', 'MoveFile', 'DeleteFile', 'CreateDirectory'])
+const writeTools = new Set(['CreateFile', 'PatchFile', 'MoveFile', 'DeleteFile', 'CreateDirectory', 'DeleteDirectory'])
 
 /** One agent run: status, timing, outcome, and (expandable) every tool call it made. */
 export function RunCard({ run, defaultOpen = false }: { run: AgentRun; defaultOpen?: boolean }) {

@@ -13,6 +13,7 @@ internal sealed class FileTools(
     AgentRunTracker runTracker,
     CreateDirectoryHandler createDirectoryHandler,
     CreateFileHandler createFileHandler,
+    DeleteDirectoryHandler deleteDirectoryHandler,
     DeleteFileHandler deleteFileHandler,
     ListFilesHandler listFilesHandler,
     MoveFileHandler moveFileHandler,
@@ -54,6 +55,33 @@ internal sealed class FileTools(
         return result.Match(
             success => success,
             error => throw new InvalidOperationException($"Failed to create file '{desiredFilePath}': {error.Message}"));
+    }
+
+    [Description(
+        """
+        Deletes an empty directory in the wiki, such as a misspelled or emptied folder. A directory that still contains
+        anything is refused: move each page to where it belongs with `MoveFile` (or remove it with `DeleteFile`) first.
+        The wiki root and its top-level sections cannot be deleted.
+        """)]
+    public bool DeleteDirectory(
+        [Description("The path of the directory to be deleted, relative to the wiki root, for example 'projects/knowlege-base'.")]
+        string desiredDirectoryPath)
+    {
+        string directoryPath = wikiPaths.Resolve(desiredDirectoryPath);
+        EnsureAllowed(nameof(DeleteDirectory), directoryPath);
+        if (IsWikiStructure(directoryPath))
+        {
+            throw new InvalidOperationException(
+                $"The directory '{desiredDirectoryPath}' is the wiki root or one of its top-level sections, which are part "
+                + "of the wiki's structure and cannot be deleted. Only delete folders inside a section.");
+        }
+
+        Result<bool, Error> result = deleteDirectoryHandler
+            .Handle(new DeleteDirectoryRequest(directoryPath))
+            .TapError(logger.ErrorOccurred);
+        return result.Match(
+            success => success,
+            error => throw new InvalidOperationException($"Failed to delete directory '{desiredDirectoryPath}': {error.Message}"));
     }
 
     [Description("Deletes the specified file at the given path in the wiki.")]
@@ -195,6 +223,18 @@ internal sealed class FileTools(
         }
 
         return matches;
+    }
+
+    /// <summary>Whether a full path is the wiki root or a section folder, which startup seeds and the wiki rules describe.</summary>
+    private bool IsWikiStructure(string fullPath)
+    {
+        string[] segments = Path
+            .GetRelativePath(wikiPaths.Root, fullPath)
+            .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries)
+            .Where(segment => segment != ".")
+            .ToArray();
+        return segments.Length == 0
+            || (segments.Length == 1 && WikiSections.All.Any(section => section.Folder.Equals(segments[0], StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>Refuses a call the current run may not make (see <see cref="RunToolPolicy"/>) before anything changes.</summary>

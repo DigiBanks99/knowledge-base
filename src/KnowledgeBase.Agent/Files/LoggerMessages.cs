@@ -35,6 +35,12 @@ public static partial class LoggerMessages
     [LoggerMessage(LogLevel.Error, "Failed to delete file '{FilePath}'")]
     public static partial void FailedToDeleteFile(this ILogger logger, string filePath, Exception exception);
 
+    [LoggerMessage(LogLevel.Information, "Deleting directory '{Directory}'")]
+    public static partial void DeletingDirectory(this ILogger logger, string directory);
+
+    [LoggerMessage(LogLevel.Error, "Failed to delete directory '{Directory}'")]
+    public static partial void FailedToDeleteDirectory(this ILogger logger, string directory, Exception exception);
+
     [LoggerMessage(LogLevel.Error, "Directory not found: '{DirectoryPath}'")]
     public static partial void DirectoryNotFound(this ILogger logger, string directoryPath);
 

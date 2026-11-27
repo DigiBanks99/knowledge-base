@@ -169,6 +169,18 @@ public sealed class RecordTopicChangesCommandHandlerTests
     }
 
     [Test]
+    public async Task ATopicsFolderIsDeleted()
+    {
+        _wikiTopics.Exists(KnownTopic).Returns(false);
+
+        await _handler.Handle(Run(KnownAgents.Editor, Call("DeleteDirectory", "projects/known/")), CancellationToken.None);
+
+        ItShouldDropTheTopicsState();
+
+        void ItShouldDropTheTopicsState() => _state.Topics.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task OnePageOfAFolderTopicIsDeleted()
     {
         await _handler.Handle(Run(KnownAgents.Editor, Call("DeleteFile", "projects/known/old.md")), CancellationToken.None);

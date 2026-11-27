@@ -9,8 +9,8 @@ using Microsoft.Extensions.AI;
 namespace KnowledgeBase.Agent.IntegrationTests.Files;
 
 /// <summary>
-/// The ThreadWeaver's file tools inside a run, called the way the agent calls them, over a wiki with a personal page
-/// and a topic page that both mention the same term.
+/// The file tools inside a ThreadWeaver or Editor run, called the way the agent calls them, over a wiki with a personal
+/// page and a topic page that both mention the same term.
 /// </summary>
 public sealed class FileToolsTests : IAsyncDisposable
 {
@@ -141,6 +141,102 @@ public sealed class FileToolsTests : IAsyncDisposable
         void ItShouldAllowEveryCall() => run.ToolCalls.ShouldAllBe(call => call.Succeeded);
     }
 
+    [Test]
+    public async Task TheEditorEmptiesAndRemovesAMisspelledFolder()
+    {
+        await LayOutTheWikiAsync();
+        WriteWikiPage("projects/knowlege-base/notes.md", "# Notes\n");
+
+        (bool deleted, AgentRun run) = await InEditorRunAsync(async tools =>
+        {
+            await _wiki.CallToolAsync(
+                nameof(FileTools.MoveFile),
+                "projects/knowlege-base/notes.md → projects/knowledge-base/notes.md",
+                () => tools.MoveFile("projects/knowlege-base/notes.md", "projects/knowledge-base/notes.md"));
+            return await _wiki.CallToolAsync(
+                nameof(FileTools.DeleteDirectory), "projects/knowlege-base/", () => Task.FromResult(tools.DeleteDirectory("projects/knowlege-base/")));
+        });
+
+        ItShouldRemoveTheFolder();
+        ItShouldKeepThePageItHeld();
+        ItShouldRecordTheDeletion();
+
+        void ItShouldRemoveTheFolder()
+        {
+            deleted.ShouldBeTrue();
+            Directory.Exists(WikiPath("projects/knowlege-base")).ShouldBeFalse();
+        }
+
+        void ItShouldKeepThePageItHeld() => File.Exists(WikiPath("projects/knowledge-base/notes.md")).ShouldBeTrue();
+
+        void ItShouldRecordTheDeletion() => run.ToolCalls.ShouldContain(call =>
+            call.Tool == nameof(FileTools.DeleteDirectory) && call.Target == "projects/knowlege-base/" && call.Succeeded);
+    }
+
+    [Test]
+    public async Task TheEditorRemovesAFolderThatStillHoldsPages()
+    {
+        await LayOutTheWikiAsync();
+
+        (Exception? exception, _) = await InEditorRunAsync(tools =>
+            Catch.ExceptionAsync(() => _wiki.CallToolAsync(
+                nameof(FileTools.DeleteDirectory), Topic, () => Task.FromResult(tools.DeleteDirectory(Topic)))));
+
+        ItShouldBeRefusedNamingThePage();
+        ItShouldKeepTheFolder();
+
+        void ItShouldBeRefusedNamingThePage() => exception.ShouldBeOfType<InvalidOperationException>()
+            .Message.ShouldContain("not empty. It still contains: index.md.", Case.Sensitive);
+
+        void ItShouldKeepTheFolder() => File.Exists(WikiPath(TopicPage)).ShouldBeTrue();
+    }
+
+    [Test]
+    [Arguments(".")]
+    [Arguments("projects")]
+    [Arguments("People/")]
+    public async Task TheEditorRemovesPartOfTheWikisStructure(string directory)
+    {
+        await _wiki.InitialiseAsync();
+
+        (Exception? exception, _) = await InEditorRunAsync(tools =>
+            Catch.ExceptionAsync(() => _wiki.CallToolAsync(
+                nameof(FileTools.DeleteDirectory), directory, () => Task.FromResult(tools.DeleteDirectory(directory)))));
+
+        ItShouldBeRefused();
+        ItShouldKeepTheSections();
+
+        void ItShouldBeRefused() => exception.ShouldBeOfType<InvalidOperationException>()
+            .Message.ShouldContain("cannot be deleted", Case.Sensitive);
+
+        void ItShouldKeepTheSections()
+        {
+            Directory.Exists(WikiPath("projects")).ShouldBeTrue();
+            Directory.Exists(WikiPath("people")).ShouldBeTrue();
+        }
+    }
+
+    [Test]
+    public async Task AResearchRunRemovesAnEmptyFolder()
+    {
+        await LayOutTheWikiAsync();
+        Directory.CreateDirectory(WikiPath("projects/empty"));
+
+        (Exception? exception, _) = await InRunAsync(FactOrigin.Research, tools =>
+            Catch.ExceptionAsync(() => _wiki.CallToolAsync(
+                nameof(FileTools.DeleteDirectory), "projects/empty", () => Task.FromResult(tools.DeleteDirectory("projects/empty")))));
+
+        ItShouldBeRefused();
+        ItShouldKeepTheFolder();
+
+        void ItShouldBeRefused() => exception.ShouldBeOfType<InvalidOperationException>()
+            .Message.ShouldStartWith($"`{nameof(FileTools.DeleteDirectory)}` is not allowed while weaving research facts.", Case.Sensitive);
+
+        void ItShouldKeepTheFolder() => Directory.Exists(WikiPath("projects/empty")).ShouldBeTrue();
+    }
+
+    private string WikiPath(string path) => Path.Combine(_wiki.Settings.WikiDirectory, path);
+
     private static bool IsPersonal(string wikiPath) =>
         wikiPath.Split(['/', '\\', ':'])[0] is "me" or "people";
 
@@ -161,6 +257,25 @@ public sealed class FileToolsTests : IAsyncDisposable
             new AgentRunTrigger(AgentRunTriggerKind.Facts, "facts.json"),
             origin,
             origin == FactOrigin.Research ? Topic : null,
+            async _ =>
+            {
+                result = await call(tools);
+                return new AgentResponse(new ChatMessage(ChatRole.Assistant, "Done."));
+            },
+            CancellationToken.None);
+        return (result, run.Value);
+    }
+
+    /// <summary>Runs the Editor over open findings, with <paramref name="call"/> as what it does.</summary>
+    private async Task<(T Result, AgentRun Run)> InEditorRunAsync<T>(Func<FileTools, Task<T>> call)
+    {
+        FileTools tools = _wiki.Get<FileTools>();
+        T result = default!;
+        Result<AgentRun, Error> run = await _wiki.Get<AgentRunTracker>().RunAsync(
+            KnownAgents.Editor,
+            new AgentRunTrigger(AgentRunTriggerKind.Findings, "findings"),
+            FactOrigin.Author,
+            null,
             async _ =>
             {
                 result = await call(tools);
